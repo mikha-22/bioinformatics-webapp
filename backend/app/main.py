@@ -1,9 +1,14 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from typing import List, Dict
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
+import uvicorn
 
 app = FastAPI()
+
+templates = Jinja2Templates(directory="../../templates")
 
 # CORS middleware to allow cross-origin requests
 app.add_middleware(
@@ -13,6 +18,13 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
+
+@app.get("/", response_class=HTMLResponse)
+async def main_page(request: Request):
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request}
+    )
 
 @app.get("/files", response_model=List[Dict[str, str]])
 async def get_files():
@@ -65,3 +77,6 @@ async def get_results():
         return result
     except FileNotFoundError:
         return []  # Return an empty list if the directory doesn't exist
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=8000)
