@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from typing import List, Dict
 import subprocess
@@ -10,8 +11,13 @@ from pydantic import BaseModel
 # Initialize FastAPI app
 app = FastAPI()
 
+# Project root directory (adjust based on `main.py` location)
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_APP_DIR = Path(__file__).parent
+FRONTEND_DIR = PROJECT_ROOT / "frontend"
+
 # Ensure Jinja2Templates points to the correct path
-TEMPLATES_DIR = Path(__file__).parent / "templates"
+TEMPLATES_DIR = BACKEND_APP_DIR / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 # Configure CORS
@@ -23,8 +29,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Project root directory (adjust based on `main.py` location)
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+# Mount the frontend directory to serve static files (CSS, JavaScript, HTML, etc.)
+app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
 class PipelineInput(BaseModel):
     forward_reads_file: str
@@ -44,6 +50,16 @@ def get_directory_contents(directory: Path) -> List[Dict[str, str]]:
 async def main_page(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+@app.get("/run_pipeline", response_class=HTMLResponse)
+async def run_pipeline_page():
+    """Serves the Run Pipeline HTML page from the frontend directory."""
+    html_path = FRONTEND_DIR / "pages" / "run_pipeline" / "run_pipeline.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="Run pipeline page not found.")
+    with open(html_path, "r") as f:
+        content = f.read()
+    return HTMLResponse(content=content)
+
 @app.get("/files", response_model=List[Dict[str, str]])
 async def get_files():
     """Returns a list of files and directories in 'bioinformatics/data'."""
@@ -57,7 +73,7 @@ async def get_results():
     return get_directory_contents(results_dir)
 
 @app.post("/run_pipeline")
-async def run_pipeline(input_data: PipelineInput):
+async def trigger_pipeline(input_data: PipelineInput):
     """Triggers the bioinformatics pipeline script with selected files."""
     pipeline_script_path = PROJECT_ROOT / "backend" / "app" / "pipeline.sh"
     data_dir = PROJECT_ROOT / "bioinformatics" / "data"
