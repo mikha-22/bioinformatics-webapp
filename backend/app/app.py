@@ -30,7 +30,7 @@ app.add_middleware(
 )
 
 # Mount the frontend directory to serve static files (CSS, JavaScript, HTML, etc.)
-app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+app.mount("/frontend", StaticFiles(directory=str(FRONTEND_DIR)), name="frontend_static")
 
 class PipelineInput(BaseModel):
     forward_reads_file: str
