@@ -6,6 +6,7 @@
     in the project root
 
 The structure of this project is as follows:
+```
 .
 ├── backend
 │   └── app
@@ -19,4 +20,4 @@ The structure of this project is as follows:
 │   └── templates
 ├── main.py
 └── README.md
-
+```
