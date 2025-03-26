@@ -22,10 +22,7 @@ function displayOutputFiles(files) {
     if (files && files.length > 0) {
         files.forEach(file => {
             const listItem = document.createElement('li');
-            const downloadLink = document.createElement('a');
-            downloadLink.href = `/results/${file.name}`; // Assuming your backend serves files from /results
-            downloadLink.textContent = file.name;
-            listItem.appendChild(downloadLink);
+            listItem.textContent = file.name; // Directly set the text content (making it unclickable)
             filesList.appendChild(listItem);
         });
     } else {

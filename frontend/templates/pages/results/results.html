@@ -16,15 +16,13 @@
         </div>
         <ul id="files-list" class="list-group list-group-flush">
             {% for file in output_files %}
-                <li class="list-group-item"><a href="/results/{{ file.name }}">{{ file.name }}</a></li>
+                <li class="list-group-item">{{ file.name }}</li>
             {% else %}
                 <li class="list-group-item">No output files found.</li>
-            {% endfor %}
+           {% endfor %}
         </ul>
-        <div class="card-body">
-            <p class="mb-0"><a href="/run_pipeline" class="btn btn-secondary"><i class="bi bi-arrow-left-circle-fill"></i> Go back to Run Pipeline</a></p>
-        </div>
     </div>
+
 {% endblock %}
 
 {% block scripts %}
