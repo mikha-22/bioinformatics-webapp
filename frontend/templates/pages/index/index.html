@@ -3,19 +3,6 @@
 {% block title %}Bioinformatics Webapp - Home{% endblock %}
 
 {% block content %}
-    <div id="pipeline-status-indicator" class="pipeline-status">
-        <div id="pipeline-status-icon">
-            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-        </div>
-        <div id="pipeline-status-popup" class="pipeline-status-popup">
-            <p>No pipeline currently running.</p>
-            <div class="progress">
-                <div class="progress-bar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-            </div>
-        </div>
-    </div>
-
     <h1>Welcome to Your Bioinformatics App</h1>
     <p>This is the main page of your application.</p>
-    <a href="/run_pipeline" class="btn btn-primary">Run Pipeline</a>
 {% endblock %}

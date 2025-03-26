@@ -5,7 +5,6 @@ body {
     background-color: #f8f9fa; /* Light gray background */
     color: #333; /* Dark gray text for good contrast */
     line-height: 1.6; /* Improves readability */
-    padding-top: 60px; /* Add some padding at the top for a fixed navigation bar (if you add one later) */
 }
 
 .container {

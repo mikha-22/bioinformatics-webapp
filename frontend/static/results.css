@@ -1,21 +1,37 @@
-/* frontend/static/results.css */
-
-/* Remove bullet points from the output files list */
-#files-list {
+/* Remove bullet points */
+ul {
     list-style-type: none;
     padding-left: 0;
 }
 
-/* Style the links in the list group */
-#files-list .list-group-item a {
-    display: block;
-    text-decoration: none;
-    color: #333;
-    padding: 0.75rem 1.25rem; /* Adjust padding as needed */
-    margin-left: -1.25rem; /* Negative margin to offset default list-group-item padding */
-    margin-right: -1.25rem; /* Negative margin to ensure full width */
+/* Style the blue output files bar */
+.output-files-header {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 15px;
+    display: flex;
+    align-items: center;
 }
 
-#files-list .list-group-item a:hover {
+.output-files-header i {
+    margin-right: 10px;
+}
+
+/* Style the file name */
+.output-file-name {
+    padding: 10px 15px;
     background-color: #f8f9fa;
+}
+
+.output-file-name a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.output-file-name a:hover {
+    text-decoration: underline;
+}
+
+.container .list-group {
+    padding: 0.75rem 1.5rem;
 }
