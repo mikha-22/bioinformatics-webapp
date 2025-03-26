@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Request, HTTPException
+import asyncio
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -8,7 +9,6 @@ from typing import List, Dict
 import subprocess
 from pydantic import BaseModel
 
-# Initialize FastAPI app
 app = FastAPI()
 
 # Project root directory (adjust based on `main.py` location)
@@ -47,18 +47,12 @@ def get_directory_contents(directory: Path) -> List[Dict[str, str]]:
     return [{"name": item.name, "type": "directory" if item.is_dir() else "file"} for item in directory.iterdir()]
 
 @app.get("/", response_class=HTMLResponse)
-async def main_page():
-    """Serves the main index.html page from the frontend directory."""
-    html_path = FRONTEND_DIR / "pages" / "index" / "index.html"
-    if not html_path.exists():
-        raise HTTPException(status_code=404, detail="Main index page not found in /frontend.")
-    with open(html_path, "r") as f:
-        content = f.read()
-    return HTMLResponse(content=content)
+async def main_page(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/run_pipeline", response_class=HTMLResponse)
-async def run_pipeline_page():
-    """Serves the Run Pipeline HTML page from the frontend directory."""
+async def run_pipeline_page(request: Request):
+    """Serves the Run Pipeline HTML page."""
     html_path = FRONTEND_DIR / "pages" / "run_pipeline" / "run_pipeline.html"
     if not html_path.exists():
         raise HTTPException(status_code=404, detail="Run pipeline page not found.")
@@ -78,9 +72,78 @@ async def get_results():
     results_dir = PROJECT_ROOT / "bioinformatics" / "results"
     return get_directory_contents(results_dir)
 
+connected_clients = set()
+pipeline_process = None
+pipeline_status = {"status": "idle", "current_file": "N/A", "progress": 0}
+
+async def send_pipeline_status(status: Dict):
+    for client in list(connected_clients):
+        try:
+            await client.send_json(status)
+        except Exception:
+            connected_clients.discard(client)
+
+@app.websocket("/ws/pipeline_status")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    connected_clients.add(websocket)
+    try:
+        await send_pipeline_status(pipeline_status) # Send initial status on connection
+        while True:
+            await websocket.receive_text() # Keep connection alive
+            # You might want to handle messages from the client here in the future
+    except WebSocketDisconnect:
+        connected_clients.remove(websocket)
+
+async def run_pipeline_async(command: List[str]):
+    global pipeline_process
+    global pipeline_status
+    pipeline_status["status"] = "running"
+    pipeline_status["current_file"] = "Starting..."
+    pipeline_status["progress"] = 0
+    await send_pipeline_status(pipeline_status)
+    process = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+    pipeline_process = process
+    while True:
+        if process.stdout.at_eof():
+            break
+        line = await process.stdout.readline()
+        if line:
+            print(f"Pipeline Output: {line.strip()}")
+            if line.startswith("status::"):
+                pipeline_status["current_file"] = line[len("status::"):].strip()
+                await send_pipeline_status(pipeline_status)
+            elif line.startswith("progress::"):
+                try:
+                    pipeline_status["progress"] = int(line[len("progress::"):].strip())
+                    await send_pipeline_status(pipeline_status)
+                except ValueError:
+                    pass
+        await asyncio.sleep(0.1)
+
+    stdout, stderr = await process.communicate()
+    if process.returncode == 0:
+        pipeline_status["status"] = "idle"
+        pipeline_status["current_file"] = "Finished"
+        pipeline_status["progress"] = 100
+    else:
+        pipeline_status["status"] = "error"
+        pipeline_status["current_file"] = "Error"
+        print(f"Pipeline Error:\n{stderr}")
+    await send_pipeline_status(pipeline_status)
+    pipeline_process = None
+
 @app.post("/run_pipeline")
 async def trigger_pipeline(input_data: PipelineInput):
-    """Triggers the bioinformatics pipeline script with selected files."""
+    global pipeline_process
+    if pipeline_process is not None and pipeline_process.returncode is None:
+        raise HTTPException(status_code=400, detail="Pipeline is already running.")
+
     pipeline_script_path = PROJECT_ROOT / "backend" / "app" / "pipeline.sh"
     data_dir = PROJECT_ROOT / "bioinformatics" / "data"
 
@@ -110,12 +173,5 @@ async def trigger_pipeline(input_data: PipelineInput):
         str(known_variants_path),
     ]
 
-    try:
-        process = subprocess.run(command, capture_output=True, text=True, check=True)
-        return JSONResponse(content={"message": "Pipeline executed successfully.", "stdout": process.stdout, "stderr": process.stderr})
-    except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=f"Pipeline execution failed: {e}")
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="One or more input files not found (this might be due to an issue with constructing the path).")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred while running the pipeline: {e}")
+    asyncio.create_task(run_pipeline_async(command))
+    return JSONResponse(content={"message": "Pipeline started in the background."})
