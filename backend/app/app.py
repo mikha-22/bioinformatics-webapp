@@ -17,7 +17,7 @@ BACKEND_APP_DIR = Path(__file__).parent
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
 
 # Ensure Jinja2Templates points to the correct path (still needed for /run_pipeline)
-TEMPLATES_DIR = BACKEND_APP_DIR / "templates"
+TEMPLATES_DIR = FRONTEND_DIR / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 # Configure CORS
@@ -54,7 +54,7 @@ async def main_page():
 @app.get("/run_pipeline", response_class=HTMLResponse)
 async def run_pipeline_page(request: Request):
     """Serves the Run Pipeline HTML page."""
-    html_path = FRONTEND_DIR / "pages" / "run_pipeline" / "run_pipeline.html"
+    html_path = FRONTEND_DIR / "templates" / "pages" / "run_pipeline" / "run_pipeline.html"
     if not html_path.exists():
         raise HTTPException(status_code=404, detail="Run pipeline page not found.")
     with open(html_path, "r") as f:
