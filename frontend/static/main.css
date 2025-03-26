@@ -1,0 +1,44 @@
+/* frontend/static/global/styles/main.css */
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* A clean and readable sans-serif font */
+    background-color: #f8f9fa; /* Light gray background */
+    color: #333; /* Dark gray text for good contrast */
+    line-height: 1.6; /* Improves readability */
+    padding-top: 60px; /* Add some padding at the top for a fixed navigation bar (if you add one later) */
+}
+
+.container {
+    max-width: 1200px; /* Limit the maximum width of the main content */
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 15px;
+    padding-right: 15px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: #007bff; /* Use the primary Bootstrap color for headings */
+    margin-bottom: 0.75rem;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+a {
+    color: #007bff; /* Primary Bootstrap color for links */
+    text-decoration: none; /* Remove underlines by default */
+}
+
+a:hover {
+    color: #0056b3; /* Darker shade of primary color on hover */
+    text-decoration: underline; /* Add underline on hover for better indication */
+}
+
+.btn-primary {
+    /* Keep the default Bootstrap primary button style */
+}
+
+.btn-secondary {
+    /* Keep the default Bootstrap secondary button style */
+}
+
+/* You can add more global styles here as needed, such as for navigation, footers, etc. */

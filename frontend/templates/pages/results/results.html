@@ -4,22 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pipeline Results</title>
-    <link rel="stylesheet" href="/frontend/static/global/styles/main.css">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/frontend/static/main.css">
+    <link rel="stylesheet" href="/frontend/static/results.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Pipeline Run Results</h1>
+    <div class="container mt-5">
+        <h1 class="mb-4">Pipeline Run Results</h1>
 
-        <section id="output-files">
-            <h2>Output Files</h2>
-            <ul id="files-list">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-file-earmark-text-fill"></i> Output Files
+            </div>
+            <ul id="files-list" class="list-group list-group-flush">
                 </ul>
-        </section>
-
-        <p><a href="/">Go back to Run Pipeline</a></p>
+            <div class="card-body">
+                <p class="mb-0"><a href="/" class="btn btn-secondary"><i class="bi bi-arrow-left-circle-fill"></i> Go back to Run Pipeline</a></p>
+            </div>
+        </div>
     </div>
 
     <script src="/frontend/static/main.js"></script>
     <script src="/frontend/static/results.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
 </body>
 </html>
