@@ -2,7 +2,7 @@ import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from typing import List, Dict
@@ -16,7 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_APP_DIR = Path(__file__).parent
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
 
-# Ensure Jinja2Templates points to the correct path
+# Ensure Jinja2Templates points to the correct path (still needed for /run_pipeline)
 TEMPLATES_DIR = BACKEND_APP_DIR / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
@@ -46,9 +46,10 @@ def get_directory_contents(directory: Path) -> List[Dict[str, str]]:
 
     return [{"name": item.name, "type": "directory" if item.is_dir() else "file"} for item in directory.iterdir()]
 
-@app.get("/", response_class=HTMLResponse)
-async def main_page(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+@app.get("/", response_class=RedirectResponse)
+async def main_page():
+    """Redirects the root path to the frontend's index.html."""
+    return RedirectResponse("/frontend/pages/index/index.html")
 
 @app.get("/run_pipeline", response_class=HTMLResponse)
 async def run_pipeline_page(request: Request):
