@@ -46,20 +46,15 @@ def get_directory_contents(directory: Path) -> List[Dict[str, str]]:
 
     return [{"name": item.name, "type": "directory" if item.is_dir() else "file"} for item in directory.iterdir()]
 
-@app.get("/", response_class=RedirectResponse)
-async def main_page():
-    """Redirects the root path to the frontend's index.html."""
-    return RedirectResponse("/frontend/static/pages/index/index.html")
+@app.get("/", response_class=HTMLResponse)
+async def main_page(request: Request):
+    """Serves the main index.html page from the frontend templates."""
+    return templates.TemplateResponse("pages/index/index.html", {"request": request})
 
 @app.get("/run_pipeline", response_class=HTMLResponse)
 async def run_pipeline_page(request: Request):
-    """Serves the Run Pipeline HTML page."""
-    html_path = FRONTEND_DIR / "templates" / "pages" / "run_pipeline" / "run_pipeline.html"
-    if not html_path.exists():
-        raise HTTPException(status_code=404, detail="Run pipeline page not found.")
-    with open(html_path, "r") as f:
-        content = f.read()
-    return HTMLResponse(content=content)
+    """Serves the Run Pipeline HTML page from the frontend templates."""
+    return templates.TemplateResponse("pages/run_pipeline/run_pipeline.html", {"request": request})
 
 @app.get("/files", response_model=List[Dict[str, str]])
 async def get_files():
@@ -134,45 +129,4 @@ async def run_pipeline_async(command: List[str]):
         pipeline_status["progress"] = 100
     else:
         pipeline_status["status"] = "error"
-        pipeline_status["current_file"] = "Error"
-        print(f"Pipeline Error:\n{stderr}")
-    await send_pipeline_status(pipeline_status)
-    pipeline_process = None
-
-@app.post("/run_pipeline")
-async def trigger_pipeline(input_data: PipelineInput):
-    global pipeline_process
-    if pipeline_process is not None and pipeline_process.returncode is None:
-        raise HTTPException(status_code=400, detail="Pipeline is already running.")
-
-    pipeline_script_path = PROJECT_ROOT / "backend" / "app" / "pipeline.sh"
-    data_dir = PROJECT_ROOT / "bioinformatics" / "data"
-
-    forward_reads_path = data_dir / input_data.forward_reads_file
-    reverse_reads_path = data_dir / input_data.reverse_reads_file
-    reference_genome_path = data_dir / input_data.reference_genome_file
-    target_regions_path = data_dir / input_data.target_regions_file
-    known_variants_path = data_dir / input_data.known_variants_file if input_data.known_variants_file else ""
-
-    if not pipeline_script_path.exists():
-        raise HTTPException(status_code=500, detail=f"Pipeline script not found at {pipeline_script_path}")
-
-    # Check if the selected files exist
-    for path in [forward_reads_path, reverse_reads_path, reference_genome_path, target_regions_path]:
-        if not path.exists():
-            raise HTTPException(status_code=404, detail=f"Input file not found: {path.name}")
-    if known_variants_path and not Path(known_variants_path).exists():
-        raise HTTPException(status_code=404, detail=f"Input file not found: {Path(known_variants_path).name}")
-
-    command = [
-        "bash",
-        str(pipeline_script_path),
-        str(forward_reads_path),
-        str(reverse_reads_path),
-        str(reference_genome_path),
-        str(target_regions_path),
-        str(known_variants_path),
-    ]
-
-    asyncio.create_task(run_pipeline_async(command))
-    return JSONResponse(content={"message": "Pipeline started in the background."})
+        pipeline
