@@ -47,8 +47,14 @@ def get_directory_contents(directory: Path) -> List[Dict[str, str]]:
     return [{"name": item.name, "type": "directory" if item.is_dir() else "file"} for item in directory.iterdir()]
 
 @app.get("/", response_class=HTMLResponse)
-async def main_page(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+async def main_page():
+    """Serves the main index.html page from the frontend directory."""
+    html_path = FRONTEND_DIR / "pages" / "index" / "index.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="Main index page not found in /frontend.")
+    with open(html_path, "r") as f:
+        content = f.read()
+    return HTMLResponse(content=content)
 
 @app.get("/run_pipeline", response_class=HTMLResponse)
 async def run_pipeline_page():
