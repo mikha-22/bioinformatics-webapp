@@ -16,7 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_APP_DIR = Path(__file__).parent
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
 
-# Ensure Jinja2Templates points to the correct path (still needed for /run_pipeline)
+# Ensure Jinja2Templates points to the correct path
 TEMPLATES_DIR = FRONTEND_DIR / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
@@ -29,8 +29,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount the frontend directory to serve static files (CSS, JavaScript, HTML, etc.)
-app.mount("/frontend", StaticFiles(directory=str(FRONTEND_DIR)), name="frontend_static")
+# Mount the frontend static files directory
+app.mount("/frontend/static", StaticFiles(directory=str(FRONTEND_DIR / "static")), name="frontend_static")
 
 class PipelineInput(BaseModel):
     forward_reads_file: str
@@ -49,7 +49,7 @@ def get_directory_contents(directory: Path) -> List[Dict[str, str]]:
 @app.get("/", response_class=RedirectResponse)
 async def main_page():
     """Redirects the root path to the frontend's index.html."""
-    return RedirectResponse("/frontend/pages/index/index.html")
+    return RedirectResponse("/frontend/static/pages/index/index.html")
 
 @app.get("/run_pipeline", response_class=HTMLResponse)
 async def run_pipeline_page(request: Request):
