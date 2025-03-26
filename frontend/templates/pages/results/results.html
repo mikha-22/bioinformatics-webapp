@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeline Results</title>
+    <link rel="stylesheet" href="/frontend/static/global/styles/main.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Pipeline Run Results</h1>
+
+        <section id="run-info">
+            <h2>Run Information</h2>
+            <p><strong>Pipeline Name:</strong> <span id="pipeline-name"></span></p>
+            <p><strong>Input Forward Reads:</strong> <span id="input-forward-reads"></span></p>
+            <p><strong>Input Reverse Reads:</strong> <span id="input-reverse-reads"></span></p>
+            <p><strong>Reference Genome:</strong> <span id="reference-genome"></span></p>
+            <p><strong>Target Regions:</strong> <span id="target-regions"></span></p>
+            <p><strong>Run Status:</strong> <span id="run-status"></span></p>
+            <p><strong>Start Time:</strong> <span id="start-time"></span></p>
+            <p><strong>End Time:</strong> <span id="end-time"></span></p>
+        </section>
+
+        <section id="summary-metrics">
+            <h2>Summary Metrics</h2>
+            <ul id="metrics-list">
+                </ul>
+        </section>
+
+        <section id="output-files">
+            <h2>Output Files</h2>
+            <ul id="files-list">
+                </ul>
+        </section>
+
+        <p><a href="/">Go back to Run Pipeline</a></p>
+    </div>
+
+    <script src="/frontend/static/global/scripts/main.js"></script>
+    <script src="/frontend/static/pages/results/results.js"></script>
+</body>
+</html>
