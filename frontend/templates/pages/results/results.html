@@ -1,31 +1,32 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pipeline Results</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <link rel="stylesheet" href="/frontend/static/main.css">
-    <link rel="stylesheet" href="/frontend/static/results.css">
-</head>
-<body>
-    <div class="container mt-5">
-        <h1 class="mb-4">Pipeline Run Results</h1>
+{% extends 'base.html' %}
 
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-                <i class="bi bi-file-earmark-text-fill"></i> Output Files
-            </div>
-            <ul id="files-list" class="list-group list-group-flush">
-                </ul>
-            <div class="card-body">
-                <p class="mb-0"><a href="/" class="btn btn-secondary"><i class="bi bi-arrow-left-circle-fill"></i> Go back to Run Pipeline</a></p>
-            </div>
+{% block title %}Pipeline Results{% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" href="/frontend/static/results.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+{% endblock %}
+
+{% block content %}
+    <h1 class="mb-4">Pipeline Run Results</h1>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <i class="bi bi-file-earmark-text-fill"></i> Output Files
+        </div>
+        <ul id="files-list" class="list-group list-group-flush">
+            {% for file in output_files %}
+                <li class="list-group-item"><a href="/results/{{ file.name }}">{{ file.name }}</a></li>
+            {% else %}
+                <li class="list-group-item">No output files found.</li>
+            {% endfor %}
+        </ul>
+        <div class="card-body">
+            <p class="mb-0"><a href="/run_pipeline" class="btn btn-secondary"><i class="bi bi-arrow-left-circle-fill"></i> Go back to Run Pipeline</a></p>
         </div>
     </div>
+{% endblock %}
 
-    <script src="/frontend/static/main.js"></script>
+{% block scripts %}
     <script src="/frontend/static/results.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-</body>
-</html>
+{% endblock %}

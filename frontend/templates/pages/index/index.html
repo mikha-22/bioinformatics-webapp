@@ -1,13 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your Bioinformatics App</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <link rel="stylesheet" href="/frontend/global/styles/main.css">
-    </head>
-<body>
+{% extends 'base.html' %}
+
+{% block title %}Bioinformatics Webapp - Home{% endblock %}
+
+{% block content %}
     <div id="pipeline-status-indicator" class="pipeline-status">
         <div id="pipeline-status-icon">
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -20,12 +15,7 @@
         </div>
     </div>
 
-    <div class="container mt-5">
-        <h1>Welcome to Your Bioinformatics App</h1>
-        <p>This is the main page of your application.</p>
-        <a href="/run_pipeline" class="btn btn-primary">Run Pipeline</a>
-        </div>
-
-    <script src="/frontend/global/scripts/main.js"></script>
-    </body>
-</html>
+    <h1>Welcome to Your Bioinformatics App</h1>
+    <p>This is the main page of your application.</p>
+    <a href="/run_pipeline" class="btn btn-primary">Run Pipeline</a>
+{% endblock %}
