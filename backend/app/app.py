@@ -61,11 +61,17 @@ async def results_page(request: Request):
     """Serves the Results HTML page."""
     return templates.TemplateResponse("pages/results/results.html", {"request": request})
 
-@app.get("/files", response_model=List[Dict[str, str]])
-async def get_files():
+@app.get("/get_data", response_model=List[Dict[str, str]])
+async def get_data():
     """Returns a list of files and directories in 'bioinformatics/data'."""
     data_dir = PROJECT_ROOT / "bioinformatics" / "data"
     return get_directory_contents(data_dir)
+
+@app.get("/get_results", response_model=List[Dict[str, str]])
+async def get_results():
+    """Returns a list of files and directories in 'bioinformatics/results'."""
+    results_dir = PROJECT_ROOT / "bioinformatics" / "results"
+    return get_directory_contents(results_dir)
 
 connected_clients = set()
 pipeline_process = None
