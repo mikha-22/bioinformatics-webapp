@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Fetch the list of files from the backend
-    fetch('/files')
+    fetch('/get_data')
         .then(response => response.json())
         .then(data => {
             populateDropdown(forwardReadsSelect, data, ['.fastq', '.fastq.gz']);
