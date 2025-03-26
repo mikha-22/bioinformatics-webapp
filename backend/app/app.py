@@ -53,20 +53,19 @@ async def main_page(request: Request):
 
 @app.get("/run_pipeline", response_class=HTMLResponse)
 async def run_pipeline_page(request: Request):
-    """Serves the Run Pipeline HTML page from the frontend templates."""
+    """Serves the Run Pipeline HTML page."""
     return templates.TemplateResponse("pages/run_pipeline/run_pipeline.html", {"request": request})
+
+@app.get("/results", response_class=HTMLResponse) # Add this route
+async def results_page(request: Request):
+    """Serves the Results HTML page."""
+    return templates.TemplateResponse("pages/results/results.html", {"request": request})
 
 @app.get("/files", response_model=List[Dict[str, str]])
 async def get_files():
     """Returns a list of files and directories in 'bioinformatics/data'."""
     data_dir = PROJECT_ROOT / "bioinformatics" / "data"
     return get_directory_contents(data_dir)
-
-@app.get("/results", response_model=List[Dict[str, str]])
-async def get_results():
-    """Returns a list of files and directories in 'bioinformatics/results'."""
-    results_dir = PROJECT_ROOT / "bioinformatics" / "results"
-    return get_directory_contents(results_dir)
 
 connected_clients = set()
 pipeline_process = None
@@ -129,4 +128,18 @@ async def run_pipeline_async(command: List[str]):
         pipeline_status["progress"] = 100
     else:
         pipeline_status["status"] = "error"
-        pipeline
+        pipeline_status["current_file"] = "Error"
+        print(f"Pipeline Error:\n{stderr}")
+    await send_pipeline_status(pipeline_status)
+    pipeline_process = None
+
+@app.post("/run_pipeline")
+async def trigger_pipeline(input_data: PipelineInput):
+    global pipeline_process
+    if pipeline_process is not None and pipeline_process.returncode is None:
+        raise HTTPException(status_code=400, detail="Pipeline is already running.")
+
+    pipeline_script_path = PROJECT_ROOT / "backend" / "app" / "pipeline.sh"
+    data_dir = PROJECT_ROOT / "bioinformatics" / "data"
+
+    forward_reads_path = data_dir / input_data.forward_reads_
