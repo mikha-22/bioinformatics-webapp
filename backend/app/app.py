@@ -107,13 +107,12 @@ async def run_pipeline_async(command: List[str]):
         *command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True
     )
     pipeline_process = process
     while True:
         if process.stdout.at_eof():
             break
-        line = await process.stdout.readline()
+        line = (await process.stdout.readline()).decode("utf-8").strip()
         if line:
             print(f"Pipeline Output: {line.strip()}")
             if line.startswith("status::"):
