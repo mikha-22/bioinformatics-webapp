@@ -88,7 +88,9 @@ h1, h2, p {
     max-width: 1200px;
     max-height: 800px;
     opacity: 1;
-    transform: scale(1);
+    top: 50%;      /* Position the top edge at the vertical center */
+    left: 50%;     /* Position the left edge at the horizontal center */
+    transform: translate(-50%, -50%) scale(1); /* Center the element and scale it up */
 }
 
 /* Close button for the iframe */
