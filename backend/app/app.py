@@ -42,7 +42,7 @@ class PipelineInput(BaseModel):
 def get_directory_contents(directory: Path) -> List[Dict[str, str]]:
     """Retrieves a list of files and directories from the specified directory."""
     if not directory.exists():
-        return# Return an empty list if the directory doesn't exist
+        return [] # Return an empty list if the directory doesn't exist
 
     return [{"name": item.name, "type": "directory" if item.is_dir() else "file"} for item in directory.iterdir()]
 
@@ -147,5 +147,37 @@ async def trigger_pipeline(input_data: PipelineInput):
 
     pipeline_script_path = PROJECT_ROOT / "backend" / "app" / "pipeline.sh"
     data_dir = PROJECT_ROOT / "bioinformatics" / "data"
+    results_dir = PROJECT_ROOT / "bioinformatics" / "results"
 
-    forward_reads_path = data_dir / input_data.forward_reads_
+    forward_reads_path = data_dir / input_data.forward_reads_file
+    reverse_reads_path = data_dir / input_data.reverse_reads_file
+    reference_genome_path = data_dir / input_data.reference_genome_file
+    target_regions_path = data_dir / input_data.target_regions_file
+    known_variants_path = data_dir / input_data.known_variants_file if input_data.known_variants_file != "None" else ""
+
+    command = [
+        "bash",
+        str(pipeline_script_path),
+        str(forward_reads_path),
+        str(reverse_reads_path),
+        str(reference_genome_path),
+        str(target_regions_path),
+        str(known_variants_path),
+    ]
+
+    print(f"Running pipeline with command: {command}") # For debugging
+
+    # Ensure the results directory exists
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    # Change the current working directory to the results directory
+    process = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=str(results_dir) # Set working directory
+    )
+
+    asyncio.create_task(run_pipeline_async(command)) # Run pipeline in the background
+
+    return JSONResponse(content={"message": "Pipeline started successfully"})
