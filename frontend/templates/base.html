@@ -6,8 +6,9 @@
     <title>{% block title %}{% endblock %}</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="/frontend/static/main.css">
-    <link rel="icon" href="/frontend/static/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="/frontend/static/floating_iframe.css"> <link rel="icon" href="/frontend/static/favicon.ico" type="image/x-icon">
     {% block head %}{% endblock %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -34,11 +35,24 @@
         {% block content %}{% endblock %}
     </div>
 
+    <button class="floating-button" id="showFileBrowser">
+        <i class="fas fa-folder"></i>
+    </button>
+
+    <div class="overlay" id="overlay"></div>
+
+    <div class="iframe-container" id="fileBrowserContainer">
+        <button class="close-btn" id="closeFileBrowser">
+            <i class="fas fa-times"></i>
+        </button>
+        <iframe src="http://localhost:8080" id="fileBrowserFrame" title="FileBrowser"></iframe>
+    </div>
+
     <footer class="mt-5 bg-light text-center py-3">
         <p>&copy; 2025 Bioinformatics Webapp</p>
     </footer>
 
     <script src="/frontend/static/main.js"></script>
-    {% block scripts %}{% endblock %}
+    <script src="/frontend/static/floating_iframe.js"></script> {% block scripts %}{% endblock %}
 </body>
 </html>
