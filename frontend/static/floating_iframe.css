@@ -2,7 +2,6 @@ body {
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
-    min-height: 5000px; /* Long page for scrolling demonstration */
     background: linear-gradient(to bottom, #f0f8ff, #e6e6fa);
 }
 
@@ -31,7 +30,7 @@ h1, h2, p {
     align-items: center;
     justify-content: center;
     z-index: 1000;
-    transition: transform 0.3s, background-color 0.3s;
+    transition: transform 0.1s, background-color 0.1s;
 }
 
 .floating-button:hover {
@@ -54,7 +53,7 @@ h1, h2, p {
     z-index: 1001;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.3s, visibility 0.3s;
+    transition: opacity 0.08s, visibility 0.08s;
 }
 
 .overlay.active {
@@ -65,8 +64,8 @@ h1, h2, p {
 /* iframe container styles */
 .iframe-container {
     position: fixed;
-    bottom: 20px; /* Set initial bottom position */
-    left: 20px;   /* Set initial left position */
+    top: 50%; /* Set initial top position */
+    left: 50%;   /* Set initial left position */
     width: 0;
     height: 0;
     background-color: #e6e6e6;
@@ -75,8 +74,8 @@ h1, h2, p {
     z-index: 1002;
     overflow: hidden;
     opacity: 0;
-    transform: scale(0.5); /* Keep the initial scale for a potential effect */
-    transition: width 0.3s, height 0.3s, opacity 0.4s, transform 0.3s;
+    transform: scale(1); /* Keep the initial scale for a potential effect */
+    transition: opacity 0.08s;
     display: flex;
     flex-direction: column;
     align-items: stretch;
@@ -85,26 +84,22 @@ h1, h2, p {
 .iframe-container.active {
     width: 80%;
     height: 80%;
-    max-width: 1200px;
-    max-height: 800px;
     opacity: 1;
-    top: 50%;      /* Position the top edge at the vertical center */
-    left: 50%;     /* Position the left edge at the horizontal center */
     transform: translate(-50%, -50%) scale(1); /* Center the element and scale it up */
 }
 
 /* Close button for the iframe */
 .close-btn {
     position: absolute;
-    top: 10px;
+    top: 8px;
     right: 10px;
     background-color: #f44336;
     color: white;
     border: none;
     border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    font-size: 16px;
+    width: 25px;
+    height: 25px;
+    font-size: 15px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -118,7 +113,8 @@ h1, h2, p {
     height: 100%;
     border: none;
     box-sizing: border-box;
-    /* margin-top: 40px; Remove this for now */
+    margin-top: 40px;
+    margin-bottom: 20px;
 }
 
 /* Sample sections for the long page */
