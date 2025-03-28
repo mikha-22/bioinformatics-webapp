@@ -1,25 +1,28 @@
 name: Docker Build and Push to GHCR
 
+# Controls when the action will run.
 on:
   push:
     branches:
-      - main
+      - main # Trigger on pushes to the main branch
+  pull_request:
+    branches:
+      - main # Trigger on Pull Requests targeting the main branch
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read
-      packages: write
+      contents: read   # For checkout
+      packages: write  # For pushing packages to GHCR (only on push to main)
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      # Set up Docker Buildx for advanced features like caching
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3 # <-- ADD THIS STEP
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -32,14 +35,18 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          # *** IMPORTANT: Ensure Dockerfile path is correct ***
-          # If your Dockerfile is in the root: file: ./Dockerfile
-          # If your Dockerfile is in ./docker/: file: ./docker/Dockerfile
-          file: ./docker/Dockerfile # Adjust this path if your Dockerfile is not in the root!
-          push: true
+          # Ensure this path points to your actual Dockerfile
+          file: ./docker/Dockerfile
+          # Push ONLY when the trigger is a push event to the 'main' branch
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          # Define tags: latest and commit-<full-sha>
           tags: |
             ghcr.io/mikha-22/bioinformatics-webapp:latest
-          # ghcr.io/mikha-22/bioinformatics-webapp:sha-${{ substr(github.sha, 0, 7) }} # Still commented out
-          # Cache settings should now work with Buildx set up
+            ghcr.io/mikha-22/bioinformatics-webapp:commit-${{ github.sha }}
+          # Pass the current branch name (e.g., 'main') as a build argument
+          # This overrides the default in your Dockerfile's ARG BRANCH
+          build-args: |
+            BRANCH=${{ github.ref_name }}
+          # Cache settings
           cache-from: type=gha
           cache-to: type=gha,mode=max
