@@ -31,7 +31,7 @@ RUN git clone --branch ${BRANCH} --depth 1 ${REPO_URL} /build/app \
 RUN mkdir -p /opt/conda/envs/ && \
     tar -xzf /build/app/docker/bio-webapp.tar.gz -C /opt/conda/envs/ && \
     echo "Running Conda clean..." && \
-    /opt/conda/bin/conda clean --all -y && \ # <-- CORRECTED PATH
+    /opt/conda/bin/conda clean --all -y && \
     echo "Removing source tarball..." && \
     rm /build/app/docker/bio-webapp.tar.gz
 
