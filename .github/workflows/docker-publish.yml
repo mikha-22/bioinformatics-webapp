@@ -1,57 +1,55 @@
 name: Docker Build and Push to GHCR
 
 # Controls when the action will run.
-# Triggers the workflow on push events but only for the main branch (adjust as needed)
+# Triggers the workflow on push events to the 'main' branch.
+# IMPORTANT: Your Dockerfile clones 'development' by default. Make sure this is intended.
+# If you want pushes to 'main' to build 'main', change ARG BRANCH in Dockerfile.
+# If you want pushes to 'development' to build 'development', change the branch below to 'development'.
 on:
   push:
     branches:
-      - main # Or 'development' if you want to build from that branch
+      - main
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   build-and-push:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
-    # Grant GITHUB_TOKEN permissions for the login action to authenticate with GHCR
+    # Permissions: contents:read is still needed for checkout.
+    # packages:write isn't strictly needed for the PAT login itself,
+    # but doesn't hurt to leave if other steps might use GITHUB_TOKEN for package interactions.
     permissions:
-      contents: read # Needed to checkout the code
-      packages: write # Needed to push packages to GHCR
+      contents: read
+      packages: write # Optional here, but safe to include
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - name: Check out repository
         uses: actions/checkout@v4
 
-      # Log in to GitHub Container Registry
+      # Log in to GitHub Container Registry using a Personal Access Token (PAT)
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          # Use the automatically generated GITHUB_TOKEN for authentication
-          # Alternatively, use the PAT stored in secrets:
-          # username: ${{ github.actor }} # Or github.repository_owner
-          # password: ${{ secrets.GITHUB_TOKEN }} # Recommended for simplicity if permissions suffice
-          # If GITHUB_TOKEN doesn't work (sometimes needs fine-grained PAT), uncomment below and comment above:
-          username: ${{ github.repository_owner }}
+          # Use the user who triggered the workflow or the repository owner
+          username: ${{ github.actor }}
+          # Use the PAT stored in the GHCR_PAT secret
           password: ${{ secrets.GHCR_PAT }}
 
       # Build and push the Docker image
-      # Uses docker/build-push-action to build and push the image to GHCR
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: . # Use the current directory as the build context
-          file: ./docker/Dockerfile # Specify the Dockerfile location
-          push: true # Push the image after building
-          tags: | # Define the tags for the image
-            ghcr.io/${{ lower(github.repository_owner) }}/${{ lower(github.event.repository.name) }}:latest
-            ghcr.io/${{ lower(github.repository_owner) }}/${{ lower(github.event.repository.name) }}:sha-${{ substr(github.sha, 0, 7) }}
-          # Optional: Add build arguments if your Dockerfile needs them
-          # build-args: |
-          #   arg1=value1
-          #   arg2=value2
-          # Optional: Enable Docker layer caching for faster builds
+          # Path to the directory containing the Dockerfile and build context
+          context: .
+          # Path to the Dockerfile relative to the context
+          file: ./Dockerfile
+          # Push the image after building
+          push: true
+          # Define the tags using your specific username and repo name
+          tags: |
+            ghcr.io/mikha-22/bioinformatics-webapp:latest
+            ghcr.io/mikha-22/bioinformatics-webapp:sha-${{ substr(github.sha, 0, 7) }}
+          # Enable Docker layer caching for potentially faster builds
           cache-from: type=gha
           cache-to: type=gha,mode=max
