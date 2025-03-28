@@ -28,10 +28,9 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./docker/Dockerfile
           push: true
           tags: |
             ghcr.io/mikha-22/bioinformatics-webapp:latest
-            # ghcr.io/mikha-22/bioinformatics-webapp:sha-${{ substr(github.sha, 0, 7) }} # Temporarily commented out for debugging
           cache-from: type=gha
           cache-to: type=gha,mode=max
