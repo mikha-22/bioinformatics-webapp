@@ -1,7 +1,7 @@
 #-------------------------------------------------------------------
 # Stage 1: Builder Stage
 #-------------------------------------------------------------------
-# Use Miniforge as the base image for building
+# Use Miniforge as the base img for building
 FROM condaforge/mambaforge AS builder
 
 # Set working directory
