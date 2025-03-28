@@ -7,7 +7,8 @@ FROM condaforge/mambaforge AS builder
 # Set working directory
 WORKDIR /build
 
-# Install build-time dependencies (Git, Tar, Curl, Coreutils)
+# Install build-time dependencies (Git, Curl, Bash, Coreutils)
+# Tar is no longer strictly needed for env creation, but kept for general utility
 # Clean up apt cache in the same layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
@@ -24,16 +25,15 @@ ARG BRANCH=main
 RUN git clone --branch ${BRANCH} --depth 1 ${REPO_URL} /build/app \
     && rm -rf /build/app/.git # Remove .git folder immediately
 
-# --- Setup and Clean Conda Environment ---
-# Extract the environment from the tarball within the cloned repo
-# IMPORTANT: Clean the Conda environment afterwards to remove caches/tarballs
-# Clean up the source tarball as well
-RUN mkdir -p /opt/conda/envs/ && \
-    tar -xzf /build/app/docker/bio-webapp.tar.gz -C /opt/conda/envs/ && \
-    echo "Running Conda clean..." && \
-    /opt/conda/bin/conda clean --all -y && \
-    echo "Removing source tarball..." && \
-    rm /build/app/docker/bio-webapp.tar.gz
+# --- Create and Clean Conda Environment from YAML ---
+# Uses mamba for faster environment creation from the YML file in the cloned repo
+# Cleans the Conda cache afterwards to reduce layer size
+# Assumes your conda_env.yml specifies 'name: bio-webapp'
+RUN echo "Creating Conda environment 'bio-webapp' from YAML..." && \
+    /opt/conda/bin/mamba env create -f /build/app/conda_env.yml && \
+    echo "Cleaning Conda cache..." && \
+    /opt/conda/bin/conda clean --all -y
+    # No source tarball to remove
 
 # --- Install File Browser ---
 # Install File Browser using bash - it usually installs to /usr/local/bin
@@ -49,18 +49,22 @@ RUN mkdir -p /build/config_staging && \
 #-------------------------------------------------------------------
 # Stage 2: Final Stage
 #-------------------------------------------------------------------
-# Use the same base image or potentially a smaller one if compatible (e.g., miniforge3)
-# Using mambaforge for consistency, but only copying essentials.
+# Use the same base image for consistency
 FROM condaforge/mambaforge
 
 # Set required Conda environment variables
+# Ensure the name here matches the 'name:' field in your conda_env.yml
 ENV PATH="/opt/conda/envs/bio-webapp/bin:$PATH"
 ENV CONDA_DEFAULT_ENV=bio-webapp
 
 # Create necessary runtime directories (/app, /data, /config)
 RUN mkdir -p /app /data /config
 
-# Copy essential artifacts from the builder stage
+# Copy essential artifacts from the builder stage:
+# 1. The created/cleaned Conda environment
+# 2. The application code
+# 3. The File Browser binary
+# 4. The File Browser configuration
 COPY --from=builder /opt/conda/envs/bio-webapp /opt/conda/envs/bio-webapp
 COPY --from=builder /build/app /app
 COPY --from=builder /usr/local/bin/filebrowser /usr/local/bin/filebrowser
