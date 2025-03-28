@@ -47,6 +47,7 @@ jobs:
           # Push the image after building
           push: true
           # Define the tags using your specific username and repo name
+          # Ensure the expressions below are typed correctly without hidden characters
           tags: |
             ghcr.io/mikha-22/bioinformatics-webapp:latest
             ghcr.io/mikha-22/bioinformatics-webapp:sha-${{ substr(github.sha, 0, 7) }}
