@@ -1,10 +1,5 @@
 name: Docker Build and Push to GHCR
 
-# Controls when the action will run.
-# Triggers the workflow on push events to the 'main' branch.
-# IMPORTANT: Your Dockerfile clones 'development' by default. Make sure this is intended.
-# If you want pushes to 'main' to build 'main', change ARG BRANCH in Dockerfile.
-# If you want pushes to 'development' to build 'development', change the branch below to 'development'.
 on:
   push:
     branches:
@@ -14,43 +9,29 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
-    # Permissions: contents:read is still needed for checkout.
-    # packages:write isn't strictly needed for the PAT login itself,
-    # but doesn't hurt to leave if other steps might use GITHUB_TOKEN for package interactions.
     permissions:
       contents: read
-      packages: write # Optional here, but safe to include
+      packages: write
 
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - name: Check out repository
         uses: actions/checkout@v4
 
-      # Log in to GitHub Container Registry using a Personal Access Token (PAT)
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          # Use the user who triggered the workflow or the repository owner
           username: ${{ github.actor }}
-          # Use the PAT stored in the GHCR_PAT secret
           password: ${{ secrets.GHCR_PAT }}
 
-      # Build and push the Docker image
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          # Path to the directory containing the Dockerfile and build context
           context: .
-          # Path to the Dockerfile relative to the context
           file: ./Dockerfile
-          # Push the image after building
           push: true
-          # Define the tags using your specific username and repo name
-          # Ensure the expressions below are typed correctly without hidden characters
           tags: |
             ghcr.io/mikha-22/bioinformatics-webapp:latest
-            ghcr.io/mikha-22/bioinformatics-webapp:sha-${{ substr(github.sha, 0, 7) }}
-          # Enable Docker layer caching for potentially faster builds
+            # ghcr.io/mikha-22/bioinformatics-webapp:sha-${{ substr(github.sha, 0, 7) }} # Temporarily commented out for debugging
           cache-from: type=gha
           cache-to: type=gha,mode=max
