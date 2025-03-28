@@ -2,7 +2,7 @@
 # Stage 1: Builder Stage
 #-------------------------------------------------------------------
 # Use Miniforge as the base image for building
-FROM condaforge/mambaforge as builder
+FROM condaforge/mambaforge AS builder # Fixed casing
 
 # Set working directory
 WORKDIR /build
@@ -31,8 +31,7 @@ RUN git clone --branch ${BRANCH} --depth 1 ${REPO_URL} /build/app \
 RUN mkdir -p /opt/conda/envs/ && \
     tar -xzf /build/app/docker/bio-webapp.tar.gz -C /opt/conda/envs/ && \
     echo "Running Conda clean..." && \
-    /opt/conda/envs/bio-webapp/bin/conda clean --all -y && \
-    # Alternative clean if the above path fails: /opt/conda/bin/conda clean --all -y
+    /opt/conda/bin/conda clean --all -y && \ # <-- CORRECTED PATH
     echo "Removing source tarball..." && \
     rm /build/app/docker/bio-webapp.tar.gz
 
@@ -59,7 +58,6 @@ ENV PATH="/opt/conda/envs/bio-webapp/bin:$PATH"
 ENV CONDA_DEFAULT_ENV=bio-webapp
 
 # Create necessary runtime directories (/app, /data, /config)
-# Create non-root user/group (Optional but good practice) - Skipping for simplicity now
 RUN mkdir -p /app /data /config
 
 # Copy essential artifacts from the builder stage
@@ -67,10 +65,6 @@ COPY --from=builder /opt/conda/envs/bio-webapp /opt/conda/envs/bio-webapp
 COPY --from=builder /build/app /app
 COPY --from=builder /usr/local/bin/filebrowser /usr/local/bin/filebrowser
 COPY --from=builder /build/config_staging /config
-
-# Install only essential RUNTIME system dependencies (bash is likely needed for CMD)
-# mambaforge base likely includes bash, but explicit install is safer if switching base
-# RUN apt-get update && apt-get install -y --no-install-recommends bash && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Ensure correct permissions for File Browser config
 RUN chmod 664 /config/filebrowser.db /config/settings.json
