@@ -1,12 +1,13 @@
 name: bio-webapp
 channels:
   - conda-forge
-  - bioconda
+  #  - bioconda
 dependencies:
-  - python=3.11
+  - python
   - fastapi
   - uvicorn[standard]
   - gunicorn
-  - samtools
-  - bcftools
-  - gatk4 # Or your preferred variant caller
+  #  - samtools
+  #  - bcftools
+  #  - gatk4
+  #  some components are disabled temporarily to ensure ligthweight container building process
