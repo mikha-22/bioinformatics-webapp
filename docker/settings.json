@@ -3,5 +3,7 @@
     "address": "0.0.0.0",
     "baseURL": "/filebrowser",
     "root": "/srv",
-    "noauth": true
+    "noauth": true,
+    "cert": "/app/tls/server.crt",
+    "key": "/app/tls/server.key"
 }
