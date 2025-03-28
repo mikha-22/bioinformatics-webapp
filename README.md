@@ -22,7 +22,7 @@ If you want to run the web application directly (without Docker), follow these s
     mamba activate bio-webapp  # Replace "bio-webapp" with the actual environment name if different
     ```
 
-2.  **Run the application:** ▶️
+2.  **Run the application:**
 
     ```bash
     python main.py
@@ -34,27 +34,27 @@ If you want to run the web application directly (without Docker), follow these s
 
 This is the recommended method for deployment, as it packages the application and its dependencies into a container, ensuring consistent behavior across different environments.
 
-1.  **Pull the Docker image:** ⬇️
+1.  **Pull the Docker image:**
 
     ```bash
     docker pull ghcr.io/mikha-22/bioinformatics-webapp:latest
     ```
 
-2.  **Run the Docker container:** ▶️
+2.  **Run the Docker container:**
 
     ```bash
     docker run --rm -p 8000:8000 -p 8080:8080 -v /path/to/your/bioinformatics:/data ghcr.io/mikha-22/bioinformatics-webapp:latest
     ```
 
-    **Parameters :** ⚙️
+    **Parameters :**
 
     *   `--rm`:  Removes the container automatically after it exits.
     *   `-p 8000:8000`: Maps port 8000 on your host machine to port 8000 inside the container (for the Uvicorn web application).
     *   `-p 8080:8080`: Maps port 8080 on your host machine to port 8080 inside the container (for the File Browser).
-    *   `-v /path/to/your/bioinformatics:/data`:  **⚠Important ⚠️:**  Maps a directory on your host machine to the `/data` directory inside the container.  **Replace `/path/to/your/bioinformatics` with the actual path to your `bioinformatics` directory** (containing `data`, `logs`, and `results` subdirectories) on your system. This allows the web application to access and store data persistently.
+    *   `-v /path/to/your/bioinformatics:/data`:  **Important:**  Maps a directory on your host machine to the `/data` directory inside the container.  **Replace `/path/to/your/bioinformatics` with the actual path to your `bioinformatics` directory** (containing `data`, `logs`, and `results` subdirectories) on your system. This allows the web application to access and store data persistently.
     *   `ghcr.io/mikha-22/bioinformatics-webapp:latest`: Specifies the Docker image to run.
 
-3.  **Access the application:** 🌐
+3.  **Access the application:**
 
     Open your web browser and navigate to `http://127.0.0.1:8000` to access the web application.  You can access the File Browser at `http://127.0.0.1:8080`.
 
