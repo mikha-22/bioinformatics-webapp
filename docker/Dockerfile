@@ -2,7 +2,7 @@
 # Stage 1: Builder Stage
 #-------------------------------------------------------------------
 # Use Miniforge as the base image for building
-FROM condaforge/mambaforge AS builder # Fixed casing
+FROM condaforge/mambaforge AS builder
 
 # Set working directory
 WORKDIR /build
