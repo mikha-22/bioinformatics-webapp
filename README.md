@@ -9,7 +9,7 @@ Before running the application, ensure you have the following installed:
 *   **Mamba  🐍:** A faster, drop-in replacement for conda.  You can install it using `conda install -n base -c conda-forge mamba`.
 *   **Docker 🐳:**  Required for containerized deployment.  Follow the instructions on [Docker's website](https://docs.docker.com/get-docker/) to install it for your operating system.
 
-## Getting Started 🚀
+## 🚀 Getting Started
 
 ### Running the Web Application (Without Docker) 
 
