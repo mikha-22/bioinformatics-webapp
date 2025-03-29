@@ -56,7 +56,7 @@ This is the recommended method for deployment, as it packages the application an
 
 3.  **Access the application:**
 
-    Open your web browser and navigate to `http://127.0.0.1:8000` to access the web application.  You can access the File Browser at `http://127.0.0.1:8080`.
+    Open your web browser and navigate to `https://127.0.0.1:8000` to access the web application.  You can also access the FileBrowser independently at `https://127.0.0.1:8081`.
 
 ## Project Structure
 ```
@@ -76,6 +76,7 @@ This is the recommended method for deployment, as it packages the application an
 ├── frontend
 │   ├── static
 │   └── templates
+├── tls
 ├── main.py
 └── README.md
 ```
