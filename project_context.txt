@@ -117,285 +117,6 @@ Access Web UI: Open https://localhost:8000 in your browser and use the "Run Pipe
 You can place this within your README.md under a new section or link to it from the README if you put it in a separate docs/ file. Remember to adjust paths or commands if your specific setup differs slightly.
 --- END FILE: ./docs/queue.txt ---
 
---- START FILE: ./tls/server.crt ---
------BEGIN CERTIFICATE-----
-MIIDqjCCApKgAwIBAgIUHLn1DdMYrngaQK5PK+WUzo5oQ5YwDQYJKoZIhvcNAQEL
-BQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM
-GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yNTAzMjgyMzQwNTNaFw0yNjAz
-MjgyMzQwNTNaMHkxCzAJBgNVBAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMRYw
-FAYDVQQHDA1TYW4gRnJhbmNpc2NvMRMwEQYDVQQKDApNeSBCaW8gQXBwMRQwEgYD
-VQQLDAtEZXZlbG9wbWVudDESMBAGA1UEAwwJbG9jYWxob3N0MIIBIjANBgkqhkiG
-9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv/F+1toW0O5cSuGhunMQyGexRX97BjUFMWtb
-ApI140bEJzVI3Dp8b1v/IwFG/1qI/1lOCR1yEOsIjNl0aM4WZk8nLsZK/+M4rwII
-r3VIJXF+I77TiOqpaEQIB8r/tnO5t5aptdGMU1zetpx91lEa+4+RZDCzUXIG+2bZ
-tLv/J4/rodvbqDz08ljHtl7FK6WM+IOkKd/7w3U8rJmHkncLY9UtwbJuGqs7rXso
-ZPU4xPoUOQJySoIuCnkM2gtRclOWTbIDrhGZ+9zW1yiqXfjYVJsf/rr6UbN/btan
-09L241O834HY8LzYyCYn5KgbqLLJwjeIG5cvvDPdz8vCfGABmQIDAQABo14wXDAa
-BgNVHREEEzARgglsb2NhbGhvc3SHBH8AAAEwHQYDVR0OBBYEFEIIJokGha8jvGhH
-TFtH9DN4ENnrMB8GA1UdIwQYMBaAFKduhv9EaWioe3h/kS016mDaXLdiMA0GCSqG
-SIb3DQEBCwUAA4IBAQCWBXknH3UGtH7tUSeXFl1/8Wr9Hkbb7jELVOEFbrREVwV0
-EJd/qKP0NKh/bF/MqeE/EUBsZXg9/7m4LGDLGPYoZgLEfAjBIwjkFMTuhXQOA62Z
-DVs69+SPfD8J3lT1jE24YZ2wfaoFo0eJgAgAlmZ+rNa81qkxriANvVSapRlCMyXZ
-WvQCIR9S9jRV1N16+jXrJmovDMSbgu/ythfuemxASAkMVshL/iIrm42puyG9i9/b
-QRGehZdCqiSHS3EkUpEGPu19yY8QzNvMyv7i9iTVcuNGdqGYYoZZGVrcmW4+tkUU
-DN8GfzxT0Pb32LCZ0PK2wYFRvh1PSBPpe0a1vGqm
------END CERTIFICATE-----
---- END FILE: ./tls/server.crt ---
-
---- START FILE: ./tls/server.conf ---
-[ req ]
-default_bits        = 2048
-prompt              = no # Don't ask for info interactively
-default_md          = sha256
-req_extensions      = req_ext
-distinguished_name  = dn
-
-[ dn ]
-C=US # Your Country
-ST=California # Your State/Province
-L=San Francisco # Your City
-O=My Bio App # Your Organization
-OU=Development # Your Organizational Unit
-CN=localhost # Common Name (still good practice, but SAN is key)
-
-[ req_ext ]
-subjectAltName = @alt_names
-
-[ alt_names ]
-# Add ALL names/IPs you use to access the server
-DNS.1 = localhost
-IP.1 = 127.0.0.1
-# If you also access via its network IP, add it too:
-# IP.2 = 192.168.0.89
---- END FILE: ./tls/server.conf ---
-
---- START FILE: ./tls/rootCA.key ---
------BEGIN PRIVATE KEY-----
-MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCxB65Ts1ErIN3v
-txHSaOHe7zgPFvAbYVy6NSE5puYgMwA83naPbi23LWP0pj0AfjEqOhgYyi6ERWkQ
-EFWHOpoKXQIMQwqsO1l9+rTujU18b8/SYIdFyG3EBq9dlkHAryMGMit/U0FXupVE
-k4Y3wHITlUjkPz9mJklK5ul4rNQK207HM7YROIqB+3mKszn9XhLVBzmp8uodmDVw
-lvN3oj+2ZHX9DitlCpLocTWmgno082zDseOasYQOyt1mY989Q2hJ1X9ULiRfaLeS
-1R5DuMbgc9va97LHbBsrj9KbQBQDQXv2uEKqh3xtjzOKe9qict4T+1b9qWzH/YoK
-MMhuWaE5AgMBAAECggEAOZnSMxHJe0r6a6EZf2j49VzI1MAV6BLJ5RycbvHLNvbh
-QOzxjsG+xjdSqqvcdWiZ/q9gX9CJSih7guqNqa57qJuSqwK1Wk0FVWRZsrTvXWnU
-KROXcDFC5eF29fCJ/HP/5Wg1lvwz6qOfJe0KYuGPPKf6S6n4qvgSKPjxRn6Vj+I4
-pLUToZTIAUAOjHIdnOAPnrmEnLQXsBTNAa9XdNzHLpm8wJiRTsanzvLmB67SQxsu
-vsLG1Xkz22HvHl5yvMmvtm23uapPuBOZbNhyvhTOplvM+SzblGAxLVWB4rWimT0J
-uSUATc0t+Vb/BVwRdbMjkQMyepzzSo5W2fYqmGi+sQKBgQDpYBazsrEvTeNbC8FI
-MbGBHE8rJQQ0/68S7rgbfPO7QIdO0wXpI/lHiF11lY78s+iCpgw+0sXUK7XiQfc2
-ChhQKqA4nFm5nnZtdxNFrufTiG6gf9weXWIYE5aoKZKvSuc6r0K4Ew5nIYMH+ZRu
-kj9Uf1LA0VAwqKfQxhOL/4HmAwKBgQDCMTaNZ/viW7X3cuJD092XvR+MybCo3pCq
-wta24+q8OGLNoAEIZZBgAUyYavr1SxkCreJGaqnVk5XveDPKcIi6q/DFvbY+QfBm
-DSLmw+HYXbSc06qgEYoEd8p/rcHh+PH3QKfNTqfDJqCllUjrP+1QxSBntxaPD4Qw
-7knXRRKFEwKBgQCUNg8U3pZCeY+7YbLFe7HEUktBFkgetIbmWi8YXfmYYTnNaJ0n
-XE5TDJp2M55UhJlUZ8n9F/TFc2EWqVgrvKuGNhv89+bPyIBjsqzNo2/dWpcPXURZ
-EGtc6QvUDlr28nX5Qhb4Ojn6a0EBDpMiycRokFfo1sW7sVCqeTEuxv0jKwKBgQCT
-Ouy5WVVH0XCtI5UZB9DB8smw3FnsLpJQZViVYUffXIDMlbsyuo4zu8hu5u1OfJmB
-xoQAD26kVzkeTmw12AxSO3pY8fTyTtwNA3iqrWjVunXtUS3UHngd2xTUqNCOm0gY
-xhRzPGdFNkwmPoECm30597sR52ZbINCAqKmjZOMdsQKBgHX21maoULQd1D+b9MXF
-FQfz+XgNm2lktqBXNDoXwcaKC8BAQY6OwiNkfFs7GMd/z6g4Ht56TiLziKxsHz8A
-oZTS78ZToL1sfVGT53cqwImvF1ErFB9Nw2hn9G9ZFNcg9olHsmcrY+wXMkKTdXP2
-OPdy01vdjir1WfEeZ8WypbWK
------END PRIVATE KEY-----
---- END FILE: ./tls/rootCA.key ---
-
---- START FILE: ./tls/server.csr ---
------BEGIN CERTIFICATE REQUEST-----
-MIIC6zCCAdMCAQAweTELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWEx
-FjAUBgNVBAcMDVNhbiBGcmFuY2lzY28xEzARBgNVBAoMCk15IEJpbyBBcHAxFDAS
-BgNVBAsMC0RldmVsb3BtZW50MRIwEAYDVQQDDAlsb2NhbGhvc3QwggEiMA0GCSqG
-SIb3DQEBAQUAA4IBDwAwggEKAoIBAQC/8X7W2hbQ7lxK4aG6cxDIZ7FFf3sGNQUx
-a1sCkjXjRsQnNUjcOnxvW/8jAUb/Woj/WU4JHXIQ6wiM2XRozhZmTycuxkr/4ziv
-AgivdUglcX4jvtOI6qloRAgHyv+2c7m3lqm10YxTXN62nH3WURr7j5FkMLNRcgb7
-Ztm0u/8nj+uh29uoPPTyWMe2XsUrpYz4g6Qp3/vDdTysmYeSdwtj1S3Bsm4aqzut
-eyhk9TjE+hQ5AnJKgi4KeQzaC1FyU5ZNsgOuEZn73NbXKKpd+NhUmx/+uvpRs39u
-1qfT0vbjU7zfgdjwvNjIJifkqBuossnCN4gbly+8M93Py8J8YAGZAgMBAAGgLTAr
-BgkqhkiG9w0BCQ4xHjAcMBoGA1UdEQQTMBGCCWxvY2FsaG9zdIcEfwAAATANBgkq
-hkiG9w0BAQsFAAOCAQEAW5Z4azXXjv67ixwqHEVaudaoHe+eo69fezdlFNp3FsH9
-mR8oK6VaVxslz2AL1cpaw5Zt+jyRVg6PU4wUZp18Dq2G3vLhggtr5QG2X8RhNQjm
-cGoaMtGm8kYAE7H3Lwnyod9sbkfGdsTGqOH1aHCFE4NJHGSxGf744jlLw4+Y5JCi
-ObSHjDjQAxEIRAT8/s4dKzTfsy8k6FIjUCYiNlfiDraV+1oJoNSpoq+IQ8KdLW0d
-0GTKCjNZHp1rs5Wh/WTn2ejeqp/C8/fKrqelhmOq8WTrnb8TdzcSv9mytVJfH9bx
-a/xubolES+WZbmluw0Wc5ENMC36PoAKteOO4pW+oYQ==
------END CERTIFICATE REQUEST-----
---- END FILE: ./tls/server.csr ---
-
---- START FILE: ./tls/server.key ---
------BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC/8X7W2hbQ7lxK
-4aG6cxDIZ7FFf3sGNQUxa1sCkjXjRsQnNUjcOnxvW/8jAUb/Woj/WU4JHXIQ6wiM
-2XRozhZmTycuxkr/4zivAgivdUglcX4jvtOI6qloRAgHyv+2c7m3lqm10YxTXN62
-nH3WURr7j5FkMLNRcgb7Ztm0u/8nj+uh29uoPPTyWMe2XsUrpYz4g6Qp3/vDdTys
-mYeSdwtj1S3Bsm4aqzuteyhk9TjE+hQ5AnJKgi4KeQzaC1FyU5ZNsgOuEZn73NbX
-KKpd+NhUmx/+uvpRs39u1qfT0vbjU7zfgdjwvNjIJifkqBuossnCN4gbly+8M93P
-y8J8YAGZAgMBAAECggEAAl1P5LGsakfQFz65pqRYO+pwbUdpapAopOKKV85un4LK
-/ninkcmeqCMyp2m9SClYsAdCRivOBetUoEzleY0LCu5FW0wnYbOY39RfQFoU2MaR
-zpBBPC832whLg7JlKAg7l3QMWdMKWX82tyUtClYsG5aPLJ7KTAyNjXdHjfRq65Uo
-JaFbF3PbY++jWdRFsOPIn8sDp3dx3Yqwr3+IM2RTw7SuvDoaOwpH3c2xaiX/LIQz
-KMUxjBmZ40AntkR5s9DcNHvaCJ3gsIQ0+yMAhuO5hkGguIzZlQvJedlSapyitEZg
-XRFbl4iZUsnel2NHY8GwHSz3BnyiZHr9kmxKLbHeAQKBgQDvexra8sMDMLet1YHo
-MwX0oZjCsLcp94IN/zyl+219uQEEM/6V/z1nWnsI3YxKxq0A4j6pFeo6VVdZEqzm
-Z5pb5RTcLkyI4ArtTQLP/Ww+52cHBtUWp3GZO3nLGzWtbwW7cmSIgscYG0KfPthN
-9jgvWIsDQ9vJBet51OAjvsY7IQKBgQDNLvHRT7SoC4DFs1Ig4iuxax1eQWzjqfNS
-V+PY11h1xOZp88CYHWF+DFKanIZRL8E8CsMNE3aOLdMuQRK/gfvPpojoWs2+Hdxu
-FNQmTXGe7coXAmR5J5qFEvpEiY/5eDChauClVtt6r651b1AV4KTsXy9PHFUEsZ3H
-GWe63HMveQKBgGbKblKAVNgvtwd0V1g1Xl8MZadbdqMay8X6Qiv0aaDHIfqN3r6/
-WbndCmZZwffuox93/PFSqMD1FJL1AyW6XnUHNRb1AIDXuZj1rzlbS3UMmhpYAmrA
-4G+nKbXWLgoNV2aHyUMW7yIXwVbdALcl8iPQW4rBO7tjQRmAF9z/69JBAoGAeH0p
-ycVpjAj9PJt6Dg9ioxQIsfHvlJ2XYnJ0PUDwFHBk8jEOlwUh3Bg2Zc6m3YQSkESt
-l78nLoTgb1gNP2KAUcc0vGWeThdQ+1/F2Rw/LZnrw6lHARJtndmwF5FEd7XJsPCH
-LPCdgCUsaI/OUpqRnrCiom07y77VrTZRAJ02EtkCgYEA2EN+0b8xgpLhP7DF00Ru
-UdS/dbW8+/AMQ9uJPl0upLfI0jU1Z8W09Wjria5veblRBtLXPKCe5J01DmTlOpd6
-499yy31OA6wSAXLWRFkUpO8MiiAu3ICTeQhsuTQD2lgVKwCaO/8HzQQneTGnbT72
-vxDVQHm+IsDLhGdUypG/RrI=
------END PRIVATE KEY-----
---- END FILE: ./tls/server.key ---
-
---- START FILE: ./tls/rootCA.crt ---
------BEGIN CERTIFICATE-----
-MIIDbTCCAlWgAwIBAgIUKvRRnA30R6kg5JD1xOJLwRfM/CkwDQYJKoZIhvcNAQEL
-BQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM
-GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAgFw0yNTAzMjgyMzA4NTFaGA8yMTI1
-MDMwNDIzMDg1MVowRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUx
-ITAfBgNVBAoMGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDCCASIwDQYJKoZIhvcN
-AQEBBQADggEPADCCAQoCggEBALEHrlOzUSsg3e+3EdJo4d7vOA8W8BthXLo1ITmm
-5iAzADzedo9uLbctY/SmPQB+MSo6GBjKLoRFaRAQVYc6mgpdAgxDCqw7WX36tO6N
-TXxvz9Jgh0XIbcQGr12WQcCvIwYyK39TQVe6lUSThjfAchOVSOQ/P2YmSUrm6Xis
-1ArbTsczthE4ioH7eYqzOf1eEtUHOany6h2YNXCW83eiP7Zkdf0OK2UKkuhxNaaC
-ejTzbMOx45qxhA7K3WZj3z1DaEnVf1QuJF9ot5LVHkO4xuBz29r3ssdsGyuP0ptA
-FANBe/a4QqqHfG2PM4p72qJy3hP7Vv2pbMf9igowyG5ZoTkCAwEAAaNTMFEwHQYD
-VR0OBBYEFKduhv9EaWioe3h/kS016mDaXLdiMB8GA1UdIwQYMBaAFKduhv9EaWio
-e3h/kS016mDaXLdiMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEB
-AHN7i7GxyX7RNcIrPQDxgTvk0TpijZ1GydHqsmaJSfMYNWqqYS8FSiqB5f99hAMD
-/skMtpPAAL7b+plqx5CYTGrH+qDEj7x5BpZF66NdijRV0gyMNNfNpGsNYrHMx5lG
-bkoOZjhD16E1lwhRZIZLdG1ano5FcMCd3pBI5mEqRzfeAwO6D1A33mc8nMBTxhFV
-Dv/PpHdpBjwehyUJGgKo9BKp66crZGaJhNVOSBfgbchuLaiQxY180HORV94/VgKf
-jG6O0yME9vXq61bpllOoI85Bzq7tBtE13dvlzKDB1bAccS68B2dajbOABCWxbHY0
-/hlfvyX6rbye6A0WAxbB1YI=
------END CERTIFICATE-----
---- END FILE: ./tls/rootCA.crt ---
-
---- START FILE: ./tls/rootCA.srl ---
-1CB9F50DD318AE781A40AE4F2BE594CE8E684396
---- END FILE: ./tls/rootCA.srl ---
-
---- START FILE: ./tls/steps_and_commands.md ---
-Okay, here is a concise version assuming you are running commands within the ./tls directory.
-
-Prerequisites: openssl installed.
-
-# Navigate to your TLS directory
-cd ./tls # Or wherever your tls directory is relative to your current position
-
-
-1. Create Root CA
-
-# Generate Root CA Key (choose one)
-openssl genpkey -algorithm RSA -out rootCA.key -aes256 -pkeyopt rsa_keygen_bits:2048 # With password (recommended)
-# openssl genpkey -algorithm RSA -out rootCA.key -pkeyopt rsa_keygen_bits:2048      # Without password
-
-# Generate Root CA Certificate (enter password if you set one)
-openssl req -x509 -new -key rootCA.key -sha256 -days 1024 -out rootCA.crt \
-    -subj "/C=US/ST=DevState/L=DevCity/O=Local Dev/CN=Local Dev Root CA"
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-Bash
-IGNORE_WHEN_COPYING_END
-
-Output: rootCA.key, rootCA.crt
-
-2. Create Server Certificate (with SAN for localhost/127.0.0.1)
-
-# Create server.conf file (in ./tls directory) with this content:
-cat > server.conf <<EOF
-[ req ]
-default_bits        = 2048
-prompt              = no
-default_md          = sha256
-req_extensions      = req_ext
-distinguished_name  = dn
-
-[ dn ]
-C=US
-ST=DevState
-L=DevCity
-O=Local Dev WebApp
-CN=localhost
-
-[ req_ext ]
-subjectAltName = @alt_names
-
-[ alt_names ]
-DNS.1 = localhost
-IP.1 = 127.0.0.1
-EOF
-
-# Generate Server Key
-openssl genpkey -algorithm RSA -out server.key -pkeyopt rsa_keygen_bits:2048
-
-# Generate Server CSR (using server.conf for SANs)
-openssl req -new -sha256 -key server.key -out server.csr -config server.conf
-
-# Sign Server CSR with Root CA (enter Root CA password if set)
-openssl x509 -req -in server.csr -CA rootCA.crt -CAkey rootCA.key \
-    -CAcreateserial -out server.crt -days 365 -sha256 \
-    -extfile server.conf -extensions req_ext
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-Bash
-IGNORE_WHEN_COPYING_END
-
-Output: server.conf, server.key, server.csr (can remove), server.crt, rootCA.srl
-
-3. Configure Web Server
-
-Update your web server (Nginx, Apache, Django dev server, etc.) config to use:
-
-SSL Certificate: ./tls/server.crt (full path might be needed)
-
-SSL Key: ./tls/server.key (full path might be needed)
-
-Restart your web server.
-
-4. Trust Root CA System-Wide (Linux - Debian/Ubuntu/Mint)
-
-sudo cp rootCA.crt /usr/local/share/ca-certificates/
-sudo update-ca-certificates
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-Bash
-IGNORE_WHEN_COPYING_END
-
-(Command varies for other distros)
-
-5. Trust Root CA in Firefox
-
-Firefox Settings -> Privacy & Security -> Certificates -> View Certificates...
-
-Go to Authorities tab -> Import...
-
-Select ./tls/rootCA.crt.
-
-Check ‚úÖ Trust this CA to identify websites.
-
-Click OK -> OK.
-
-Restart Firefox.
-
-6. Verify
-
-Access https://localhost:PORT or https://127.0.0.1:PORT (replace PORT with your server's port).
-
-You should see the padlock icon üîí with no warnings.
---- END FILE: ./tls/steps_and_commands.md ---
-
 --- START FILE: ./.github/workflows/docker-publish.yml ---
 name: Docker Build and Push to GHCR
 
@@ -645,1779 +366,6 @@ EXPOSE 8000 8080
 # Using absolute paths for robustness
 CMD ["sh", "-c", "/opt/conda/envs/bio-webapp/bin/python /app/main.py & /usr/local/bin/filebrowser --database /config/filebrowser.db --config /config/settings.json --port 8080 --root /data"]
 --- END FILE: ./docker/Dockerfile.backup_stable ---
-
---- START FILE: ./.git/COMMIT_EDITMSG ---
-added docs for redisQ task queueing
---- END FILE: ./.git/COMMIT_EDITMSG ---
-
---- START FILE: ./.git/refs/heads/development ---
-f932347fce94f1459e501171596c783892db14ae
---- END FILE: ./.git/refs/heads/development ---
-
---- START FILE: ./.git/refs/heads/feat_frontend ---
-adccb25a561e55fe7826854109cb889df9898737
---- END FILE: ./.git/refs/heads/feat_frontend ---
-
---- START FILE: ./.git/refs/heads/master ---
-446812ae69fe71ae4951683495495ffc72873a92
---- END FILE: ./.git/refs/heads/master ---
-
---- START FILE: ./.git/refs/heads/show ---
-f71403f26eb115013e87479b4bd994f9532cb50b
---- END FILE: ./.git/refs/heads/show ---
-
---- START FILE: ./.git/refs/heads/feat_backend ---
-a1c771547de9434980502a418fe0f21e111ad507
---- END FILE: ./.git/refs/heads/feat_backend ---
-
---- START FILE: ./.git/refs/heads/main ---
-14cc6fef334482814d59d8307800d030ea43e621
---- END FILE: ./.git/refs/heads/main ---
-
---- START FILE: ./.git/refs/heads/feat_queue ---
-cc2d6824b4b807c1c59d26091d5d1d224fe77c70
---- END FILE: ./.git/refs/heads/feat_queue ---
-
---- START FILE: ./.git/refs/remotes/origin/development ---
-f932347fce94f1459e501171596c783892db14ae
---- END FILE: ./.git/refs/remotes/origin/development ---
-
---- START FILE: ./.git/refs/remotes/origin/feat_frontend ---
-73c939b604cf4cf7dae0499ab31962e42fd5d174
---- END FILE: ./.git/refs/remotes/origin/feat_frontend ---
-
---- START FILE: ./.git/refs/remotes/origin/feat_backend ---
-a1c771547de9434980502a418fe0f21e111ad507
---- END FILE: ./.git/refs/remotes/origin/feat_backend ---
-
---- START FILE: ./.git/refs/remotes/origin/feat_main-page ---
-8d5ad01326bd1297ceef06cc17bcf0deccaa70cf
---- END FILE: ./.git/refs/remotes/origin/feat_main-page ---
-
---- START FILE: ./.git/refs/remotes/origin/main ---
-14cc6fef334482814d59d8307800d030ea43e621
---- END FILE: ./.git/refs/remotes/origin/main ---
-
---- START FILE: ./.git/refs/remotes/origin/feat_queue ---
-cc2d6824b4b807c1c59d26091d5d1d224fe77c70
---- END FILE: ./.git/refs/remotes/origin/feat_queue ---
-
---- START FILE: ./.git/HEAD ---
-ref: refs/heads/feat_queue
---- END FILE: ./.git/HEAD ---
-
---- START FILE: ./.git/FETCH_HEAD ---
-b86f35a69b47d8fe44304bb00ca17000bacb155d		branch 'main' of github.com:mikha-22/bioinformatics-webapp
-5980aaf16da5a414e54227227780fafb59f3b045	not-for-merge	branch 'development' of github.com:mikha-22/bioinformatics-webapp
-a1c771547de9434980502a418fe0f21e111ad507	not-for-merge	branch 'feat_backend' of github.com:mikha-22/bioinformatics-webapp
-73c939b604cf4cf7dae0499ab31962e42fd5d174	not-for-merge	branch 'feat_frontend' of github.com:mikha-22/bioinformatics-webapp
-8d5ad01326bd1297ceef06cc17bcf0deccaa70cf	not-for-merge	branch 'feat_main-page' of github.com:mikha-22/bioinformatics-webapp
---- END FILE: ./.git/FETCH_HEAD ---
-
---- START FILE: ./.git/objects/ff/9893a11297aa3355245700a9243cb05f7775e1 ---
-xùéKn√0C≥÷)f_¿˝†rÅb4%B,€uîEo_µG(∏!ÚÅºµV;O˝‰ú$·,Vü9±M:Yäl(ÚÆê)!ñ¢ç⁄Èêµ√å.˘‚|eJ÷afÕﬁ„8á≥.∞QÙÓèÌÄ[}>>[]d≠O™_âñÎΩQ]&ﬁ⁄ttVÙ8√FD5“q∞À?¶ÍΩgÍía‡◊iˇÜæ¡R_]÷_á”ü‘$`NÁ
---- END FILE: ./.git/objects/ff/9893a11297aa3355245700a9243cb05f7775e1 ---
-
---- START FILE: ./.git/objects/a1/c771547de9434980502a418fe0f21e111ad507 ---
-xùéAn√ E≥Ê≥ØçÉGä™^†á`Hêçq1QØ_ü°“_=Ω'˝ÿj-¥µ∑—E@∑Ú9ªeöÊËt¬ºÃhº∑‚0&èãKì:∏À>¿õHÜÇCÛ5üX–q09-VÁ4ß…[≈ÔÒjæÀ˙bx‘≤…^V.?Å∑ØgÂ≤›c´üp©ö»íû·=¢∫Ëup»?Rı+·lqïGoœ.Á	Å;ú•æ7•ÌÍ˛£NŒ
---- END FILE: ./.git/objects/a1/c771547de9434980502a418fe0f21e111ad507 ---
-
---- START FILE: ./.git/objects/f4/a0fef53a3f728995c8335f6ed517b8ec1b6905 ---
-xùŒAn√ @—¨9˚*0ÄTEΩ@1c3
-ÿ©ÉÔ_ü!€/=ÈO[Ôuhp˘2ˆR4bÎÿ2dpsƒ(¬8!ŒeÚI»8üYΩh/Î–3√%F,òK()íRl3`åäéÒÿv˝[ü“ﬂΩ∂≤÷'’?¶ˆ≥t™Ì6m˝ÆmÙŒ&@4˙ÀDc‘Yœ¡Q>†äN◊_£ÆãÓGı˙¥ÕGm≥˙“-L‹
---- END FILE: ./.git/objects/f4/a0fef53a3f728995c8335f6ed517b8ec1b6905 ---
-
---- START FILE: ./.git/objects/bd/2de2448251d37af18bd84fd94a1c9b8eeda088 ---
-xùéKn!ΩÊΩèb√Ø•(Ú|àzld$„Â˙Ê—€=©TU∂1öÄuÓ$;3‘∞ZÔkö=.hçé\uàûMN%⁄%ß9]‘Ì¸Hs¡∞$™ÏÎjKDL’8$tË#OòS^Q—!˜mák{‹	æFÎ¸ljøô˙Â6®ısŸ∆7òËìÇ”	>t‘ZÕw
-ˇU„Ë“>_B7Ü|¥^·ØÕäC@hü‚ÆﬁíëOJ
---- END FILE: ./.git/objects/bd/2de2448251d37af18bd84fd94a1c9b8eeda088 ---
-
---- START FILE: ./.git/objects/a0/1ae2d5a3de1a3ad324bdddaa47dad4bc0e8fcd ---
-xùéÀmƒ0DsVºoà¢>&∞∂Å!—r,¨µvl¶ˇ®ÜgÄ7odÔΩ)8èoz÷
-â√DñƒïH´óö®ícYä∏ë=Ágs‰≥æ00ª	„Ï'KA,N<{*Ö¶¥0SÃ≈‰_]˜æ⁄sÕpÔm´ØˆÃÌß‰ÌÒ›s€>dÔüÄ…;ˆ¬Õ&kÕh«A≠ˇ@Õ•Yõ¿2dÁ~åï#Î˙Z/5UíKÁ
---- END FILE: ./.git/objects/a0/1ae2d5a3de1a3ad324bdddaa47dad4bc0e8fcd ---
-
---- START FILE: ./.git/objects/54/cb864460ebd510cf281e47e2301974289da1f8 ---
-xùŒK
-É0F·é≥äÃíƒ\ØÅR∫Å.‚œ´çZI›}]Cß>8a´µ4i4_⁄ëízó{ØT$ß≥s∫G &ºé@BLŸõ≠;é¥6…»ÉG‡ú#5ë•‰ô≤Ff–œü6má|ñyÇº’≤§µÃ(oèÂÒ™(K∂zóö≠qn$"yU¨î8Î9ÿ“T`ﬂª˝+~XEÿ
---- END FILE: ./.git/objects/54/cb864460ebd510cf281e47e2301974289da1f8 ---
-
---- START FILE: ./.git/objects/80/4b5f45fcbcab35247a0dc1c53624cd693646c2 ---
-xùéK!]s
-ˆ&ÜœKåq·÷C@w„ê%x9É€ó™‘ÉVk\)wùà√B‡–fKŸyÇÚ¨Úî|„S¬Ÿ;v:óZÂ	†§ê….	P≠å∆i#LNà"Y,~«⁄:ñmç¸ZÀNGŸb˘§∏ﬂ_5ñ˝≠ﬁ∏tãñ2Xe¯Y8!ÿ\Á¡A®,"ÚGÉçzûEˆ›ÄH‡
---- END FILE: ./.git/objects/80/4b5f45fcbcab35247a0dc1c53624cd693646c2 ---
-
---- START FILE: ./.git/objects/6c/9ab384e5875cbc9a32fe48e816b1cb2dae41e9 ---
-xùéKj1D≥ûSÙ>Zø˘Ä	9Ä≥J.–-µ<¬#i¨»‰˙—µ*®zœ◊úSÌ∂óﬁD¿Ú÷-Ç÷±8TJyV∏Ú&÷âè^Ç◊3O'5)‹∂"QTs GVYqVÎedY1Rd∑E√„j¢gﬂkÉœtﬂ	.9R“ù“ÉÈ¯∏eJ«õØ˘‘bç∆Ÿò^qAúF;ª¸c:∂%¶€≥IÄÔÎƒ¡Á⁄w∏tû@%@*‹ÍÔè¥È[ëS˝
---- END FILE: ./.git/objects/6c/9ab384e5875cbc9a32fe48e816b1cb2dae41e9 ---
-
---- START FILE: ./.git/objects/d9/f69572c468b549db0c9da028b3df0c1bdc6b00 ---
-xùéM¬ F]s
-ˆ&Üü2â1^¿Ce∞§–jÉO/gpıÂΩ‰%ﬂº∑V∫4Fù˙¡,…Êƒ!˙8FC"ˆŒdBDH…'áÉ≠x—¡[ó†≠≠ö2&é‡f!e¥:d÷.NA–ß/˚!e]H^[©ºïï ;RΩ?ïzô˜vì⁄OVic»≥ÚJâa«¡Œ§"óçj˘r?°NEÊ
---- END FILE: ./.git/objects/d9/f69572c468b549db0c9da028b3df0c1bdc6b00 ---
-
---- START FILE: ./.git/objects/75/861fce916a85c6124338dbd9cbc382dece655e ---
-x+)JMU043c040031Qp…OŒN-JÀÃIeHz,«$®nØπ6Û_cÓÑNµÖ[BU%eÊÎñß&%Ëï$È•W1€∑ò◊ÊÜ‚Á≠ñGEü∑˘}ÂZ|˜T1»∞§¢¸Ú‚‘"Ωî$ù˛ƒ©«˛Üs4≈’©]ﬂòÃ∞ æwTeqjIIf^z±^Vq~CÂû,ü√{Æñ2)⁄Óã¸Úv’ÈôﬂıòE2
---- END FILE: ./.git/objects/75/861fce916a85c6124338dbd9cbc382dece655e ---
-
---- START FILE: ./.git/objects/de/185e5fa309761f52c9bc5e0656b0f91eeadfe6 ---
-xùŒMj1@·Æ}
-Ì¡Y˛ÅPzÅBcKâõÒ8\»Òõ3t˚‡ÉWFÔm¬ÇÀ«<DÄbMEó§#Ö(÷%á…IÒï8$ÚJ+VÛ‰Cˆ		≠rÆ.ÁUbr¡{‰ëV	Ã¬î%ÕäÜÁ}pmè;√•∑Mˆˆ‡ˆ≥ÚˆuÎ‹∂s˝\Ùà! p≤—ZÛÆÔ¡)ˇ†F€K*<èÒ-eB˚î◊4µÚJq
---- END FILE: ./.git/objects/de/185e5fa309761f52c9bc5e0656b0f91eeadfe6 ---
-
---- START FILE: ./.git/objects/7d/fc0e678422f99fb25ebfd076a83ac63cc7e784 ---
-xùŒ]j√0‡>Î˚(kŸ˙ÉPzÅb$≠jÀJz¸∫=Bü>òaRo≠“∆æåCÑ¨mY4ñÄI¢E*^c¬Ïy÷:2ò'ı¿!˚ kºÛ$√$±)«Ë3óp¯L6°∞¬◊X˚A∑z_A◊V7ŸÎı3b{ˇh®€kÍÌç&∑Ãö≠Ûö.Ïò’©Á¡!ˇ®™Rø%S-ö–Ë¥u‰ﬂ\«x<©Óœ!'ÙÚÍl8S
---- END FILE: ./.git/objects/7d/fc0e678422f99fb25ebfd076a83ac63cc7e784 ---
-
---- START FILE: ./.git/objects/9f/cc859d60f7fb7f5fdb23cee10a8612240fb79c ---
-xùéM
-√ ªˆÓEüZÛ†î^†á¯‚O#âI*Ê˛Õ∫f¬VkÈíà/Ω•$aâG7¬+ØFbìî·äP˜< ≥ÿ—“⁄eŒ<∞Å÷ƒ0∆9≤Œ+&k¬®\ˆﬁª§é>mMæÀ<A>jY“ZfîÔàÂı©(À-lı)µ∑Fì≥Éñ◊s@âìûÉ=˝°äcèË) ∏Ö9µ|6≈i˝He
---- END FILE: ./.git/objects/9f/cc859d60f7fb7f5fdb23cee10a8612240fb79c ---
-
---- START FILE: ./.git/objects/2e/9dc5436613b9d22392309e880b43034d05f346 ---
-xEåA
-¬0E]ÁÆ+b›X@\LíILg¬$≠Ùˆñ ∏˚ÔÒ¯6âÖÀπ?0Œ4Äç“}»bŒ∆M»L©†'Ï±¢#5ﬁ√¶åßLÏâ]§_ö∑:	ﬂ˚”≠ïK≈€^÷ËD˘πõ˝N˝´Ÿq·¶ú´H*¨±æØpÑá¬&ãBV
-§JV‘à\¡aJ§ÊÈÿCÊ
---- END FILE: ./.git/objects/2e/9dc5436613b9d22392309e880b43034d05f346 ---
-
---- START FILE: ./.git/objects/e6/3640a807c1edf582bde2797e6057022145d861 ---
-xùŒM
-¬0@a◊9EˆB…L¶IDºÄáò¸Ÿ–¶’Ôoœ‡ˆ¡/Ó≠’Æ“èú5!`DåŒ90\b,#≈î
-MîÄe’[éºuÕ»‰LI.@í] .BRÇ1£M^ ±ıH§‰€Á˝–œ∫Ã¢o≠Æy´ã‘OêıÒjR◊!ÓÌÆ¡ì=©üH_ç7FùıÏ˘™ı-B9
---- END FILE: ./.git/objects/e6/3640a807c1edf582bde2797e6057022145d861 ---
-
---- START FILE: ./.git/objects/ab/5103e3c3201346e3f0fc419faae3283f586f9e ---
-x+)JMU01e040031Q(*Õã/»,HÕ…ÃK’À(…Õa–Nj_2•l[°É”aÅ|„†è%+ì÷Éö
---- END FILE: ./.git/objects/ab/5103e3c3201346e3f0fc419faae3283f586f9e ---
-
---- START FILE: ./.git/objects/76/d99c3dfaaea86b590a5ef596d098b4a1ed3e1b ---
-xùéKj1D≥÷)zo0≠÷L»ràñ‘äÖG{êÔ˘
-ﬁèzTï}å>Ååˇöáîä}cädÑ–µ\
-:ùl§úu$≠KKU=¯ê˚Îc)¡¯d§¨vhïí±ò[¢àΩ±M…)~ÕÎ~¿oø].£orÔ7ÓœÃ€œﬂ‡æùÀ>æAk4áN’¢Î‡îT5∏
-0¥}´Àok>ø˙;´ÇÌJî
---- END FILE: ./.git/objects/76/d99c3dfaaea86b590a5ef596d098b4a1ed3e1b ---
-
---- START FILE: ./.git/objects/ad/ccb25a561e55fe7826854109cb889df9898737 ---
-xùéAé!E]sä⁄õòÇ±3Ò¢Äj%6çÉxˇÈ3LÚW/Ô%?˜÷ÍGÓ0á*atˆí≥K…Q	≈'¶ê<€ÑlùP÷ºeË6!Rf‚tFüó}±à¢gñDñœNΩ[J(6z#ﬂ˘ÏÓıı∏∂∫ÍV_Rì¨∑Gì∫ûro?∞´é9P@8bD4;›N˝Gjﬁ£?Ü~>êd¿2˙6u+ÊyIñ
---- END FILE: ./.git/objects/ad/ccb25a561e55fe7826854109cb889df9898737 ---
-
---- START FILE: ./.git/objects/13/2fdccd1e9fe64bcd3932589573505fbdd0b6d9 ---
-xùŒ[
-¬0Öaü≥äºe&˜ÄàpìIjCõVK‹øYÉØæ√œGkµKÖÍ“œRdb¥î–Â1ÈspÅÛÃ1ŒF´!yo:À>`qém`ùc÷A%,ΩÒ4Ng–÷”L≤†o_éS>Î∫êºµ∫ïΩÆT?â∂«´Q›&>⁄]¨¡DçQ^¡à±é¿^˛†b?zæBæ
---- END FILE: ./.git/objects/13/2fdccd1e9fe64bcd3932589573505fbdd0b6d9 ---
-
---- START FILE: ./.git/objects/13/8e871c76193238c93d37a302c4f7ddbd444fb7 ---
-xùéK
-¬0@]ÁŸí¶ ¢†K7ﬁ`23’`cµƒ˚€3∏}èèÊ÷j◊Œ¡¶/"\1Z&§œf$(Vf,q$M∂Íçãº∫é%‰‚SÒc‚1x 7&¿î$öUI&√0$Öﬂ˛ò}≠œÍ}´ìºÍÎß‡tº7¨”éÊv–6Ô¨ÕÙ÷dc‘J◊¡.§Í˚fÏ¬˙v9ùØó]cıÓ∆H3
---- END FILE: ./.git/objects/13/8e871c76193238c93d37a302c4f7ddbd444fb7 ---
-
---- START FILE: ./.git/objects/97/5fa6a04c1c841ed266d775ed8a3dcec52ced4a ---
-xMéÕ
-¬0Ñ=Á)ÜxQ(1ÒRr"ÙÊ,im1h~HS¡∑7¡‹e`Êc∂Ö™UÎbHÀ€!y6•‡–õ·9˙ª01VaÕ‘[t?‚jÊ|πu®Ó?u(Fïà∆Ï"o‹H≠¡âú±ûàü ¨≠"-~Wêè0gÕ’±≤¨‚Íw˙$•‹≥/åO9“
---- END FILE: ./.git/objects/97/5fa6a04c1c841ed266d775ed8a3dcec52ced4a ---
-
---- START FILE: ./.git/objects/aa/1e593f400880807571b67b098384483aa6ac5f ---
-x+)JMU02¥`040031Qp…OŒN-JÀÃIeh©X»“tÂÁ¸”ãblƒô{{˚1TÈ%%&góƒó$&ı$=ñcT∑◊\õ˘ÇØ1wBß⁄¬≠°zí2ÛuÀSì
-ÙJãÙ“´éÌ[ÃksCÒÛVÀ£¢œ€¸ær-æ{
-™‰Ä§¢¸Ú‚‘"Ωî$ù˛ƒ©«˛Üs4≈’©]ﬂòÃ∞ æwTeqjIIf^z±^Vq~CÂû,ü√{Æñ2)⁄Óã¸Úv’Èôﬂ}5Yy
---- END FILE: ./.git/objects/aa/1e593f400880807571b67b098384483aa6ac5f ---
-
---- START FILE: ./.git/objects/8d/5ad01326bd1297ceef06cc17bcf0deccaa70cf ---
-xùé[N≈ Ü}Ó*Ê]”¥ÖMNå[ô33¥hÅÜ“®ª/+ÌøÂÀO9∆PA)˝Pãhmî”$,Fh≤jÒh4YeΩu~bvì1ÛlÓ›ÅERÖ—Zq„0—`ù≥,NœJπ≈;a‘w„˝¬≥q2tx’-ÿ∞|fxÑogNn-ËÏÀ1Ï=Â¯‹®zöÌ¢›èÉÜÆ•Ìfï∫ò9¯ ¸E<RÕE01¯—‘QÚ´PÖ≥ñãÍU‰Ø€¨€	!eñêπÌi√¥ û◊or¸›˜k®aMç›}Òn˘
---- END FILE: ./.git/objects/8d/5ad01326bd1297ceef06cc17bcf0deccaa70cf ---
-
---- START FILE: ./.git/objects/30/8c54accf794a8455bb70f526f3e85faf9935bc ---
-xùŒM
-√ @·Æ=Ö˚B0éøPJ/–CÃËÿHblÉΩsÜn|Ro≠©Áp≥TD£Nö`.Öú'6…3£f	°0ã7ºÈ¡™§ŸX‚Ë0*&ìSÅΩàv6¡Á`~«“˘¨ÎÇÚ÷Í∆{]±~∑«´a›¶‘€]ŒﬁhÎmZ^ïWJúı¸£Á>µ,~PE&
---- END FILE: ./.git/objects/30/8c54accf794a8455bb70f526f3e85faf9935bc ---
-
---- START FILE: ./.git/objects/1a/3cf387d893498f8ab9ae0808f4d0ca717bbf97 ---
-xùé[J1E˝Œ*Í_ëº ‚\D%©Ù”Ièôå‡Óm\ÇáÁrÀ—;/–ﬁ<≠I!…Ve}ÛŒ…‚<UØbT∆É%k)77ú4§VJt©zŸBÀ°πV≥6ÖHIå^imÂ©S¯Xóc¬'_/oùw|E˛ ∏ly-G¨Q⁄%·Y)≈iœÉã˛ë
-¨ï*ú∑I˜˚éä@„*O*Îò?/¿7Ç¸‡ΩÚÿƒ/PïUï
---- END FILE: ./.git/objects/1a/3cf387d893498f8ab9ae0808f4d0ca717bbf97 ---
-
---- START FILE: ./.git/objects/73/c939b604cf4cf7dae0499ab31962e42fd5d174 ---
-xùŒAN!@Q◊ú¢ˆ&cU¡@ì„<D≈4ô¥É∆„;gp˚ìó¸<{oÿ—”:U!‘jkOE7G≥Kæ"Z⁄ƒ)πd}ŒE—öO9u,∞5xä%≥-öºÊ+Eñ®FÊ\19$#ﬂkü'|¥˚.⁄€°£›•}%9ﬁo]⁄q…≥ø«Ò ë#<c@4è˙\˙j˙¸i„m˝ΩÏ´∞&º‘sé•£ò?[πMD
---- END FILE: ./.git/objects/73/c939b604cf4cf7dae0499ab31962e42fd5d174 ---
-
---- START FILE: ./.git/objects/02/b60f9d23661a3944f50719ec0fe9a419757434 ---
-xùŒQ
-¬0Äaü{äæ“fY≥ÇàIñÕ‚∫È®˜wgıá~›j-Õß∂õy$û$™•1ìÄı=£à1)¬îu¨⁄π7Ô∂6/:dAôb§åI4¶Ö ı£©iÓÕÒ∑=∑›? Î…˛ZÀbkyq˘/˜πrY.∫’õèÑê1ƒ.˘s†‹Qè¡fP˜}è‹lÙsie^∑›‹'Iz
---- END FILE: ./.git/objects/02/b60f9d23661a3944f50719ec0fe9a419757434 ---
-
---- START FILE: ./.git/objects/89/4feab75b3e80d2af9e20a90fc4801a9e16b852 ---
-xùè;Nƒ0@©s
-w[ !è«øH+ƒˆhÏo¨MÏ≈2úü4\ÄˆÈΩ‚Â~u*‘ˆeÂSqk¿¬*+E+Q˚P<ED Çî—õÂIC⁄T⁄I1çOY¿ƒ-;$ü¥Ç¢%ÇÜ5ˇ˘§Åƒ∞#dBb4613ëLlS>ãíy°Ôπı°nı±ë∫uóVTøÌ˜ÉÍ˛ñ˚ÒÆ X≥ZA´W¥^NzM˘G∫‹d‹E•A-oÍRÑÊgΩMi|QµÕÆX~dÔœ„\_~∞4a+
---- END FILE: ./.git/objects/89/4feab75b3e80d2af9e20a90fc4801a9e16b852 ---
-
---- START FILE: ./.git/objects/41/c13af0579c5ee3b8a70851475a60294cf1c3f8 ---
-xùŒQ
-¬0Pøsä¸ín6€DºÄáÿt∑l¨∆à◊7gÊk`x3o•‰f¶]´™ñ@Q‚àà"A?˘H	9PŒ{"^2OÆ˙hVÑ$Œ@h‚§HöHip1,qÓ1¸i∑≠⁄KæﬂÿK^ıëÔú_â◊Ûµp^ÛVNv±3‘Uªw£s¶∑˝`”?¶ÜETÏ“≠T∑Ô[´˘'ˆHU
---- END FILE: ./.git/objects/41/c13af0579c5ee3b8a70851475a60294cf1c3f8 ---
-
---- START FILE: ./.git/objects/0a/e6170dbe3523eedd29bd2d7051e166fc9d8dab ---
-xùèKä√0gÌSÙ>Z_K0sÅ¢[›[q∆(˜èsÖ¨
-º*{ÔmÄu¯5Ui∂¬N≥Ò&üLÅkêÑµbTÎ|ä¬úƒM:Ù>@rç9Ã∂¯ò8¯,å%°MÏ§b1,%2‚Dœ±Ï‹⁄∫|˜∂ÈΩ≠‘˛ô∂ﬂøNmªñΩˇÄôΩCcs∂p¡˘ÙŒı<8Ùuz>ÑÜ
-J“ﬁÅ”`2Iº
---- END FILE: ./.git/objects/0a/e6170dbe3523eedd29bd2d7051e166fc9d8dab ---
-
---- START FILE: ./.git/objects/db/5fa2e71eb34d6afac638ab18ca013cdea3eba1 ---
-xMé±¬0Cô˚ñXR7V$:≤ >†óÙDÙ.J/Ö˛=),x≥üd€=’°94õ-.ÌÒtn´já´"eÅØ=◊È¡òrbò"O\Ç—Q*\z¬ãb‰TØ‘'&cêÙ oa^Àí »b•˝ønøŸgrCÖ¢ÆÎ‚bÉJ	≤èK	æ ¸≈§wˆÜ§j»µ?
---- END FILE: ./.git/objects/db/5fa2e71eb34d6afac638ab18ca013cdea3eba1 ---
-
---- START FILE: ./.git/objects/db/0becc8b033a4a78144f4a3bb852082fe91cd62 ---
-xeRÀj√0ÏŸ_at¡.	=¥«§“M{
-°ÿ“⁄^"KFZ7ÅíØdŸiKÆ;≥3öYRÒ›˝¸Ê;äc∆u”¢Û“jeŸCÏ« ªËPäµ*ı ¿íTiüçùõ&‘¥)YÆUâU‚°Ñl·ó–-±È†ìõ
-»Øg€ŸÌl6Œ%n∏”9€Ù Ëœp¢ënÿn∞X÷¿%”¡4Í“IºËîpb∑Ò$∆AÈ¨ñùœÊ5ã@Es)ıq›¥⁄™Í›f'eáÇEﬂ:çú@<Ö‰ˇ>è@¿GõR£â“YÉæÄˇoﬁ†Ú¶óÁZ2»iΩ¥“™≥ 6öÁ“ﬂÊœõFÏ57y„ÃÕærÒ®6∫´Íen¡Æ’ˆàƒÎkÓ[±EYY∫°ìQ—ıyˆÁa®∏ÏÑˇ;ˆÖ…p{≤lù£ßú∏
---- END FILE: ./.git/objects/db/0becc8b033a4a78144f4a3bb852082fe91cd62 ---
-
---- START FILE: ./.git/objects/58/97013e9b8281653cd672792810c0e8aa317b2d ---
-xùŒQä1Äaü{äº“f“iYˆ"I£ßééı˛Îˆıá~[{oèª±π´∞aJVeB-\Sû"≥í—%Y…l«™sx Êèñçë∏\à¶YQ´S$±§s°ú5ÕÇ5¶ üq[78∑˚M‡‘€‚èvóˆRY~Ø]⁄r∞µˇ@*4≈HH˚Xbﬂ˙˛§VØ∞˘˚≥å7<ÂÍ·òÖHp
---- END FILE: ./.git/objects/58/97013e9b8281653cd672792810c0e8aa317b2d ---
-
---- START FILE: ./.git/objects/09/f9640a65de655b4aeb0760c3e0ea9716d4abc1 ---
-xùéKn√0ª÷)∏»˙QÇ"»!(ä™[ñÎ(˜Øœ–ÌfÊqo≠0÷çSd"ˆ9c∞>x.”Ñé 	ã!r3ÍT2≥:Ëî}Äò†QóòÊ@ËuúùD,T∞0≈hÀŸÿ§Ë3ñ~¬´Æ¡£’Mˆ∫R˝M¥=’ÌŒΩ}√’≥⁄9¥∑K¨’µ^á¸Uü#”ê≠Û
-G=d´ª‹ﬂã˙C3L
---- END FILE: ./.git/objects/09/f9640a65de655b4aeb0760c3e0ea9716d4abc1 ---
-
---- START FILE: ./.git/objects/d5/d2f56b7aa3fb6972c49675a1ed20b872aa332c ---
-xmQAN√0‰ÏW¨ƒµDâ∑äVÂ@ABΩS«Ÿ¥¶±7≤7-π!ﬁê#áæ•OÈKÿ¥çd$"‚ôÒÏxúWî√˝Ì›’5ºM«ì˘T©XÑ∆Ø8ß7±	L–D¿ÂzZx_hÿÈ∫∆0ÍYP3Çˆh√v€o–om Ô–≥∏ß÷ê∑Äüh∂~
-‰[.óuÀkÚ2ƒ˙¨n8ˆú®ÙÅÜ!±R…94Ü˚tTJha–»ØéPRU—.>®Lªüc˜%rm6ËAæ˚√é]wa‰.©Œíı%ßŸöò»£B≥N‡¡%`l*Ó¬«ßÒÀl˙¸:ÀÊì>5¯.e≠´ºî∆¯o¬¡)rÊü°åÆÆ§ÒtÏ•EQ—ŒùπB©_ÚS◊˘
---- END FILE: ./.git/objects/d5/d2f56b7aa3fb6972c49675a1ed20b872aa332c ---
-
---- START FILE: ./.git/objects/59/28108d3e961d79a59e24d8957d9f1f1fe67230 ---
-xùŒM
-¬0@a◊9EˆB…ˇL@ƒxà…tjCõVKºø=É€<ﬁ[´];Î.˝—ë	•∞&!≤§q °@î	Ú®ﬁt»÷µ°D≈OÅQ&0Çw%ã%t≈{é„X8!)˙ˆy?Ù≥.3È[´´lu°˙)¥>^çÍ:ﬁÓ⁄ûﬁBŒ>Î´c‘Yœ¡.P5®◊rC\
---- END FILE: ./.git/objects/59/28108d3e961d79a59e24d8957d9f1f1fe67230 ---
-
---- START FILE: ./.git/objects/59/80aaf16da5a414e54227227780fafb59f3b045 ---
-xùŒANƒ0@Q÷9Ö˜H»Iíé‚¬é=”hö¢Ù˛ÙløÙ§_èﬁ€Ñﬂ_Ê0üBBoQ$f“Eπ–]T*9ñJ$òºâ˚·a˚—†àJH^cÊª/¢ó–Öÿ◊Eäô2ñ‚¯úÎ1‡ª=WÜèﬁ6€€ì€ØˆıË‹∂∑zÙOô¢/ŸcÇWÃàÓ™◊‡¥P∑ïÎj∑9N=G€ g€‘˝VL
---- END FILE: ./.git/objects/59/80aaf16da5a414e54227227780fafb59f3b045 ---
-
---- START FILE: ./.git/objects/83/0fa9d199be7816443a2335be6aaea59e66f9f3 ---
-xùŒ]j!@·<ª
-ﬂAØ?W!în†k(WΩfL∆q:ËÚ;kËÎÅNΩ∑)¡∏À<ò•˜@|¶ó4S–9´úRu÷a±bßÉ∑)k4`,÷Ã—Vm]dß¥FÌ¢œLàPí∂ƒÇﬁsá¸jØÖ‰Ω∑ï∑ˆ¢ˆìh˝|tjÎ-è˛!5Zc<:ãÚ™P)q÷spÚ?®Ë£¥⁄∏»˝OŒÛ;èmÚÔ2©K5
---- END FILE: ./.git/objects/83/0fa9d199be7816443a2335be6aaea59e66f9f3 ---
-
---- START FILE: ./.git/objects/96/a011efd51a1d29cc16df145fcf7760a7c3509d ---
-xUèAn1EªûS e=õ™Q§\•Í€å≈ÆÕ$ ÌCú™RVü/E|ûéÇù!∞Œ7
-XÎW°“œ¿Q%·ºhÀ‰˙DÓtJTIId˙s◊ª≠*cq¡nXyÙ˚ï£6˘v‚i-˝⁄~_ÖwÔFv«ÕTÀøqy”ÌÚı2w›»œ€™
-âu¿F‡I
-%0rﬁ∞qπÉ)êÙ›«Ö≥≠7‚º⁄Û1Cjv.â%Cm©˜ÈÒ¥[j
---- END FILE: ./.git/objects/96/a011efd51a1d29cc16df145fcf7760a7c3509d ---
-
---- START FILE: ./.git/objects/0e/8bcb22b10f8a3b82723e753e9dc7086edabd04 ---
-x+)JMU027a040031QHK,ÀLŒœ”ºùlŸdgVß-+ûr¨á˝àdE8TYnbfû^rq1√Ñn’#Iä≥„+ûIymœ~‚É¨&´ò·Ÿ‹G≥7]ºÊÏ›≠πÆ<Í∆°'=¡°JäRãKsJä¡&qÈNñËû∏ÖıAK⁄ˇïôv/T˝GS4ÏPÔ£À6w,M.iˇ':!.É˜î'LUi^|AfAjNf^*ÿD|#´´•{˙˙öﬂèWÌøÌ5€Œ[âñÆØ@sL
---- END FILE: ./.git/objects/0e/8bcb22b10f8a3b82723e753e9dc7086edabd04 ---
-
---- START FILE: ./.git/objects/5b/47b36b3f74e3a438c2f68a66e5047be7c0d896 ---
-xùéKNƒ0DY˚ΩGBÌN‚èÑ‡Ìv{bMs¬XïTØûT“[´hÛ/s®%$∑Q‰(ô∞,ëX1—Ê$s@"J,∂¨l<Ùú‡sTÁ√JTb,◊TS…ËáÖ≈-"^/j¯gÓ}¿WΩÔÔ≠z÷;◊Ôƒ«Á≠q=ﬁ§∑∞~]»⁄-zxEèhÆˆ:8ı™ëùœõf®epS‡úÛ–Á}L(£7fˇKk~ MR
---- END FILE: ./.git/objects/5b/47b36b3f74e3a438c2f68a66e5047be7c0d896 ---
-
---- START FILE: ./.git/objects/94/0967f8789c1ee60a08d2131caea0d7638a077e ---
-xùéK
-1D]ÁΩ§Ûõ$ ‚U:IGÕdòâà∑7xóı(^UjµŒîµáæ1É∂≤dxÚ≤ &ßKD]rÒÑ8EÁu÷FØƒJ/äìf‘ƒQJãR≥w∆Öhb¡î`µJ—bÙÍ˜∂¡ù∂OÉ˜úË±∑•¡yÄ”/^oïÊÁ)µzÈå≤Œá ·àQ:nv˛[ (gŒ0&XÈ∆@KÜπÔ–πÆOÍ,æsÁQï
---- END FILE: ./.git/objects/94/0967f8789c1ee60a08d2131caea0d7638a077e ---
-
---- START FILE: ./.git/objects/af/ebc91207b60db179e2155b8b736b9d4a141642 ---
-xeQÀn¬0ÏŸ_±5⁄Cìæ®‘V=D`B» 8TU‰$b)ÿëcü_G·]ÀßŸŸ›Ÿô∏–1tﬁﬁoZ∑~,ïã*'§ìB$òÎ"Eô6∞`S(eâÖTX◊á™\[»dÅÈè˘"‡Ωà≥†7˝¢Ì'J8õ3>eGËπÜ˙å≥∞À¢«ﬂÃ_(ô|¿fé7é√∫˘ïíQ8^Ñ—<‡√ ú’XáÇIÆÅNˆ†≤¬XL=œ£˚R_õ≠0)iıÌU«ö
-è§ù'RÜUÇ∞D•WËÜ]ã?Pg¬,—∫qK©UΩıÚß[f
-h˚Ú,
-øü`sT‹kÆ)ΩU∞F
-eÎiW-$ìˇåHÙ™,–YwÂ)≥{gãK©ÎÃ∞ŒJNlµ.öÏ<bı:…¡Û|˜c©•raØÑïIÂ7º ?ÎçÃ≥;ÎÑÏ§ÖGÚΩ	≤
---- END FILE: ./.git/objects/af/ebc91207b60db179e2155b8b736b9d4a141642 ---
-
---- START FILE: ./.git/objects/c3/1ba9b832695468caaed626f2471cc0b59dd4a1 ---
-xùéKnÑ0≥ˆ)z)x¸§Qî‰Mª-∞!‡Y‰ˆ±ÊŸæW%Ì•H´ı[;ô!ÜÃ7£)∏1ZO¡∆l»9õº%äNŸ°9™OÆÇ∂ﬁ3ÂNﬂÔûsM‰Ã—ÑÆŸ88Öœ∂Ï'|À∫ <äl\eE˘ôp˚ö ˆA{˘Ñ[tf¥—Ô:j≠˙⁄ˇCUò'ò•…\˜ì!˜Ä„∑wT §ÖA*“ 5xÄ5Ω†Iv©ù.ÿÑÆ·‰ÎπµÎu	™?óc.
---- END FILE: ./.git/objects/c3/1ba9b832695468caaed626f2471cc0b59dd4a1 ---
-
---- START FILE: ./.git/objects/cf/f27606a658d9657f85d134ed6aa324f1c97052 ---
-xùéKn!ΩÊΩèlÒoê"À»!ËÒ É3CÓŒ‡]ÈI•Wπ∑Vh´/„`ßc–¨%FM%±)e1íC#mëî¢ãN≥x”¡˚Äú≥Û)†≈ £µZ≥w≈ÊÃàéä˜ãR!GÙÇ˛∆⁄¯©Øï‡ª’ç˜˙¢˙õh{<’Ìñ{ªÉBkTîŒ¯í(•òÎ¸Å*®x”Xœk}Ó˝`Xf¡Ÿ€Ñ˘ääπMV
---- END FILE: ./.git/objects/cf/f27606a658d9657f85d134ed6aa324f1c97052 ---
-
---- START FILE: ./.git/objects/cf/ff8c3518d73d87ea2875e1cbc6870d1fdca8b1 ---
-xmR¡ä€0ÌY_1∞á∂∞d◊¶M≥A]áB MnÀRÇlO5≤∆ï∆È∫__…õd/ï@B3£7Ô=©2T¡4ùæyáø·ßhpßz√€J≥áÛêêﬁòâŒQ€Ò%¯≤K∞70'˚ñA˘#Ï»Å∂;
-£S5Îö·
-€6Ø˜%¯ÉJ?NEËº≈gFÎ5ŸsW˘ƒ®h¥gm˜Ωˆl∂Vµ °±B<Ö5PŒÂ¶©wêSoŸ¢¸!set`cµ∫$KVåwÖ£ì∂5ä•,ïÖoNŸZ˚: xÅ–<àµ¸>¿WMêu›%±v{eı_≈Å•Xo‰É4ÍZ¥¸øe`c5ã|%’ »«∫ú⁄ñ,¨¢éwAô1∞'j†Õ™Ò™û°ÃV†=qxuûΩb}_˝¬ö3√#ÇÑ/*ºVt≈«¬Î!îﬁ@÷4ê-ó0¶ÔÖáÅzË=®∫FÔÅ›	ùòØ IºΩ“ãb$Èß…}òI¿\ÏFe¸‚,éﬂ≈"ˇ!wÑEq*¥÷˙–Áx©ò§8yH'…têf‚/»
---- END FILE: ./.git/objects/cf/ff8c3518d73d87ea2875e1cbc6870d1fdca8b1 ---
-
---- START FILE: ./.git/objects/85/2e4b3ec3f839d6f2afba7e5b473f57ffdfe249 ---
-x}ì¡j‹0Ü{ŒSÇ%'≈Œ•îbíSO•îBË©»÷Ïz®<#9…R˙ÓïÌ›ƒﬁê¨Ò?øf>èZÁ[¯Ù±¸g¯úêmÑÎ÷DºÈ”‡Æa˜˜Í*jùÔ~C¢‰0áÓ…ÔΩ&Q·[h¯‚ú|ÿ.˙MrÁ9€ß…ÚUYz≤µ
-–£é…§1jbKùI^tŒƒ¯F°öŸ‡ˇ&y∑ïn÷∆`¯l1£Ë÷ãEÅÌR«AÅxáµZjR`ÑåÓ…Z‰Z%Q5U1Æj)rG´Â{˝∆^oz˘˙j3WöØŒú†E2Hwôâ7U.2¶ÕœÙƒcº¿ÒÇÔB¶[ì…/›áSÍäÈ8y"õ˙œPÓNPçë˝S≠ ud†j1œµ∫-K’îªjÀjÆeZ)NØÀ‘Ù∑Õ∫.$?˝(p1çw!TEñ-˙–¸Ë)BæSè0bÊÄ‡˜púíÛ‡∫i‹»Û+∆ @/∏ØUë	ˇ:É˘gmb»èBÉë£jæèﬂNc\¶ôNÃ˙¸‰ïY
---- END FILE: ./.git/objects/85/2e4b3ec3f839d6f2afba7e5b473f57ffdfe249 ---
-
---- START FILE: ./.git/objects/27/34b3471d596be1ff955abddc0c7cefa3b47a8a ---
-xçìKO„0ÖY˚Wú1l[(Â!2ñ¨ëXçF®∫Ink¸àlßi~¸∏%Ñ*ÇÏru|æú{ú\ªwÎõì”Áπ≤Á9ÖFà ˘û|πÒLe¯%œVRxﬁ≤<é.w£ä=€Ç75[g8	◊RDÚ5«§´ï≥ª√WR¸µÆ∑õ-yE6Óf◊RàS<)”iäå÷ªÇCP∂∆Ä∆-∏hdàªêeè329ËíMÌìOñ≠.§öπ≈j4˙
-4ëÉ÷ﬂk¬€öÊCçî«∏Îw9óÎmˇ)÷~ˇÛ∞©Óu;¢fW∏ØáZÖ™y6Ì[‚˘'b√V =≥ïN›‰Ò{ØwÈ£v&án+%>'T-keï≤*4\'[]$ót˝~ªΩÎt	Îº!≠_—–ñÒÍ:*bGÌ¡Æp∆ê-ötÁ”·Á¡/dZÕYzÕ{Çaì≤è%ÖL≥…ˇ$ÒÅLtNl˜X‰OX‡§Umπ‹ÚeN&Y/óK$2ÇÉ≥‚?º∆A
---- END FILE: ./.git/objects/27/34b3471d596be1ff955abddc0c7cefa3b47a8a ---
-
---- START FILE: ./.git/objects/46/8cc73693ec05f7fd29340bf928040634fee025 ---
-xùéQ¬ D˝Ê¸õò•–Óí„<ƒã%-V[ºøú¡ø…dﬁÃƒ≠÷“Ù`›©Ì"íÒ8zÊâ"†Û.çì1∫!òÄ,`ßú≠zÛ.Ø¶€ò-a"oùßL|œPv	"£¡≤G≈ﬂ6oª~îef}≠eïWY∏|Ø˜gÂ≤^‚Vo⁄†≥fò»z}P›Ìõ¸Å™$´4I∫wºw9é.sV?‹ÛJå
---- END FILE: ./.git/objects/46/8cc73693ec05f7fd29340bf928040634fee025 ---
-
---- START FILE: ./.git/objects/1c/e3b9928c2911db57428c43a8b71b3cccf8a96b ---
-xçèIn√0C≥÷)¥/|MñA/–CkàÖXVb´˜Ø=@wíè°’Z∫‘V_˙ëíÃ Ls'59ê«ê¨^tà‰M†ò3ì/iÔíÁ)áiaÎ„úìµÜ,3QÄÚDƒ¨úã?}má¸.œÚVÀñˆÚDy3∂ØGEŸÆ°’ªTﬁµê3F~–(√Ä=˝?Í‘_T F˘B_œœÚÿ€1ﬁÇ≥’!∆˛)~xåN
---- END FILE: ./.git/objects/1c/e3b9928c2911db57428c43a8b71b3cccf8a96b ---
-
---- START FILE: ./.git/objects/cc/c56b87478094422e65d4cce775ad66f118c976 ---
-x}ìKÔ¢H≈gÕß®=È?Ø§g“P †àÇ†»éGÅ(/P˘ÙmœÃ≤”7wsOrísnÚÀ∫¶©F¿BQ¸kàÀœBiQêúêLAYA$AŒR1/ƒ"AõqàÍìÅ¥#&I¡äy"$àED@'}Víaë©†|
-ë@%”xÈ∞≠nó|%(H
-‚ËÊ◊˝ç„~L2<æ⁄n }˝˛*´Ò2•_Y◊¸X	Ò¨¨JRız$0´—öR˝€è?⁄ æ|T%¯ˆk4√¥]∞7˜‡`õÆÑæÒØN
-<´LSU´™ßyÎVòœ*ˆ1õx“4	·•VUU≤CO5^	>MUΩZoÊ¡™÷"LÅuU–úãáy‚‹JÁ FkπÈÊ5√WíøxÁ]·≠Õ%˙l…†⁄6B‚u<˜ õ1}¬‘ß@{\†ë$Å}Ìˆáö°Ò'{î2«6NNWú6úü‘'wbøÍ≠õlvL4˙∂5çäÓ≠†¿™ºõãnùjûÁıKÜ„ho◊’≥∑‘,‡Ûõ87ªÎZ‚ÏP"Å€E¡<eyﬂN∆8ºêˆia¯≠(¥RjëMy›xƒa∫S∏™Ã≤f:ΩÑQæe◊4XHøVñf¬:2ÙπùMÅˆ4Aªm,i3˚éYªO∑ÃíäóCnÍ7≈|Èm!ÈTﬁÁÏóhn ≤¨É°¿-‹Ω:9ß°∂jUTö˚˚µk«√dÎ¬›@ï|¢SgFâ´ßI&Ù)†ûŒbåıõŸÓº≠ølO
-WK™O€¬2Êw[•Åey◊÷Ÿãy∆çïûmï[ïLÅ˝ûÀê9>˜ó1c-zÏtÇÚÖÀéΩXZ1ﬂl’æ3äÇpÓÆı%÷Iˆ÷Q0R‡]¿¢ØD«fÊRÎcÅM;¬H„ÌªìK˛6…˝$Ÿ*…•3_wçóháOèúú˛‡~>âiZC√√2—»ø¶øãziá÷÷M˘”∆TÔ°ÁqÎ1Ù=Î˙‘®K√”Q7(‡lÒ"E¬Î⁄°âüè…Üho
-¸=Ö≈ô˙è	√’Oˆy2‡™æ5æö¸'u˜J‚
---- END FILE: ./.git/objects/cc/c56b87478094422e65d4cce775ad66f118c976 ---
-
---- START FILE: ./.git/objects/ac/76a2c6425b45d9ba1b67bfa153d35a55a8a7c5 ---
-xçTMo”@Âú_1RP”J8ÅYµM°=T•
-Â¿©Z€k{âΩkˆ#*˝ÔÃÏ⁄âì¿ÀﬁŸ73ÔΩô§R	º˘˙„…j√•J\√ÖULfpÁL	V¡’ıl>a¶§’™2∞*π[r`©J¬JTh'«%„@ÉÈêh&”íõAÕÑÑ!‹kQòoS47îà ˝y∏Êë™ÍAÛﬂé˚ˇàwÎôá[Ãt¡≠ê≈3¸¡/ï¯“Í9¬û£]Èÿèâ∞pâì÷E≥Xƒ¿∑’p]c∞˜mg)í√•51hŒ2l}_ïl>](g˝5dÜ•V ∞“¬Ú.ä≤RÅ›q«:+Ym:íË/—sä0ñ7€Ùgî0!ñ—(#¨“õ67Ä3î9àf&]igÀwê‰	(ﬂπ◊Ï9b}Äíy∑L∑Æâ<Î( ü-ﬂ‚›®PˆŒK‰zB=-R•
-!{!–\∂5S¯£y!å’õä2’c°∂Öy@:x˘¯ﬁt…´B!ûûzq3f•t≈ûjnÕò|˛pw~è±®ﬁCä–'3ÄÍÊ¢pögá≠Ì∆ÖDÏ(5™ºM∏◊goõ}øç<l÷ªjmcoC»3_§¡Z–œ¬†gl	çË="x£ú&â´⁄brQÌJ†Oƒõ¥¥á©?àÜŸˇv{Ûs7Ï∂YÃ…¸–_¢„))Óà¨9j'æW≠ü(œs´áøı@2¡t
-#:¡—Q'óÊπˇèo3)qñÃ$ Ô)8ÑKûâ∞=Ü”o≠T’µ∞—ßó@dJˆπWK˛”˚ùã&µXî,:=ù$…ÃïÆô©âV<aM∑„ﬂπíﬁ≠ˇ˛u≥-®ÁH¨jﬂè»7:“”ò:≠â’∞˝<¬1„W-√'‰GﬁFÄ´Õ’ﬁÎw+ŸB-π÷"£≈ä‚d<gÆ≤4Ñﬁ ;’GŒÁWp1?øù]˜`ÇMŸ›',ÑN{˝†TAœâfwéó•Ìkz‡)DπVuv”iQ≤g«VÌ_’*„”ö≠º{	
---- END FILE: ./.git/objects/ac/76a2c6425b45d9ba1b67bfa153d35a55a8a7c5 ---
-
---- START FILE: ./.git/objects/79/d7286865a6d1fc7fef849b39a31efe663c4e9b ---
-xùŒAn√ @—Æ9≈Ï+E@00Rı=ƒ0åkcg≤ËÌÎ3t˚•'}ﬁ{o
-~rzà@¨%Æ9Âê|±k¶ê±L⁄ ‰êk(≈ít»¶‡úãícâ~ˆ1Á´-N,{$—ÂÎTSBBCo]ˆæ€c!∏ı∂ ÷‘ûÖ÷ØüNmΩﬁÔ‡RNô‡”&kÕYœAïPÛïT*–óÒ∫√, Ë"R“∆0ü#/Û4P=
---- END FILE: ./.git/objects/79/d7286865a6d1fc7fef849b39a31efe663c4e9b ---
-
---- START FILE: ./.git/objects/35/db1dc7f0ac6f9d8e234f451416d561d9049679 ---
-xçìQo”@«yŒß0/K*A OL€]'&uLBÏ›rN{ÙzÂX4Âªcﬂ5Y -R´k„øÌü˝ø{ÎÔ·ÙÙ√˚W⁄W›ïJÎıO>lL tÿ˘ÂÌÕ ;˛AØ4Í¸‘ù´»xW,‡1~j§jw€Q”—ï±ä≈Y6'S°w’ˇè∏cj˚„I“UﬁÇC√ÑsPøî°§.ÚÂÈ;øÏ,Ö|qÀ%‹5Zj@ßo¡›◊MlL≤ôä◊c≤“Ô«¶Âù<RÕ[,±m=Û^)&–@>’±†Æè?e
-§®Lô“§Ô©k›”√Ù6A≈4—îÎGêi>…¥	çU˝|§Qy†R<q(bœs†g0kaJ ∆mˇbIÚTv»Ü,7ˇm‡∏¶çXÖâ&Òz÷≈Mü˙k]‰±Ò∑ñ£x[….2Këï∆±«>ªŸpÇ<èª\YT-(◊>pà¥-Z0ÑáÂ≤–4«ìì¥ó“¢€“.‡›|1®¨}ªV’.J‡¸bÊ≥q˚+\sÅ9G’"õÍàR‰÷åÌè˚ñ∂DT>–*›N UKßq.MãŸ–AÇ≈sr£†8®Ω≤ª˘NYSÌ’Ω≈≈d))‚¥T”∞√W;cu1üôFnú@À◊Êq íñ5*^Ã8
-ûÒÂ_¸FÇ⁄wNóy*˛‚é≈oø¨ôi:
---- END FILE: ./.git/objects/35/db1dc7f0ac6f9d8e234f451416d561d9049679 ---
-
---- START FILE: ./.git/objects/35/8ca9ba93f089b0133f05933f133a446402eb17 ---
-xeRKk¬@ÓŸ_ˆ(6°z¨¥ñ⁄ûD fw¢S7ªagÇBÒøw◊±ˆ23ﬂ3…çÀì·È·ßì$Bπ≤B~Y1:K‚9â„∞`z©—Ëô-‹4ÑÖH3Î4|ïN◊(Kπ¨2&ÂlÅ€TVU îGåË]h§ﬂGÙd5Ë˙Ìº&CÅ¶Œèå$ö"ıŸ◊pÃ√`}Ö&bº\àﬁ˘ëŒºÃÉ≥ÕÂ∫Ò’HΩ¬ë[)⁄c5«|¥µøÚü›e›‰•∂:ƒOín÷ònòﬁÅú©c-ë3o[Riå;Ã  yFª˝†…ë¡“•¬õ8$É^4•]ıœ7:c`P≠L·ºÇVƒ∫Iâ±º¬o:F;§‚«¯“Î¥YÊh£ôkbèÍn›ß›ÎπS“‹’›Óﬁ§óe0ÂˇÌß!6Ôº´∑ªë$†ô]ê’ÓØ≈»£b€†W®aR!_”UÀ,ü‚ghï©u¸Ω÷ÇºõŒ©ÛéˇÃS
---- END FILE: ./.git/objects/35/8ca9ba93f089b0133f05933f133a446402eb17 ---
-
---- START FILE: ./.git/objects/1f/68328a767d263d64957bff64660b9cda4f514d ---
-xmRÀn¬0ÏôØ∞r‡‘,$ê=qËw Â±ÄibG∂ì∂™Ë∑◊k«$ îK<;3;ªvQÀÇmñ´óﬂcë»åﬁYtTRUÙJh´xü*’°ÉzTöKA‹%ÿœÕOÎ‰ç¨∫=¶K≈[£-ì:X∑
-{íı‹:íóÖäé◊ÅFó,.ÿ|Œ®Ã<>êj.qP”É nˆøÇ'gk}uY+lÌ((Jéì˘7ótå	la‹Ê•ksHv∑¡lDá«ïlºƒ◊&-˙èß]ˆ>Ì‚‚[Ì MÜeYœ=ÌK/Z&~ôı˚÷∑∏{⁄”E/⁄∫;qèVkXçC˘.˘}_àßÍ¯,ÂßOõ¡$Ï3™¬£B}v∆KXC≤k<Ÿgï◊√~≠O6NÌÜvèÇtl ≤±O2o!µﬁÅ„›€§÷ïÓ`vù˝ìΩm
---- END FILE: ./.git/objects/1f/68328a767d263d64957bff64660b9cda4f514d ---
-
---- START FILE: ./.git/objects/d6/14b2a56276c1942fbaa0dde2e001c057b44de1 ---
-xEåA
-¬0E]ÁÆ+Vª*x .&…§∆ô0I+ΩΩ%Ó˛{<æMb·råo¡FÈ>d1g„fd¶TF–Åˆÿ—âÔaS∆S&ˆƒ.“/Õ[ùÖo◊Sﬂ∑4`©òc€Àù(?v≥ˇ©6;-‹tÉÇÔ*íJÎ¬&¨ØépWÿdQ»JÅT…√äë+8Lâ‘|òD
---- END FILE: ./.git/objects/d6/14b2a56276c1942fbaa0dde2e001c057b44de1 ---
-
---- START FILE: ./.git/objects/81/e0f529a92235f74bc95c0bf2a8b69a9ba39fe0 ---
-xmQAN√0‰ÏW¨ƒµD\8¿≠¢U9PêPÔ‘q6≠iÏçÏMKnà7‰»°oÈS˙6m#â»áxf<;ÁÂpw{uo”Òd>UÍ°Ò¿kCé¿ÈBl4pπÅﬁv∫Æ1åz÷‘å†}⁄∞›ˆÙ[»;Ù,Ó©5‰-‡'öÜ≠_Å˘ñÀe›Úöº±>´[NÑ='™}†aD¨‘B2Fç·>ï⁄F4Ú´#îTU¥ã™w ‘±˚9v_≤ ◊fÉæ‰˚∞?Ï·ÿuFÓìÍ,Y_Rpö≠ââ|0*4Î\∆¶‚˛¿ ||øÃ¶œØ≥l>I‡SãÔRS÷∫*¡Kiçˇ&ú"˜a˛ ËÍJZO«^öıÌ¸ÿô+N•¸”⁄J
---- END FILE: ./.git/objects/81/e0f529a92235f74bc95c0bf2a8b69a9ba39fe0 ---
-
---- START FILE: ./.git/objects/e4/bb69c3023565ada33fd2e93856996bd0de5e4a ---
-xùéMj√0Fª÷)f_(£[Ñêd”ò—x[V"‘Bo_Á
-Ÿ}<xèèk)πÉqÓ£7p&&gƒ[‰Ÿ˘§ì0t6‡£ÇI&DÉzPìΩÉuë%ykºµBà,.ºi}öÖN8‡héà¢üæ‘∑º.Áí7ŸÛJ˘iªﬁÂÌãkπÄˆŒÎG?¬'zDu–„`ó7Tı-•˛ ”Ù¯c‚E¶	R´z#^Û~WˇlàN⁄
---- END FILE: ./.git/objects/e4/bb69c3023565ada33fd2e93856996bd0de5e4a ---
-
---- START FILE: ./.git/objects/44/6812ae69fe71ae4951683495495ffc72873a92 ---
-xùçK
-¬0@]Á≥Jõ§ÕEºÄgêIfjCÛ¡ooœ‡‚m<^®9«ÍS€E@ÏŸXcÇ«ÄãX‚—†FÁópp1÷íu*z∑µÓpè€J0Áò§ƒç‚ÀS∫=3≈‘ÖöØ08´«i—¡πw}Ø{õ¸ë*bÜP”C ß˚Ê§~±^<
---- END FILE: ./.git/objects/44/6812ae69fe71ae4951683495495ffc72873a92 ---
-
---- START FILE: ./.git/objects/4d/c72ed454e82f58dd1f05c4cee3171ec8112726 ---
-xùéÀç√0DsVºÙÒGÇ`HîH;D$;Ò ˝Øjÿ€`0ÔaÚ^´6/ÌG!-1dÒí3å-^f?∆ƒÅ'ûÜÖÃáŸ0⁄y8ı]<wM÷ı4⁄eD…cS∂ÜŒˆ⁄xÍ˚EpØZd”7È7Q˘Y+iπÂΩ>¿uõãﬁ9Ñ´ù≠5ΩÌõ¸5‘π˙i∫≠Pœ“~≠È‘¬Ê‚˘LÓ
---- END FILE: ./.git/objects/4d/c72ed454e82f58dd1f05c4cee3171ec8112726 ---
-
---- START FILE: ./.git/objects/be/f5202a32cbd0632c43de40f6e908532903fd42 ---
-xUé¡
-¬0Ü=˜)‚©h+zÇÇ^Ù	\•–.£ã0ﬂ›d”€ó??_RG™aΩYÕBj)3º‡¬98>ëGx√-SùÒÍX´±‚$`<ÒeÈ)Y6S[èΩq]7*vm˚U+l∏ÎµRì∂‰I4Êé|à8‡˛yÙÖŒrTóÛ“dk.@5}ºïQÇAoÆÏœn°JıG)N∞
---- END FILE: ./.git/objects/be/f5202a32cbd0632c43de40f6e908532903fd42 ---
-
---- START FILE: ./.git/objects/f7/1403f26eb115013e87479b4bd994f9532cb50b ---
-xùè[N√0E˘Œ*ÊD’ÿNb;BlÄEåÌIk≈Ø⁄.Î'®Ç†˘ªsètèÕ1˙ìîOΩ¡4sv‹‚å€∏·J‡$◊EΩ9‚⁄-nÂF/¬+•jë3ëB;F4ÛÕY!›äÃöIŒVmJk1Mz¿{øÊ
-ü~ø"ºE(˘˝Õ`¯∏DÙ·ls|Æf±(&ÉW¶éÙÿÈËÄŒëÉ‚üË‹ÆêåÌN…çX
-`ÑòÌ˛◊:¡Éj9“„”0ñ@Ìá5>˚¥Â±{€Fá˚ï⁄=tÿ±œùb9Å≈ïb˛"8‘˝%ÂJêyæ‘Cyî
---- END FILE: ./.git/objects/f7/1403f26eb115013e87479b4bd994f9532cb50b ---
-
---- START FILE: ./.git/objects/11/16e86b62f29698830b1e0c29ac461835d779a9 ---
-xùŒMJD1`◊9EÔÖ!/øÒûA:I«i&>Úﬁﬁú¡m’WPi¥∆î5/Î$Î|9R°≤îZ€CÙHî09Ì£º´{ÒFg1Ò§æ@™Ë‰∆J;w†∆+˝(…BÕº›ﬁº÷cú…œ¬[„Jùü»?Î«wCÆ∑4⁄;ﬁ®∞Ω*Ωîbß˚‡¢LEôSúÛ6a‡ûÍï	Œ´MûTπ”ÆY¸qR
---- END FILE: ./.git/objects/11/16e86b62f29698830b1e0c29ac461835d779a9 ---
-
---- START FILE: ./.git/objects/15/992816d4b97035c0189d43b3611c387f9936ab ---
-xùŒMj!@·¨=EÌ¡ø≤Üê‰•ñ3≈¥v«8˜Oü!€ærÙ.,∫∑5ô=E‘TôåUõîò(AWÁsF◊öŸ´ì&è∆ò¿1‰`õM!≈Ët6¨ãMT|0—a›∂DI—k=é	ﬂÚ|‹∫Ï<‰IÚìiˇ∫wí˝£˝ÃÊmÚ5¬ªﬁ¥VWΩÄãˇ±*™ï+d˙ïmcÒ®–.≈|8Â‰]√IwVÃêQ+
---- END FILE: ./.git/objects/15/992816d4b97035c0189d43b3611c387f9936ab ---
-
---- START FILE: ./.git/objects/93/0f9e301a5ddba6f3cdd8e0b7bf3a479db73988 ---
-xùŒAé!@Q◊ú¢ˆ&#Ut%f‚<D’JÑnß•ÔØgòÌO^ÚÛ⁄{‡<∆¶
-^Ì,ÑöÖœ¬n¢¬!då(%ób,:„l^≤È2@CJƒŸ[ÁëPäx?ßÏ'$fJ≈EbdèuÉ[}>.Ω6]ÍSÍ_ívΩw©Ì'Ø˝Œ18ˆq"G≠5ﬂ˙˙jrSY¥¿˛ÇSë!p⁄ÙΩ∑Ò6CÏKƒ
---- END FILE: ./.git/objects/93/0f9e301a5ddba6f3cdd8e0b7bf3a479db73988 ---
-
---- START FILE: ./.git/ORIG_HEAD ---
-5b47b36b3f74e3a438c2f68a66e5047be7c0d896
---- END FILE: ./.git/ORIG_HEAD ---
-
---- START FILE: ./.git/description ---
-Unnamed repository; edit this file 'description' to name the repository.
---- END FILE: ./.git/description ---
-
---- START FILE: ./.git/logs/refs/heads/development ---
-0000000000000000000000000000000000000000 f71403f26eb115013e87479b4bd994f9532cb50b Mikha <milenikaiqbal@gmail.com> 1742580290 +0700	branch: Created from origin/development
-f71403f26eb115013e87479b4bd994f9532cb50b bc89b4209719884762a46bc1634b7265decec95e Mikha <milenikaiqbal@gmail.com> 1742938997 +0700	pull: Fast-forward
-bc89b4209719884762a46bc1634b7265decec95e 02b60f9d23661a3944f50719ec0fe9a419757434 Mikha <milenikaiqbal@gmail.com> 1742940228 +0700	merge feat_backend: Fast-forward
-02b60f9d23661a3944f50719ec0fe9a419757434 1116e86b62f29698830b1e0c29ac461835d779a9 Mikha <milenikaiqbal@gmail.com> 1742943537 +0700	merge feat_backend: Fast-forward
-1116e86b62f29698830b1e0c29ac461835d779a9 15992816d4b97035c0189d43b3611c387f9936ab Mikha <milenikaiqbal@gmail.com> 1742944529 +0700	merge feat_frontend: Fast-forward
-15992816d4b97035c0189d43b3611c387f9936ab e54780b7e7ab2908e44f7f7b4e8e3d4098e607ec Mikha <milenikaiqbal@gmail.com> 1742944646 +0700	merge feat_backend: Merge made by the 'ort' strategy.
-e54780b7e7ab2908e44f7f7b4e8e3d4098e607ec 05ef25326bce128b8431d53a6b061a1f0e81019c Mikha <milenikaiqbal@gmail.com> 1742944897 +0700	merge feat_backend: Merge made by the 'ort' strategy.
-05ef25326bce128b8431d53a6b061a1f0e81019c 894feab75b3e80d2af9e20a90fc4801a9e16b852 Mikha <milenikaiqbal@gmail.com> 1742945170 +0700	merge feat_frontend: Merge made by the 'ort' strategy.
-894feab75b3e80d2af9e20a90fc4801a9e16b852 42ce1817c35b62eddcc56d4975ea6f2efd3902aa Mikha <milenikaiqbal@gmail.com> 1742946055 +0700	commit: removed results
-42ce1817c35b62eddcc56d4975ea6f2efd3902aa 3f7667d3149c3deb66a225192a9e80922cf0b401 Mikha <milenikaiqbal@gmail.com> 1742949895 +0700	commit: moved index.html and app.py
-3f7667d3149c3deb66a225192a9e80922cf0b401 73c939b604cf4cf7dae0499ab31962e42fd5d174 Mikha <milenikaiqbal@gmail.com> 1742952929 +0700	commit: moving index.html to /frontend
-73c939b604cf4cf7dae0499ab31962e42fd5d174 a1c771547de9434980502a418fe0f21e111ad507 Mikha <milenikaiqbal@gmail.com> 1742994965 +0700	merge feat_backend: Fast-forward
-a1c771547de9434980502a418fe0f21e111ad507 6f0a06f71a6b1158ecf7f8770b7cc81f730e61fd Mikha <milenikaiqbal@gmail.com> 1742995391 +0700	merge feat_frontend: Merge made by the 'ort' strategy.
-6f0a06f71a6b1158ecf7f8770b7cc81f730e61fd 384dc311441f8e06f63073f06d13765628681c14 Mikha <milenikaiqbal@gmail.com> 1742997062 +0700	commit: progress bar
-384dc311441f8e06f63073f06d13765628681c14 267ea81e4ea35ce281f8317093fed10c5878a62f Mikha <milenikaiqbal@gmail.com> 1742997863 +0700	commit: restructured the frontend folder, now contains static/ and templates/
-267ea81e4ea35ce281f8317093fed10c5878a62f 7af6bac7dc9957815545eb75f1acbfaca2617ab7 Mikha <milenikaiqbal@gmail.com> 1742998375 +0700	commit: fixed app.py folder
-7af6bac7dc9957815545eb75f1acbfaca2617ab7 54cb864460ebd510cf281e47e2301974289da1f8 Mikha <milenikaiqbal@gmail.com> 1742998555 +0700	commit: app.py
-54cb864460ebd510cf281e47e2301974289da1f8 c5c8822487f4436b2bde404ac1b67455b16a2d01 Mikha <milenikaiqbal@gmail.com> 1742999909 +0700	commit: app.py
-c5c8822487f4436b2bde404ac1b67455b16a2d01 5897013e9b8281653cd672792810c0e8aa317b2d Mikha <milenikaiqbal@gmail.com> 1743004242 +0700	commit: added results page
-5897013e9b8281653cd672792810c0e8aa317b2d 151d3ab5776ff8411864450a5ba4c05cbc141eab Mikha <milenikaiqbal@gmail.com> 1743004466 +0700	commit: updated app.py to serve results.html
-151d3ab5776ff8411864450a5ba4c05cbc141eab 6a32fd8216e961b0da4c80095f55be60dd3d26ed Mikha <milenikaiqbal@gmail.com> 1743004981 +0700	commit: updated app.py
-6a32fd8216e961b0da4c80095f55be60dd3d26ed 929460fd6b1b7ae6b49fa4afb0053d7a1d937244 Mikha <milenikaiqbal@gmail.com> 1743005459 +0700	commit: .
-929460fd6b1b7ae6b49fa4afb0053d7a1d937244 e63640a807c1edf582bde2797e6057022145d861 Mikha <milenikaiqbal@gmail.com> 1743005784 +0700	commit: .
-e63640a807c1edf582bde2797e6057022145d861 abaa08fe73c1bb1745979c34f0cedd1f9675c974 Mikha <milenikaiqbal@gmail.com> 1743007451 +0700	commit: .
-abaa08fe73c1bb1745979c34f0cedd1f9675c974 5ae7467be947c5ec3d92e3801277ac054b24af33 Mikha <milenikaiqbal@gmail.com> 1743009394 +0700	commit: .
-5ae7467be947c5ec3d92e3801277ac054b24af33 6126211304f8deb65c269df838619fe15b496a86 Mikha <milenikaiqbal@gmail.com> 1743009893 +0700	commit: .
-6126211304f8deb65c269df838619fe15b496a86 d9f69572c468b549db0c9da028b3df0c1bdc6b00 Mikha <milenikaiqbal@gmail.com> 1743012326 +0700	commit: finalized
-d9f69572c468b549db0c9da028b3df0c1bdc6b00 0ae6170dbe3523eedd29bd2d7051e166fc9d8dab Mikha <milenikaiqbal@gmail.com> 1743012992 +0700	commit: updated readme tree
-0ae6170dbe3523eedd29bd2d7051e166fc9d8dab 8f38d35e439fa6c448c8df0939b8d3e55de19f2d Mikha <milenikaiqbal@gmail.com> 1743013059 +0700	commit: .
-8f38d35e439fa6c448c8df0939b8d3e55de19f2d eb2555d9c266568abe46eb6d1e5b102945f9cf9c Mikha <milenikaiqbal@gmail.com> 1743028628 +0700	commit: now results are unclickable
-eb2555d9c266568abe46eb6d1e5b102945f9cf9c 41c13af0579c5ee3b8a70851475a60294cf1c3f8 Mikha <milenikaiqbal@gmail.com> 1743036396 +0700	commit: added filebrowser
-41c13af0579c5ee3b8a70851475a60294cf1c3f8 981e16e0d7d6fc88ba4e2b92781636993ca7b7a5 Mikha <milenikaiqbal@gmail.com> 1743037356 +0700	commit: .
-981e16e0d7d6fc88ba4e2b92781636993ca7b7a5 e26070f8b96a750894e87faf7fca8832723cd23b Mikha <milenikaiqbal@gmail.com> 1743041652 +0700	commit: .
-e26070f8b96a750894e87faf7fca8832723cd23b 09f9640a65de655b4aeb0760c3e0ea9716d4abc1 Mikha <milenikaiqbal@gmail.com> 1743044737 +0700	commit: updated mock pipeline.sh
-09f9640a65de655b4aeb0760c3e0ea9716d4abc1 d5764662153ccc925e62b67ce90695e1c57b6882 Mikha <milenikaiqbal@gmail.com> 1743046165 +0700	commit: updated python to ver 3.11 in conda_env.yml
-d5764662153ccc925e62b67ce90695e1c57b6882 2e66c58c3d9d382b1e51747a5abbcd0357afa08d Mikha <milenikaiqbal@gmail.com> 1743046576 +0700	commit: fixed app.py
-2e66c58c3d9d382b1e51747a5abbcd0357afa08d 132fdccd1e9fe64bcd3932589573505fbdd0b6d9 Mikha <milenikaiqbal@gmail.com> 1743049319 +0700	commit: .
-132fdccd1e9fe64bcd3932589573505fbdd0b6d9 804b5f45fcbcab35247a0dc1c53624cd693646c2 Mikha <milenikaiqbal@gmail.com> 1743119625 +0700	commit: added Dockerfile
-804b5f45fcbcab35247a0dc1c53624cd693646c2 ff9893a11297aa3355245700a9243cb05f7775e1 Mikha <milenikaiqbal@gmail.com> 1743120508 +0700	commit: updated main.py to listen to 0.0.0.0
-ff9893a11297aa3355245700a9243cb05f7775e1 9fcc859d60f7fb7f5fdb23cee10a8612240fb79c Mikha <milenikaiqbal@gmail.com> 1743125481 +0700	commit: updated dockerfile
-9fcc859d60f7fb7f5fdb23cee10a8612240fb79c 1a3cf387d893498f8ab9ae0808f4d0ca717bbf97 Mikha <milenikaiqbal@gmail.com> 1743125908 +0700	commit: added compressed conda env directory, image building
-1a3cf387d893498f8ab9ae0808f4d0ca717bbf97 468cc73693ec05f7fd29340bf928040634fee025 Mikha <milenikaiqbal@gmail.com> 1743126839 +0700	commit: deleted compressed file
-468cc73693ec05f7fd29340bf928040634fee025 76d99c3dfaaea86b590a5ef596d098b4a1ed3e1b Mikha <milenikaiqbal@gmail.com> 1743127503 +0700	commit: made a folder for builder
-76d99c3dfaaea86b590a5ef596d098b4a1ed3e1b 0762a9910dd83fe32a4cf195d455d3e090a339d4 Mikha <milenikaiqbal@gmail.com> 1743175440 +0700	commit: added dockerbuild files
-0762a9910dd83fe32a4cf195d455d3e090a339d4 78f8b12efb6bee55bdce5ae377e45237a8e44508 Mikha <milenikaiqbal@gmail.com> 1743178864 +0700	commit: added .github/deployment for github actions
-78f8b12efb6bee55bdce5ae377e45237a8e44508 d9b399bdb287a6270cb1f52a02a5e8b0e832b317 Mikha <milenikaiqbal@gmail.com> 1743180455 +0700	merge main: Fast-forward
-d9b399bdb287a6270cb1f52a02a5e8b0e832b317 d9074396398342d239a60142d50f59ecd88b5bc0 Mikha <milenikaiqbal@gmail.com> 1743181330 +0700	commit: .
-d9074396398342d239a60142d50f59ecd88b5bc0 4dc72ed454e82f58dd1f05c4cee3171ec8112726 Mikha <milenikaiqbal@gmail.com> 1743182380 +0700	merge main: Fast-forward
-4dc72ed454e82f58dd1f05c4cee3171ec8112726 db2c276f7742bf69e546f8506f25f8854b192677 Mikha <milenikaiqbal@gmail.com> 1743182415 +0700	commit: attempting multi stage build
-db2c276f7742bf69e546f8506f25f8854b192677 fa3a71a362b37c9686d05087157403a4b354222a Mikha <milenikaiqbal@gmail.com> 1743183267 +0700	merge main: Fast-forward
-fa3a71a362b37c9686d05087157403a4b354222a d0a03bff072e8356f6420e6a9730c2e5888254de Mikha <milenikaiqbal@gmail.com> 1743184964 +0700	commit: multi stage build + building mamba env in builder
-d0a03bff072e8356f6420e6a9730c2e5888254de 8a7bc9638ade5df2c7998d149a94957eed0e8bf9 Mikha <milenikaiqbal@gmail.com> 1743185497 +0700	merge main: Fast-forward
-8a7bc9638ade5df2c7998d149a94957eed0e8bf9 5980aaf16da5a414e54227227780fafb59f3b045 Mikha <milenikaiqbal@gmail.com> 1743188335 +0700	merge main: Fast-forward
-5980aaf16da5a414e54227227780fafb59f3b045 6c9ab384e5875cbc9a32fe48e816b1cb2dae41e9 Mikha <milenikaiqbal@gmail.com> 1743206336 +0700	commit: configured TLS for both main app and filebrowser
-6c9ab384e5875cbc9a32fe48e816b1cb2dae41e9 7dfc0e678422f99fb25ebfd076a83ac63cc7e784 Mikha <milenikaiqbal@gmail.com> 1743206811 +0700	merge main: Fast-forward
-7dfc0e678422f99fb25ebfd076a83ac63cc7e784 5b47b36b3f74e3a438c2f68a66e5047be7c0d896 Mikha <milenikaiqbal@gmail.com> 1743211597 +0700	commit: changed iframe adddress port from 8080 to 8081
-5b47b36b3f74e3a438c2f68a66e5047be7c0d896 14cc6fef334482814d59d8307800d030ea43e621 Mikha <milenikaiqbal@gmail.com> 1743360455 +0700	merge main: Fast-forward
-14cc6fef334482814d59d8307800d030ea43e621 f932347fce94f1459e501171596c783892db14ae Mikha <milenikaiqbal@gmail.com> 1743365145 +0700	commit: added project context txt dump
---- END FILE: ./.git/logs/refs/heads/development ---
-
---- START FILE: ./.git/logs/refs/heads/feat_frontend ---
-0000000000000000000000000000000000000000 308c54accf794a8455bb70f526f3e85faf9935bc Mikha <milenikaiqbal@gmail.com> 1742576437 +0700	branch: Created from backend
-308c54accf794a8455bb70f526f3e85faf9935bc 308c54accf794a8455bb70f526f3e85faf9935bc Mikha <milenikaiqbal@gmail.com> 1742943588 +0700	Branch: renamed refs/heads/frontend to refs/heads/feat_frontend
-308c54accf794a8455bb70f526f3e85faf9935bc 1116e86b62f29698830b1e0c29ac461835d779a9 Mikha <milenikaiqbal@gmail.com> 1742943816 +0700	reset: moving to development
-1116e86b62f29698830b1e0c29ac461835d779a9 15992816d4b97035c0189d43b3611c387f9936ab Mikha <milenikaiqbal@gmail.com> 1742944505 +0700	commit: added basic frontend for run pipeline page
-15992816d4b97035c0189d43b3611c387f9936ab a01ae2d5a3de1a3ad324bdddaa47dad4bc0e8fcd Mikha <milenikaiqbal@gmail.com> 1742945151 +0700	commit: static files proper path, test
-a01ae2d5a3de1a3ad324bdddaa47dad4bc0e8fcd 73c939b604cf4cf7dae0499ab31962e42fd5d174 Mikha <milenikaiqbal@gmail.com> 1742992343 +0700	merge development: Fast-forward
-73c939b604cf4cf7dae0499ab31962e42fd5d174 adccb25a561e55fe7826854109cb889df9898737 Mikha <milenikaiqbal@gmail.com> 1742995350 +0700	commit: progress bar frontend
---- END FILE: ./.git/logs/refs/heads/feat_frontend ---
-
---- START FILE: ./.git/logs/refs/heads/master ---
-0000000000000000000000000000000000000000 446812ae69fe71ae4951683495495ffc72873a92 Mikha <milenikaiqbal@gmail.com> 1742566587 +0700	commit (initial): added conda_env.yml
---- END FILE: ./.git/logs/refs/heads/master ---
-
---- START FILE: ./.git/logs/refs/heads/show ---
-0000000000000000000000000000000000000000 f71403f26eb115013e87479b4bd994f9532cb50b Mikha <milenikaiqbal@gmail.com> 1742573318 +0700	branch: Created from backend
---- END FILE: ./.git/logs/refs/heads/show ---
-
---- START FILE: ./.git/logs/refs/heads/feat_backend ---
-0000000000000000000000000000000000000000 446812ae69fe71ae4951683495495ffc72873a92 Mikha <milenikaiqbal@gmail.com> 1742566640 +0700	branch: Created from master
-446812ae69fe71ae4951683495495ffc72873a92 7564eeb228d0ee41fdc26d9a0cb364c7f7882338 Mikha <milenikaiqbal@gmail.com> 1742568133 +0700	commit: created api to list data and result, and sample items in the directory to test API
-7564eeb228d0ee41fdc26d9a0cb364c7f7882338 f71403f26eb115013e87479b4bd994f9532cb50b Mikha <milenikaiqbal@gmail.com> 1742570600 +0700	commit: added pipeline.sh on /backend/app as a mock pipeline, added some mock samples on bioinformatics/data, added result files (temp, can remove or ignore later)
-f71403f26eb115013e87479b4bd994f9532cb50b 735093b2e45be96ac4bf4db608e7533951487d85 Mikha <milenikaiqbal@gmail.com> 1742573719 +0700	commit: added mockup pipeline function to test
-735093b2e45be96ac4bf4db608e7533951487d85 308c54accf794a8455bb70f526f3e85faf9935bc Mikha <milenikaiqbal@gmail.com> 1742575882 +0700	commit: todo.md
-308c54accf794a8455bb70f526f3e85faf9935bc 603522a9fcf5c6885cdeef927efe726d533f6e64 Mikha <milenikaiqbal@gmail.com> 1742937320 +0700	commit: deleting temporary results for testing
-603522a9fcf5c6885cdeef927efe726d533f6e64 c31ba9b832695468caaed626f2471cc0b59dd4a1 Mikha <milenikaiqbal@gmail.com> 1742937560 +0700	commit: added gitignore for python cache in /backend/app and for bioinformatics/results and /data
-c31ba9b832695468caaed626f2471cc0b59dd4a1 34bcef732733ea00ce493ea0a118dea805062fec Mikha <milenikaiqbal@gmail.com> 1742937647 +0700	commit: fixed
-34bcef732733ea00ce493ea0a118dea805062fec e4bb69c3023565ada33fd2e93856996bd0de5e4a Mikha <milenikaiqbal@gmail.com> 1742937676 +0700	commit: Removed __pycache__ from tracking
-e4bb69c3023565ada33fd2e93856996bd0de5e4a 930f9e301a5ddba6f3cdd8e0b7bf3a479db73988 Mikha <milenikaiqbal@gmail.com> 1742937863 +0700	commit: cleaned up /data /results
-930f9e301a5ddba6f3cdd8e0b7bf3a479db73988 bc89b4209719884762a46bc1634b7265decec95e Mikha <milenikaiqbal@gmail.com> 1742939126 +0700	reset: moving to development
-bc89b4209719884762a46bc1634b7265decec95e bc89b4209719884762a46bc1634b7265decec95e Mikha <milenikaiqbal@gmail.com> 1742939206 +0700	Branch: renamed refs/heads/backend to refs/heads/feat_backend
-bc89b4209719884762a46bc1634b7265decec95e 02b60f9d23661a3944f50719ec0fe9a419757434 Mikha <milenikaiqbal@gmail.com> 1742940136 +0700	commit: updated gitignore
-02b60f9d23661a3944f50719ec0fe9a419757434 1116e86b62f29698830b1e0c29ac461835d779a9 Mikha <milenikaiqbal@gmail.com> 1742943459 +0700	commit: modified app.py to include run_pipeline api
-1116e86b62f29698830b1e0c29ac461835d779a9 79d7286865a6d1fc7fef849b39a31efe663c4e9b Mikha <milenikaiqbal@gmail.com> 1742944617 +0700	commit: updated app.py to fetch the static files
-79d7286865a6d1fc7fef849b39a31efe663c4e9b dce1888c2693430ec2b788f6682a84dc622d3d38 Mikha <milenikaiqbal@gmail.com> 1742944882 +0700	commit: app py to serve static files from root / front end
-dce1888c2693430ec2b788f6682a84dc622d3d38 73c939b604cf4cf7dae0499ab31962e42fd5d174 Mikha <milenikaiqbal@gmail.com> 1742992365 +0700	merge development: Fast-forward
-73c939b604cf4cf7dae0499ab31962e42fd5d174 a1c771547de9434980502a418fe0f21e111ad507 Mikha <milenikaiqbal@gmail.com> 1742994925 +0700	commit: websocket progress bar simulation
---- END FILE: ./.git/logs/refs/heads/feat_backend ---
-
---- START FILE: ./.git/logs/refs/heads/main ---
-0000000000000000000000000000000000000000 f71403f26eb115013e87479b4bd994f9532cb50b Mikha <milenikaiqbal@gmail.com> 1742573267 +0700	branch: Created from backend
-f71403f26eb115013e87479b4bd994f9532cb50b 78f8b12efb6bee55bdce5ae377e45237a8e44508 Mikha <milenikaiqbal@gmail.com> 1743178929 +0700	merge development: Fast-forward
-78f8b12efb6bee55bdce5ae377e45237a8e44508 ef28bdbdffe15efc5555493eeb3b90353e6c1fb4 Mikha <milenikaiqbal@gmail.com> 1743179116 +0700	commit: fixed github actions
-ef28bdbdffe15efc5555493eeb3b90353e6c1fb4 646a83085bb9a224ef5e424b02948d34b13d39c0 Mikha <milenikaiqbal@gmail.com> 1743179651 +0700	commit: .
-646a83085bb9a224ef5e424b02948d34b13d39c0 e0ea6ab3f4c8ef7057432b9e1a82b33c5ddbc68a Mikha <milenikaiqbal@gmail.com> 1743179785 +0700	commit: fixed
-e0ea6ab3f4c8ef7057432b9e1a82b33c5ddbc68a 5928108d3e961d79a59e24d8957d9f1f1fe67230 Mikha <milenikaiqbal@gmail.com> 1743179939 +0700	commit: .
-5928108d3e961d79a59e24d8957d9f1f1fe67230 fad3673afc8df9a3b51a64deb8e83731d4d7fbe3 Mikha <milenikaiqbal@gmail.com> 1743180033 +0700	commit: .
-fad3673afc8df9a3b51a64deb8e83731d4d7fbe3 d9b399bdb287a6270cb1f52a02a5e8b0e832b317 Mikha <milenikaiqbal@gmail.com> 1743180209 +0700	commit: .
-d9b399bdb287a6270cb1f52a02a5e8b0e832b317 d9074396398342d239a60142d50f59ecd88b5bc0 Mikha <milenikaiqbal@gmail.com> 1743181344 +0700	merge development: Fast-forward
-d9074396398342d239a60142d50f59ecd88b5bc0 4dc72ed454e82f58dd1f05c4cee3171ec8112726 Mikha <milenikaiqbal@gmail.com> 1743182119 +0700	commit: attempting multi stage build
-4dc72ed454e82f58dd1f05c4cee3171ec8112726 db2c276f7742bf69e546f8506f25f8854b192677 Mikha <milenikaiqbal@gmail.com> 1743182426 +0700	merge development: Fast-forward
-db2c276f7742bf69e546f8506f25f8854b192677 f4a0fef53a3f728995c8335f6ed517b8ec1b6905 Mikha <milenikaiqbal@gmail.com> 1743182660 +0700	commit: attempting multi-stage build
-f4a0fef53a3f728995c8335f6ed517b8ec1b6905 fa3a71a362b37c9686d05087157403a4b354222a Mikha <milenikaiqbal@gmail.com> 1743182915 +0700	commit: attempting multi-stage build
-fa3a71a362b37c9686d05087157403a4b354222a d0a03bff072e8356f6420e6a9730c2e5888254de Mikha <milenikaiqbal@gmail.com> 1743185018 +0700	merge development: Fast-forward
-d0a03bff072e8356f6420e6a9730c2e5888254de 8a7bc9638ade5df2c7998d149a94957eed0e8bf9 Mikha <milenikaiqbal@gmail.com> 1743185481 +0700	commit: finalized Dockerfile config for minimum size
-8a7bc9638ade5df2c7998d149a94957eed0e8bf9 bd2de2448251d37af18bd84fd94a1c9b8eeda088 Mikha <milenikaiqbal@gmail.com> 1743186408 +0700	commit: multi-stage build without tarball
-bd2de2448251d37af18bd84fd94a1c9b8eeda088 5980aaf16da5a414e54227227780fafb59f3b045 Mikha <milenikaiqbal@gmail.com> 1743187105 +0700	commit: nocache:true during build
-5980aaf16da5a414e54227227780fafb59f3b045 ccc56b87478094422e65d4cce775ad66f118c976 Mikha <milenikaiqbal@gmail.com> 1743189536 +0700	pull: Fast-forward
-ccc56b87478094422e65d4cce775ad66f118c976 cff27606a658d9657f85d134ed6aa324f1c97052 Mikha <milenikaiqbal@gmail.com> 1743190533 +0700	commit: add paths-ignore for some files
-cff27606a658d9657f85d134ed6aa324f1c97052 1ce3b9928c2911db57428c43a8b71b3cccf8a96b Mikha <milenikaiqbal@gmail.com> 1743190551 +0700	pull (finish): refs/heads/main onto b86f35a69b47d8fe44304bb00ca17000bacb155d
-1ce3b9928c2911db57428c43a8b71b3cccf8a96b 658784aeda5ce6cdbb7a990953f92a48f95d59f0 Mikha <milenikaiqbal@gmail.com> 1743206382 +0700	merge development: Merge made by the 'ort' strategy.
-658784aeda5ce6cdbb7a990953f92a48f95d59f0 7dfc0e678422f99fb25ebfd076a83ac63cc7e784 Mikha <milenikaiqbal@gmail.com> 1743206782 +0700	commit: fixed iframe to load to https instead of http
-7dfc0e678422f99fb25ebfd076a83ac63cc7e784 5b47b36b3f74e3a438c2f68a66e5047be7c0d896 Mikha <milenikaiqbal@gmail.com> 1743211610 +0700	merge development: Fast-forward
-5b47b36b3f74e3a438c2f68a66e5047be7c0d896 138e871c76193238c93d37a302c4f7ddbd444fb7 Mikha <milenikaiqbal@gmail.com> 1743211718 +0700	commit: updated README.md
-138e871c76193238c93d37a302c4f7ddbd444fb7 14cc6fef334482814d59d8307800d030ea43e621 Mikha <milenikaiqbal@gmail.com> 1743360437 +0700	commit: q
---- END FILE: ./.git/logs/refs/heads/main ---
-
---- START FILE: ./.git/logs/refs/heads/feat_queue ---
-0000000000000000000000000000000000000000 f932347fce94f1459e501171596c783892db14ae Mikha <milenikaiqbal@gmail.com> 1743366062 +0700	branch: Created from development
-f932347fce94f1459e501171596c783892db14ae 830fa9d199be7816443a2335be6aaea59e66f9f3 Mikha <milenikaiqbal@gmail.com> 1743367547 +0700	commit: modified project_context
-830fa9d199be7816443a2335be6aaea59e66f9f3 de185e5fa309761f52c9bc5e0656b0f91eeadfe6 Mikha <milenikaiqbal@gmail.com> 1743367659 +0700	commit: fixed project context
-de185e5fa309761f52c9bc5e0656b0f91eeadfe6 3d019736ce006b6f937a0d48b478b385ab3f6078 Mikha <milenikaiqbal@gmail.com> 1743368048 +0700	commit: added working queue system
-3d019736ce006b6f937a0d48b478b385ab3f6078 cc2d6824b4b807c1c59d26091d5d1d224fe77c70 Mikha <milenikaiqbal@gmail.com> 1743368396 +0700	commit: added docs for redisQ task queueing
---- END FILE: ./.git/logs/refs/heads/feat_queue ---
-
---- START FILE: ./.git/logs/refs/remotes/origin/development ---
-0000000000000000000000000000000000000000 f71403f26eb115013e87479b4bd994f9532cb50b Mikha <milenikaiqbal@gmail.com> 1742580225 +0700	pull origin development: storing head
-f71403f26eb115013e87479b4bd994f9532cb50b bc89b4209719884762a46bc1634b7265decec95e Mikha <milenikaiqbal@gmail.com> 1742581019 +0700	pull origin development: fast-forward
-bc89b4209719884762a46bc1634b7265decec95e 02b60f9d23661a3944f50719ec0fe9a419757434 Mikha <milenikaiqbal@gmail.com> 1742943520 +0700	update by push
-02b60f9d23661a3944f50719ec0fe9a419757434 1116e86b62f29698830b1e0c29ac461835d779a9 Mikha <milenikaiqbal@gmail.com> 1742943542 +0700	update by push
-1116e86b62f29698830b1e0c29ac461835d779a9 15992816d4b97035c0189d43b3611c387f9936ab Mikha <milenikaiqbal@gmail.com> 1742944535 +0700	update by push
-15992816d4b97035c0189d43b3611c387f9936ab e54780b7e7ab2908e44f7f7b4e8e3d4098e607ec Mikha <milenikaiqbal@gmail.com> 1742944666 +0700	update by push
-e54780b7e7ab2908e44f7f7b4e8e3d4098e607ec 05ef25326bce128b8431d53a6b061a1f0e81019c Mikha <milenikaiqbal@gmail.com> 1742944905 +0700	update by push
-05ef25326bce128b8431d53a6b061a1f0e81019c 894feab75b3e80d2af9e20a90fc4801a9e16b852 Mikha <milenikaiqbal@gmail.com> 1742945189 +0700	update by push
-894feab75b3e80d2af9e20a90fc4801a9e16b852 42ce1817c35b62eddcc56d4975ea6f2efd3902aa Mikha <milenikaiqbal@gmail.com> 1742946061 +0700	update by push
-42ce1817c35b62eddcc56d4975ea6f2efd3902aa 73c939b604cf4cf7dae0499ab31962e42fd5d174 Mikha <milenikaiqbal@gmail.com> 1742992328 +0700	update by push
-73c939b604cf4cf7dae0499ab31962e42fd5d174 a1c771547de9434980502a418fe0f21e111ad507 Mikha <milenikaiqbal@gmail.com> 1742994970 +0700	update by push
-a1c771547de9434980502a418fe0f21e111ad507 6f0a06f71a6b1158ecf7f8770b7cc81f730e61fd Mikha <milenikaiqbal@gmail.com> 1742995398 +0700	update by push
-6f0a06f71a6b1158ecf7f8770b7cc81f730e61fd 267ea81e4ea35ce281f8317093fed10c5878a62f Mikha <milenikaiqbal@gmail.com> 1742997870 +0700	update by push
-267ea81e4ea35ce281f8317093fed10c5878a62f 7af6bac7dc9957815545eb75f1acbfaca2617ab7 Mikha <milenikaiqbal@gmail.com> 1742998384 +0700	update by push
-7af6bac7dc9957815545eb75f1acbfaca2617ab7 54cb864460ebd510cf281e47e2301974289da1f8 Mikha <milenikaiqbal@gmail.com> 1742998559 +0700	update by push
-54cb864460ebd510cf281e47e2301974289da1f8 c5c8822487f4436b2bde404ac1b67455b16a2d01 Mikha <milenikaiqbal@gmail.com> 1742999915 +0700	update by push
-c5c8822487f4436b2bde404ac1b67455b16a2d01 5897013e9b8281653cd672792810c0e8aa317b2d Mikha <milenikaiqbal@gmail.com> 1743004284 +0700	update by push
-5897013e9b8281653cd672792810c0e8aa317b2d 151d3ab5776ff8411864450a5ba4c05cbc141eab Mikha <milenikaiqbal@gmail.com> 1743004470 +0700	update by push
-151d3ab5776ff8411864450a5ba4c05cbc141eab 6a32fd8216e961b0da4c80095f55be60dd3d26ed Mikha <milenikaiqbal@gmail.com> 1743004986 +0700	update by push
-6a32fd8216e961b0da4c80095f55be60dd3d26ed 929460fd6b1b7ae6b49fa4afb0053d7a1d937244 Mikha <milenikaiqbal@gmail.com> 1743005464 +0700	update by push
-929460fd6b1b7ae6b49fa4afb0053d7a1d937244 e63640a807c1edf582bde2797e6057022145d861 Mikha <milenikaiqbal@gmail.com> 1743005790 +0700	update by push
-e63640a807c1edf582bde2797e6057022145d861 abaa08fe73c1bb1745979c34f0cedd1f9675c974 Mikha <milenikaiqbal@gmail.com> 1743007455 +0700	update by push
-abaa08fe73c1bb1745979c34f0cedd1f9675c974 5ae7467be947c5ec3d92e3801277ac054b24af33 Mikha <milenikaiqbal@gmail.com> 1743009399 +0700	update by push
-5ae7467be947c5ec3d92e3801277ac054b24af33 6126211304f8deb65c269df838619fe15b496a86 Mikha <milenikaiqbal@gmail.com> 1743009897 +0700	update by push
-6126211304f8deb65c269df838619fe15b496a86 d9f69572c468b549db0c9da028b3df0c1bdc6b00 Mikha <milenikaiqbal@gmail.com> 1743012330 +0700	update by push
-d9f69572c468b549db0c9da028b3df0c1bdc6b00 0ae6170dbe3523eedd29bd2d7051e166fc9d8dab Mikha <milenikaiqbal@gmail.com> 1743012998 +0700	update by push
-0ae6170dbe3523eedd29bd2d7051e166fc9d8dab 8f38d35e439fa6c448c8df0939b8d3e55de19f2d Mikha <milenikaiqbal@gmail.com> 1743013064 +0700	update by push
-8f38d35e439fa6c448c8df0939b8d3e55de19f2d eb2555d9c266568abe46eb6d1e5b102945f9cf9c Mikha <milenikaiqbal@gmail.com> 1743030376 +0700	update by push
-eb2555d9c266568abe46eb6d1e5b102945f9cf9c 41c13af0579c5ee3b8a70851475a60294cf1c3f8 Mikha <milenikaiqbal@gmail.com> 1743036402 +0700	update by push
-41c13af0579c5ee3b8a70851475a60294cf1c3f8 981e16e0d7d6fc88ba4e2b92781636993ca7b7a5 Mikha <milenikaiqbal@gmail.com> 1743037360 +0700	update by push
-981e16e0d7d6fc88ba4e2b92781636993ca7b7a5 e26070f8b96a750894e87faf7fca8832723cd23b Mikha <milenikaiqbal@gmail.com> 1743041657 +0700	update by push
-e26070f8b96a750894e87faf7fca8832723cd23b 09f9640a65de655b4aeb0760c3e0ea9716d4abc1 Mikha <milenikaiqbal@gmail.com> 1743044742 +0700	update by push
-09f9640a65de655b4aeb0760c3e0ea9716d4abc1 d5764662153ccc925e62b67ce90695e1c57b6882 Mikha <milenikaiqbal@gmail.com> 1743046172 +0700	update by push
-d5764662153ccc925e62b67ce90695e1c57b6882 2e66c58c3d9d382b1e51747a5abbcd0357afa08d Mikha <milenikaiqbal@gmail.com> 1743046582 +0700	update by push
-2e66c58c3d9d382b1e51747a5abbcd0357afa08d 132fdccd1e9fe64bcd3932589573505fbdd0b6d9 Mikha <milenikaiqbal@gmail.com> 1743049324 +0700	update by push
-132fdccd1e9fe64bcd3932589573505fbdd0b6d9 804b5f45fcbcab35247a0dc1c53624cd693646c2 Mikha <milenikaiqbal@gmail.com> 1743119640 +0700	update by push
-804b5f45fcbcab35247a0dc1c53624cd693646c2 ff9893a11297aa3355245700a9243cb05f7775e1 Mikha <milenikaiqbal@gmail.com> 1743120514 +0700	update by push
-ff9893a11297aa3355245700a9243cb05f7775e1 9fcc859d60f7fb7f5fdb23cee10a8612240fb79c Mikha <milenikaiqbal@gmail.com> 1743125487 +0700	update by push
-9fcc859d60f7fb7f5fdb23cee10a8612240fb79c 1a3cf387d893498f8ab9ae0808f4d0ca717bbf97 Mikha <milenikaiqbal@gmail.com> 1743126484 +0700	update by push
-1a3cf387d893498f8ab9ae0808f4d0ca717bbf97 468cc73693ec05f7fd29340bf928040634fee025 Mikha <milenikaiqbal@gmail.com> 1743126844 +0700	update by push
-468cc73693ec05f7fd29340bf928040634fee025 76d99c3dfaaea86b590a5ef596d098b4a1ed3e1b Mikha <milenikaiqbal@gmail.com> 1743127508 +0700	update by push
-76d99c3dfaaea86b590a5ef596d098b4a1ed3e1b 0762a9910dd83fe32a4cf195d455d3e090a339d4 Mikha <milenikaiqbal@gmail.com> 1743175498 +0700	update by push
-0762a9910dd83fe32a4cf195d455d3e090a339d4 78f8b12efb6bee55bdce5ae377e45237a8e44508 Mikha <milenikaiqbal@gmail.com> 1743178905 +0700	update by push
-78f8b12efb6bee55bdce5ae377e45237a8e44508 d9b399bdb287a6270cb1f52a02a5e8b0e832b317 Mikha <milenikaiqbal@gmail.com> 1743180463 +0700	update by push
-d9b399bdb287a6270cb1f52a02a5e8b0e832b317 d9074396398342d239a60142d50f59ecd88b5bc0 Mikha <milenikaiqbal@gmail.com> 1743181335 +0700	update by push
-d9074396398342d239a60142d50f59ecd88b5bc0 db2c276f7742bf69e546f8506f25f8854b192677 Mikha <milenikaiqbal@gmail.com> 1743182421 +0700	update by push
-db2c276f7742bf69e546f8506f25f8854b192677 fa3a71a362b37c9686d05087157403a4b354222a Mikha <milenikaiqbal@gmail.com> 1743183274 +0700	update by push
-fa3a71a362b37c9686d05087157403a4b354222a d0a03bff072e8356f6420e6a9730c2e5888254de Mikha <milenikaiqbal@gmail.com> 1743184970 +0700	update by push
-d0a03bff072e8356f6420e6a9730c2e5888254de 8a7bc9638ade5df2c7998d149a94957eed0e8bf9 Mikha <milenikaiqbal@gmail.com> 1743185505 +0700	update by push
-8a7bc9638ade5df2c7998d149a94957eed0e8bf9 5980aaf16da5a414e54227227780fafb59f3b045 Mikha <milenikaiqbal@gmail.com> 1743188344 +0700	update by push
-5980aaf16da5a414e54227227780fafb59f3b045 6c9ab384e5875cbc9a32fe48e816b1cb2dae41e9 Mikha <milenikaiqbal@gmail.com> 1743206341 +0700	update by push
-6c9ab384e5875cbc9a32fe48e816b1cb2dae41e9 7dfc0e678422f99fb25ebfd076a83ac63cc7e784 Mikha <milenikaiqbal@gmail.com> 1743206825 +0700	update by push
-7dfc0e678422f99fb25ebfd076a83ac63cc7e784 5b47b36b3f74e3a438c2f68a66e5047be7c0d896 Mikha <milenikaiqbal@gmail.com> 1743211603 +0700	update by push
-5b47b36b3f74e3a438c2f68a66e5047be7c0d896 f932347fce94f1459e501171596c783892db14ae Mikha <milenikaiqbal@gmail.com> 1743365151 +0700	update by push
---- END FILE: ./.git/logs/refs/remotes/origin/development ---
-
---- START FILE: ./.git/logs/refs/remotes/origin/feat_frontend ---
-0000000000000000000000000000000000000000 308c54accf794a8455bb70f526f3e85faf9935bc Mikha <milenikaiqbal@gmail.com> 1742943750 +0700	update by push
-308c54accf794a8455bb70f526f3e85faf9935bc 1116e86b62f29698830b1e0c29ac461835d779a9 Mikha <milenikaiqbal@gmail.com> 1742944079 +0700	update by push
-1116e86b62f29698830b1e0c29ac461835d779a9 15992816d4b97035c0189d43b3611c387f9936ab Mikha <milenikaiqbal@gmail.com> 1742944513 +0700	update by push
-15992816d4b97035c0189d43b3611c387f9936ab a01ae2d5a3de1a3ad324bdddaa47dad4bc0e8fcd Mikha <milenikaiqbal@gmail.com> 1742945164 +0700	update by push
-a01ae2d5a3de1a3ad324bdddaa47dad4bc0e8fcd 73c939b604cf4cf7dae0499ab31962e42fd5d174 Mikha <milenikaiqbal@gmail.com> 1742992355 +0700	update by push
---- END FILE: ./.git/logs/refs/remotes/origin/feat_frontend ---
-
---- START FILE: ./.git/logs/refs/remotes/origin/feat_backend ---
-0000000000000000000000000000000000000000 bc89b4209719884762a46bc1634b7265decec95e Mikha <milenikaiqbal@gmail.com> 1742939220 +0700	update by push
-bc89b4209719884762a46bc1634b7265decec95e 02b60f9d23661a3944f50719ec0fe9a419757434 Mikha <milenikaiqbal@gmail.com> 1742940170 +0700	update by push
-02b60f9d23661a3944f50719ec0fe9a419757434 1116e86b62f29698830b1e0c29ac461835d779a9 Mikha <milenikaiqbal@gmail.com> 1742943475 +0700	update by push
-1116e86b62f29698830b1e0c29ac461835d779a9 79d7286865a6d1fc7fef849b39a31efe663c4e9b Mikha <milenikaiqbal@gmail.com> 1742944627 +0700	update by push
-79d7286865a6d1fc7fef849b39a31efe663c4e9b dce1888c2693430ec2b788f6682a84dc622d3d38 Mikha <milenikaiqbal@gmail.com> 1742944889 +0700	update by push
-dce1888c2693430ec2b788f6682a84dc622d3d38 73c939b604cf4cf7dae0499ab31962e42fd5d174 Mikha <milenikaiqbal@gmail.com> 1742992371 +0700	update by push
-73c939b604cf4cf7dae0499ab31962e42fd5d174 a1c771547de9434980502a418fe0f21e111ad507 Mikha <milenikaiqbal@gmail.com> 1742994930 +0700	update by push
---- END FILE: ./.git/logs/refs/remotes/origin/feat_backend ---
-
---- START FILE: ./.git/logs/refs/remotes/origin/feat_main-page ---
-0000000000000000000000000000000000000000 8d5ad01326bd1297ceef06cc17bcf0deccaa70cf Mikha <milenikaiqbal@gmail.com> 1742580265 +0700	fetch origin: storing head
---- END FILE: ./.git/logs/refs/remotes/origin/feat_main-page ---
-
---- START FILE: ./.git/logs/refs/remotes/origin/main ---
-0000000000000000000000000000000000000000 f71403f26eb115013e87479b4bd994f9532cb50b Mikha <milenikaiqbal@gmail.com> 1742573293 +0700	update by push
-f71403f26eb115013e87479b4bd994f9532cb50b 78f8b12efb6bee55bdce5ae377e45237a8e44508 Mikha <milenikaiqbal@gmail.com> 1743178948 +0700	update by push
-78f8b12efb6bee55bdce5ae377e45237a8e44508 ef28bdbdffe15efc5555493eeb3b90353e6c1fb4 Mikha <milenikaiqbal@gmail.com> 1743179123 +0700	update by push
-ef28bdbdffe15efc5555493eeb3b90353e6c1fb4 646a83085bb9a224ef5e424b02948d34b13d39c0 Mikha <milenikaiqbal@gmail.com> 1743179657 +0700	update by push
-646a83085bb9a224ef5e424b02948d34b13d39c0 e0ea6ab3f4c8ef7057432b9e1a82b33c5ddbc68a Mikha <milenikaiqbal@gmail.com> 1743179790 +0700	update by push
-e0ea6ab3f4c8ef7057432b9e1a82b33c5ddbc68a 5928108d3e961d79a59e24d8957d9f1f1fe67230 Mikha <milenikaiqbal@gmail.com> 1743179945 +0700	update by push
-5928108d3e961d79a59e24d8957d9f1f1fe67230 fad3673afc8df9a3b51a64deb8e83731d4d7fbe3 Mikha <milenikaiqbal@gmail.com> 1743180038 +0700	update by push
-fad3673afc8df9a3b51a64deb8e83731d4d7fbe3 d9b399bdb287a6270cb1f52a02a5e8b0e832b317 Mikha <milenikaiqbal@gmail.com> 1743180214 +0700	update by push
-d9b399bdb287a6270cb1f52a02a5e8b0e832b317 d9074396398342d239a60142d50f59ecd88b5bc0 Mikha <milenikaiqbal@gmail.com> 1743181351 +0700	update by push
-d9074396398342d239a60142d50f59ecd88b5bc0 4dc72ed454e82f58dd1f05c4cee3171ec8112726 Mikha <milenikaiqbal@gmail.com> 1743182125 +0700	update by push
-4dc72ed454e82f58dd1f05c4cee3171ec8112726 db2c276f7742bf69e546f8506f25f8854b192677 Mikha <milenikaiqbal@gmail.com> 1743182432 +0700	update by push
-db2c276f7742bf69e546f8506f25f8854b192677 f4a0fef53a3f728995c8335f6ed517b8ec1b6905 Mikha <milenikaiqbal@gmail.com> 1743182666 +0700	update by push
-f4a0fef53a3f728995c8335f6ed517b8ec1b6905 fa3a71a362b37c9686d05087157403a4b354222a Mikha <milenikaiqbal@gmail.com> 1743182922 +0700	update by push
-fa3a71a362b37c9686d05087157403a4b354222a d0a03bff072e8356f6420e6a9730c2e5888254de Mikha <milenikaiqbal@gmail.com> 1743185024 +0700	update by push
-d0a03bff072e8356f6420e6a9730c2e5888254de 8a7bc9638ade5df2c7998d149a94957eed0e8bf9 Mikha <milenikaiqbal@gmail.com> 1743185487 +0700	update by push
-8a7bc9638ade5df2c7998d149a94957eed0e8bf9 bd2de2448251d37af18bd84fd94a1c9b8eeda088 Mikha <milenikaiqbal@gmail.com> 1743186414 +0700	update by push
-bd2de2448251d37af18bd84fd94a1c9b8eeda088 5980aaf16da5a414e54227227780fafb59f3b045 Mikha <milenikaiqbal@gmail.com> 1743187111 +0700	update by push
-5980aaf16da5a414e54227227780fafb59f3b045 ccc56b87478094422e65d4cce775ad66f118c976 Mikha <milenikaiqbal@gmail.com> 1743189525 +0700	pull: fast-forward
-ccc56b87478094422e65d4cce775ad66f118c976 b86f35a69b47d8fe44304bb00ca17000bacb155d Mikha <milenikaiqbal@gmail.com> 1743190551 +0700	pull: fast-forward
-b86f35a69b47d8fe44304bb00ca17000bacb155d 1ce3b9928c2911db57428c43a8b71b3cccf8a96b Mikha <milenikaiqbal@gmail.com> 1743190556 +0700	update by push
-1ce3b9928c2911db57428c43a8b71b3cccf8a96b 658784aeda5ce6cdbb7a990953f92a48f95d59f0 Mikha <milenikaiqbal@gmail.com> 1743206401 +0700	update by push
-658784aeda5ce6cdbb7a990953f92a48f95d59f0 7dfc0e678422f99fb25ebfd076a83ac63cc7e784 Mikha <milenikaiqbal@gmail.com> 1743206802 +0700	update by push
-7dfc0e678422f99fb25ebfd076a83ac63cc7e784 5b47b36b3f74e3a438c2f68a66e5047be7c0d896 Mikha <milenikaiqbal@gmail.com> 1743211615 +0700	update by push
-5b47b36b3f74e3a438c2f68a66e5047be7c0d896 138e871c76193238c93d37a302c4f7ddbd444fb7 Mikha <milenikaiqbal@gmail.com> 1743211723 +0700	update by push
-138e871c76193238c93d37a302c4f7ddbd444fb7 14cc6fef334482814d59d8307800d030ea43e621 Mikha <milenikaiqbal@gmail.com> 1743360448 +0700	update by push
---- END FILE: ./.git/logs/refs/remotes/origin/main ---
-
---- START FILE: ./.git/logs/refs/remotes/origin/feat_queue ---
-0000000000000000000000000000000000000000 830fa9d199be7816443a2335be6aaea59e66f9f3 Mikha <milenikaiqbal@gmail.com> 1743367559 +0700	update by push
-830fa9d199be7816443a2335be6aaea59e66f9f3 de185e5fa309761f52c9bc5e0656b0f91eeadfe6 Mikha <milenikaiqbal@gmail.com> 1743367667 +0700	update by push
-de185e5fa309761f52c9bc5e0656b0f91eeadfe6 3d019736ce006b6f937a0d48b478b385ab3f6078 Mikha <milenikaiqbal@gmail.com> 1743368054 +0700	update by push
-3d019736ce006b6f937a0d48b478b385ab3f6078 cc2d6824b4b807c1c59d26091d5d1d224fe77c70 Mikha <milenikaiqbal@gmail.com> 1743372535 +0700	update by push
---- END FILE: ./.git/logs/refs/remotes/origin/feat_queue ---
-
---- START FILE: ./.git/logs/HEAD ---
-0000000000000000000000000000000000000000 446812ae69fe71ae4951683495495ffc72873a92 Mikha <milenikaiqbal@gmail.com> 1742566587 +0700	commit (initial): added conda_env.yml
-446812ae69fe71ae4951683495495ffc72873a92 446812ae69fe71ae4951683495495ffc72873a92 Mikha <milenikaiqbal@gmail.com> 1742566643 +0700	checkout: moving from master to backend
-446812ae69fe71ae4951683495495ffc72873a92 7564eeb228d0ee41fdc26d9a0cb364c7f7882338 Mikha <milenikaiqbal@gmail.com> 1742568133 +0700	commit: created api to list data and result, and sample items in the directory to test API
-7564eeb228d0ee41fdc26d9a0cb364c7f7882338 f71403f26eb115013e87479b4bd994f9532cb50b Mikha <milenikaiqbal@gmail.com> 1742570600 +0700	commit: added pipeline.sh on /backend/app as a mock pipeline, added some mock samples on bioinformatics/data, added result files (temp, can remove or ignore later)
-f71403f26eb115013e87479b4bd994f9532cb50b 735093b2e45be96ac4bf4db608e7533951487d85 Mikha <milenikaiqbal@gmail.com> 1742573719 +0700	commit: added mockup pipeline function to test
-735093b2e45be96ac4bf4db608e7533951487d85 308c54accf794a8455bb70f526f3e85faf9935bc Mikha <milenikaiqbal@gmail.com> 1742575882 +0700	commit: todo.md
-308c54accf794a8455bb70f526f3e85faf9935bc 308c54accf794a8455bb70f526f3e85faf9935bc Mikha <milenikaiqbal@gmail.com> 1742576464 +0700	checkout: moving from backend to frontend
-308c54accf794a8455bb70f526f3e85faf9935bc 308c54accf794a8455bb70f526f3e85faf9935bc Mikha <milenikaiqbal@gmail.com> 1742580127 +0700	checkout: moving from frontend to backend
-308c54accf794a8455bb70f526f3e85faf9935bc f71403f26eb115013e87479b4bd994f9532cb50b Mikha <milenikaiqbal@gmail.com> 1742580290 +0700	checkout: moving from backend to development
-f71403f26eb115013e87479b4bd994f9532cb50b 308c54accf794a8455bb70f526f3e85faf9935bc Mikha <milenikaiqbal@gmail.com> 1742581010 +0700	checkout: moving from development to backend
-308c54accf794a8455bb70f526f3e85faf9935bc 603522a9fcf5c6885cdeef927efe726d533f6e64 Mikha <milenikaiqbal@gmail.com> 1742937320 +0700	commit: deleting temporary results for testing
-603522a9fcf5c6885cdeef927efe726d533f6e64 c31ba9b832695468caaed626f2471cc0b59dd4a1 Mikha <milenikaiqbal@gmail.com> 1742937560 +0700	commit: added gitignore for python cache in /backend/app and for bioinformatics/results and /data
-c31ba9b832695468caaed626f2471cc0b59dd4a1 34bcef732733ea00ce493ea0a118dea805062fec Mikha <milenikaiqbal@gmail.com> 1742937647 +0700	commit: fixed
-34bcef732733ea00ce493ea0a118dea805062fec e4bb69c3023565ada33fd2e93856996bd0de5e4a Mikha <milenikaiqbal@gmail.com> 1742937676 +0700	commit: Removed __pycache__ from tracking
-e4bb69c3023565ada33fd2e93856996bd0de5e4a 930f9e301a5ddba6f3cdd8e0b7bf3a479db73988 Mikha <milenikaiqbal@gmail.com> 1742937863 +0700	commit: cleaned up /data /results
-930f9e301a5ddba6f3cdd8e0b7bf3a479db73988 f71403f26eb115013e87479b4bd994f9532cb50b Mikha <milenikaiqbal@gmail.com> 1742938991 +0700	checkout: moving from backend to development
-f71403f26eb115013e87479b4bd994f9532cb50b bc89b4209719884762a46bc1634b7265decec95e Mikha <milenikaiqbal@gmail.com> 1742938997 +0700	pull: Fast-forward
-bc89b4209719884762a46bc1634b7265decec95e 930f9e301a5ddba6f3cdd8e0b7bf3a479db73988 Mikha <milenikaiqbal@gmail.com> 1742939122 +0700	checkout: moving from development to backend
-930f9e301a5ddba6f3cdd8e0b7bf3a479db73988 bc89b4209719884762a46bc1634b7265decec95e Mikha <milenikaiqbal@gmail.com> 1742939126 +0700	reset: moving to development
-bc89b4209719884762a46bc1634b7265decec95e 0000000000000000000000000000000000000000 Mikha <milenikaiqbal@gmail.com> 1742939206 +0700	Branch: renamed refs/heads/backend to refs/heads/feat_backend
-0000000000000000000000000000000000000000 bc89b4209719884762a46bc1634b7265decec95e Mikha <milenikaiqbal@gmail.com> 1742939206 +0700	Branch: renamed refs/heads/backend to refs/heads/feat_backend
-bc89b4209719884762a46bc1634b7265decec95e 02b60f9d23661a3944f50719ec0fe9a419757434 Mikha <milenikaiqbal@gmail.com> 1742940136 +0700	commit: updated gitignore
-02b60f9d23661a3944f50719ec0fe9a419757434 bc89b4209719884762a46bc1634b7265decec95e Mikha <milenikaiqbal@gmail.com> 1742940207 +0700	checkout: moving from feat_backend to development
-bc89b4209719884762a46bc1634b7265decec95e 02b60f9d23661a3944f50719ec0fe9a419757434 Mikha <milenikaiqbal@gmail.com> 1742940228 +0700	merge feat_backend: Fast-forward
-02b60f9d23661a3944f50719ec0fe9a419757434 02b60f9d23661a3944f50719ec0fe9a419757434 Mikha <milenikaiqbal@gmail.com> 1742942790 +0700	checkout: moving from development to feat_backend
-02b60f9d23661a3944f50719ec0fe9a419757434 1116e86b62f29698830b1e0c29ac461835d779a9 Mikha <milenikaiqbal@gmail.com> 1742943459 +0700	commit: modified app.py to include run_pipeline api
-1116e86b62f29698830b1e0c29ac461835d779a9 02b60f9d23661a3944f50719ec0fe9a419757434 Mikha <milenikaiqbal@gmail.com> 1742943481 +0700	checkout: moving from feat_backend to development
-02b60f9d23661a3944f50719ec0fe9a419757434 1116e86b62f29698830b1e0c29ac461835d779a9 Mikha <milenikaiqbal@gmail.com> 1742943537 +0700	merge feat_backend: Fast-forward
-1116e86b62f29698830b1e0c29ac461835d779a9 308c54accf794a8455bb70f526f3e85faf9935bc Mikha <milenikaiqbal@gmail.com> 1742943568 +0700	checkout: moving from development to frontend
-308c54accf794a8455bb70f526f3e85faf9935bc 0000000000000000000000000000000000000000 Mikha <milenikaiqbal@gmail.com> 1742943588 +0700	Branch: renamed refs/heads/frontend to refs/heads/feat_frontend
-0000000000000000000000000000000000000000 308c54accf794a8455bb70f526f3e85faf9935bc Mikha <milenikaiqbal@gmail.com> 1742943588 +0700	Branch: renamed refs/heads/frontend to refs/heads/feat_frontend
-308c54accf794a8455bb70f526f3e85faf9935bc 1116e86b62f29698830b1e0c29ac461835d779a9 Mikha <milenikaiqbal@gmail.com> 1742943816 +0700	reset: moving to development
-1116e86b62f29698830b1e0c29ac461835d779a9 308c54accf794a8455bb70f526f3e85faf9935bc Mikha <milenikaiqbal@gmail.com> 1742943837 +0700	pull (start): checkout 308c54accf794a8455bb70f526f3e85faf9935bc
-308c54accf794a8455bb70f526f3e85faf9935bc 1116e86b62f29698830b1e0c29ac461835d779a9 Mikha <milenikaiqbal@gmail.com> 1742944035 +0700	reset: moving to development
-1116e86b62f29698830b1e0c29ac461835d779a9 1116e86b62f29698830b1e0c29ac461835d779a9 Mikha <milenikaiqbal@gmail.com> 1742944055 +0700	checkout: moving from 1116e86b62f29698830b1e0c29ac461835d779a9 to feat_frontend
-1116e86b62f29698830b1e0c29ac461835d779a9 15992816d4b97035c0189d43b3611c387f9936ab Mikha <milenikaiqbal@gmail.com> 1742944505 +0700	commit: added basic frontend for run pipeline page
-15992816d4b97035c0189d43b3611c387f9936ab 1116e86b62f29698830b1e0c29ac461835d779a9 Mikha <milenikaiqbal@gmail.com> 1742944518 +0700	checkout: moving from feat_frontend to development
-1116e86b62f29698830b1e0c29ac461835d779a9 15992816d4b97035c0189d43b3611c387f9936ab Mikha <milenikaiqbal@gmail.com> 1742944529 +0700	merge feat_frontend: Fast-forward
-15992816d4b97035c0189d43b3611c387f9936ab 1116e86b62f29698830b1e0c29ac461835d779a9 Mikha <milenikaiqbal@gmail.com> 1742944545 +0700	checkout: moving from development to feat_backend
-1116e86b62f29698830b1e0c29ac461835d779a9 79d7286865a6d1fc7fef849b39a31efe663c4e9b Mikha <milenikaiqbal@gmail.com> 1742944617 +0700	commit: updated app.py to fetch the static files
-79d7286865a6d1fc7fef849b39a31efe663c4e9b 15992816d4b97035c0189d43b3611c387f9936ab Mikha <milenikaiqbal@gmail.com> 1742944641 +0700	checkout: moving from feat_backend to development
-15992816d4b97035c0189d43b3611c387f9936ab e54780b7e7ab2908e44f7f7b4e8e3d4098e607ec Mikha <milenikaiqbal@gmail.com> 1742944646 +0700	merge feat_backend: Merge made by the 'ort' strategy.
-e54780b7e7ab2908e44f7f7b4e8e3d4098e607ec 79d7286865a6d1fc7fef849b39a31efe663c4e9b Mikha <milenikaiqbal@gmail.com> 1742944848 +0700	checkout: moving from development to feat_backend
-79d7286865a6d1fc7fef849b39a31efe663c4e9b dce1888c2693430ec2b788f6682a84dc622d3d38 Mikha <milenikaiqbal@gmail.com> 1742944882 +0700	commit: app py to serve static files from root / front end
-dce1888c2693430ec2b788f6682a84dc622d3d38 e54780b7e7ab2908e44f7f7b4e8e3d4098e607ec Mikha <milenikaiqbal@gmail.com> 1742944894 +0700	checkout: moving from feat_backend to development
-e54780b7e7ab2908e44f7f7b4e8e3d4098e607ec 05ef25326bce128b8431d53a6b061a1f0e81019c Mikha <milenikaiqbal@gmail.com> 1742944897 +0700	merge feat_backend: Merge made by the 'ort' strategy.
-05ef25326bce128b8431d53a6b061a1f0e81019c 15992816d4b97035c0189d43b3611c387f9936ab Mikha <milenikaiqbal@gmail.com> 1742944945 +0700	checkout: moving from development to feat_frontend
-15992816d4b97035c0189d43b3611c387f9936ab a01ae2d5a3de1a3ad324bdddaa47dad4bc0e8fcd Mikha <milenikaiqbal@gmail.com> 1742945151 +0700	commit: static files proper path, test
-a01ae2d5a3de1a3ad324bdddaa47dad4bc0e8fcd 05ef25326bce128b8431d53a6b061a1f0e81019c Mikha <milenikaiqbal@gmail.com> 1742945166 +0700	checkout: moving from feat_frontend to development
-05ef25326bce128b8431d53a6b061a1f0e81019c 894feab75b3e80d2af9e20a90fc4801a9e16b852 Mikha <milenikaiqbal@gmail.com> 1742945170 +0700	merge feat_frontend: Merge made by the 'ort' strategy.
-894feab75b3e80d2af9e20a90fc4801a9e16b852 42ce1817c35b62eddcc56d4975ea6f2efd3902aa Mikha <milenikaiqbal@gmail.com> 1742946055 +0700	commit: removed results
-42ce1817c35b62eddcc56d4975ea6f2efd3902aa 3f7667d3149c3deb66a225192a9e80922cf0b401 Mikha <milenikaiqbal@gmail.com> 1742949895 +0700	commit: moved index.html and app.py
-3f7667d3149c3deb66a225192a9e80922cf0b401 73c939b604cf4cf7dae0499ab31962e42fd5d174 Mikha <milenikaiqbal@gmail.com> 1742952929 +0700	commit: moving index.html to /frontend
-73c939b604cf4cf7dae0499ab31962e42fd5d174 a01ae2d5a3de1a3ad324bdddaa47dad4bc0e8fcd Mikha <milenikaiqbal@gmail.com> 1742992339 +0700	checkout: moving from development to feat_frontend
-a01ae2d5a3de1a3ad324bdddaa47dad4bc0e8fcd 73c939b604cf4cf7dae0499ab31962e42fd5d174 Mikha <milenikaiqbal@gmail.com> 1742992343 +0700	merge development: Fast-forward
-73c939b604cf4cf7dae0499ab31962e42fd5d174 dce1888c2693430ec2b788f6682a84dc622d3d38 Mikha <milenikaiqbal@gmail.com> 1742992363 +0700	checkout: moving from feat_frontend to feat_backend
-dce1888c2693430ec2b788f6682a84dc622d3d38 73c939b604cf4cf7dae0499ab31962e42fd5d174 Mikha <milenikaiqbal@gmail.com> 1742992365 +0700	merge development: Fast-forward
-73c939b604cf4cf7dae0499ab31962e42fd5d174 73c939b604cf4cf7dae0499ab31962e42fd5d174 Mikha <milenikaiqbal@gmail.com> 1742994496 +0700	checkout: moving from feat_backend to feat_backend
-73c939b604cf4cf7dae0499ab31962e42fd5d174 a1c771547de9434980502a418fe0f21e111ad507 Mikha <milenikaiqbal@gmail.com> 1742994925 +0700	commit: websocket progress bar simulation
-a1c771547de9434980502a418fe0f21e111ad507 73c939b604cf4cf7dae0499ab31962e42fd5d174 Mikha <milenikaiqbal@gmail.com> 1742994960 +0700	checkout: moving from feat_backend to development
-73c939b604cf4cf7dae0499ab31962e42fd5d174 a1c771547de9434980502a418fe0f21e111ad507 Mikha <milenikaiqbal@gmail.com> 1742994965 +0700	merge feat_backend: Fast-forward
-a1c771547de9434980502a418fe0f21e111ad507 73c939b604cf4cf7dae0499ab31962e42fd5d174 Mikha <milenikaiqbal@gmail.com> 1742994978 +0700	checkout: moving from development to feat_frontend
-73c939b604cf4cf7dae0499ab31962e42fd5d174 adccb25a561e55fe7826854109cb889df9898737 Mikha <milenikaiqbal@gmail.com> 1742995350 +0700	commit: progress bar frontend
-adccb25a561e55fe7826854109cb889df9898737 a1c771547de9434980502a418fe0f21e111ad507 Mikha <milenikaiqbal@gmail.com> 1742995378 +0700	checkout: moving from feat_frontend to development
-a1c771547de9434980502a418fe0f21e111ad507 6f0a06f71a6b1158ecf7f8770b7cc81f730e61fd Mikha <milenikaiqbal@gmail.com> 1742995391 +0700	merge feat_frontend: Merge made by the 'ort' strategy.
-6f0a06f71a6b1158ecf7f8770b7cc81f730e61fd 384dc311441f8e06f63073f06d13765628681c14 Mikha <milenikaiqbal@gmail.com> 1742997062 +0700	commit: progress bar
-384dc311441f8e06f63073f06d13765628681c14 267ea81e4ea35ce281f8317093fed10c5878a62f Mikha <milenikaiqbal@gmail.com> 1742997863 +0700	commit: restructured the frontend folder, now contains static/ and templates/
-267ea81e4ea35ce281f8317093fed10c5878a62f 7af6bac7dc9957815545eb75f1acbfaca2617ab7 Mikha <milenikaiqbal@gmail.com> 1742998375 +0700	commit: fixed app.py folder
-7af6bac7dc9957815545eb75f1acbfaca2617ab7 54cb864460ebd510cf281e47e2301974289da1f8 Mikha <milenikaiqbal@gmail.com> 1742998555 +0700	commit: app.py
-54cb864460ebd510cf281e47e2301974289da1f8 c5c8822487f4436b2bde404ac1b67455b16a2d01 Mikha <milenikaiqbal@gmail.com> 1742999909 +0700	commit: app.py
-c5c8822487f4436b2bde404ac1b67455b16a2d01 5897013e9b8281653cd672792810c0e8aa317b2d Mikha <milenikaiqbal@gmail.com> 1743004242 +0700	commit: added results page
-5897013e9b8281653cd672792810c0e8aa317b2d 151d3ab5776ff8411864450a5ba4c05cbc141eab Mikha <milenikaiqbal@gmail.com> 1743004466 +0700	commit: updated app.py to serve results.html
-151d3ab5776ff8411864450a5ba4c05cbc141eab 6a32fd8216e961b0da4c80095f55be60dd3d26ed Mikha <milenikaiqbal@gmail.com> 1743004981 +0700	commit: updated app.py
-6a32fd8216e961b0da4c80095f55be60dd3d26ed 929460fd6b1b7ae6b49fa4afb0053d7a1d937244 Mikha <milenikaiqbal@gmail.com> 1743005459 +0700	commit: .
-929460fd6b1b7ae6b49fa4afb0053d7a1d937244 e63640a807c1edf582bde2797e6057022145d861 Mikha <milenikaiqbal@gmail.com> 1743005784 +0700	commit: .
-e63640a807c1edf582bde2797e6057022145d861 abaa08fe73c1bb1745979c34f0cedd1f9675c974 Mikha <milenikaiqbal@gmail.com> 1743007451 +0700	commit: .
-abaa08fe73c1bb1745979c34f0cedd1f9675c974 5ae7467be947c5ec3d92e3801277ac054b24af33 Mikha <milenikaiqbal@gmail.com> 1743009394 +0700	commit: .
-5ae7467be947c5ec3d92e3801277ac054b24af33 6126211304f8deb65c269df838619fe15b496a86 Mikha <milenikaiqbal@gmail.com> 1743009893 +0700	commit: .
-6126211304f8deb65c269df838619fe15b496a86 d9f69572c468b549db0c9da028b3df0c1bdc6b00 Mikha <milenikaiqbal@gmail.com> 1743012326 +0700	commit: finalized
-d9f69572c468b549db0c9da028b3df0c1bdc6b00 0ae6170dbe3523eedd29bd2d7051e166fc9d8dab Mikha <milenikaiqbal@gmail.com> 1743012992 +0700	commit: updated readme tree
-0ae6170dbe3523eedd29bd2d7051e166fc9d8dab 8f38d35e439fa6c448c8df0939b8d3e55de19f2d Mikha <milenikaiqbal@gmail.com> 1743013059 +0700	commit: .
-8f38d35e439fa6c448c8df0939b8d3e55de19f2d eb2555d9c266568abe46eb6d1e5b102945f9cf9c Mikha <milenikaiqbal@gmail.com> 1743028628 +0700	commit: now results are unclickable
-eb2555d9c266568abe46eb6d1e5b102945f9cf9c 41c13af0579c5ee3b8a70851475a60294cf1c3f8 Mikha <milenikaiqbal@gmail.com> 1743036396 +0700	commit: added filebrowser
-41c13af0579c5ee3b8a70851475a60294cf1c3f8 981e16e0d7d6fc88ba4e2b92781636993ca7b7a5 Mikha <milenikaiqbal@gmail.com> 1743037356 +0700	commit: .
-981e16e0d7d6fc88ba4e2b92781636993ca7b7a5 e26070f8b96a750894e87faf7fca8832723cd23b Mikha <milenikaiqbal@gmail.com> 1743041652 +0700	commit: .
-e26070f8b96a750894e87faf7fca8832723cd23b 09f9640a65de655b4aeb0760c3e0ea9716d4abc1 Mikha <milenikaiqbal@gmail.com> 1743044737 +0700	commit: updated mock pipeline.sh
-09f9640a65de655b4aeb0760c3e0ea9716d4abc1 d5764662153ccc925e62b67ce90695e1c57b6882 Mikha <milenikaiqbal@gmail.com> 1743046165 +0700	commit: updated python to ver 3.11 in conda_env.yml
-d5764662153ccc925e62b67ce90695e1c57b6882 2e66c58c3d9d382b1e51747a5abbcd0357afa08d Mikha <milenikaiqbal@gmail.com> 1743046576 +0700	commit: fixed app.py
-2e66c58c3d9d382b1e51747a5abbcd0357afa08d 132fdccd1e9fe64bcd3932589573505fbdd0b6d9 Mikha <milenikaiqbal@gmail.com> 1743049319 +0700	commit: .
-132fdccd1e9fe64bcd3932589573505fbdd0b6d9 804b5f45fcbcab35247a0dc1c53624cd693646c2 Mikha <milenikaiqbal@gmail.com> 1743119625 +0700	commit: added Dockerfile
-804b5f45fcbcab35247a0dc1c53624cd693646c2 ff9893a11297aa3355245700a9243cb05f7775e1 Mikha <milenikaiqbal@gmail.com> 1743120508 +0700	commit: updated main.py to listen to 0.0.0.0
-ff9893a11297aa3355245700a9243cb05f7775e1 9fcc859d60f7fb7f5fdb23cee10a8612240fb79c Mikha <milenikaiqbal@gmail.com> 1743125481 +0700	commit: updated dockerfile
-9fcc859d60f7fb7f5fdb23cee10a8612240fb79c 1a3cf387d893498f8ab9ae0808f4d0ca717bbf97 Mikha <milenikaiqbal@gmail.com> 1743125908 +0700	commit: added compressed conda env directory, image building
-1a3cf387d893498f8ab9ae0808f4d0ca717bbf97 468cc73693ec05f7fd29340bf928040634fee025 Mikha <milenikaiqbal@gmail.com> 1743126839 +0700	commit: deleted compressed file
-468cc73693ec05f7fd29340bf928040634fee025 76d99c3dfaaea86b590a5ef596d098b4a1ed3e1b Mikha <milenikaiqbal@gmail.com> 1743127503 +0700	commit: made a folder for builder
-76d99c3dfaaea86b590a5ef596d098b4a1ed3e1b 0762a9910dd83fe32a4cf195d455d3e090a339d4 Mikha <milenikaiqbal@gmail.com> 1743175440 +0700	commit: added dockerbuild files
-0762a9910dd83fe32a4cf195d455d3e090a339d4 78f8b12efb6bee55bdce5ae377e45237a8e44508 Mikha <milenikaiqbal@gmail.com> 1743178864 +0700	commit: added .github/deployment for github actions
-78f8b12efb6bee55bdce5ae377e45237a8e44508 f71403f26eb115013e87479b4bd994f9532cb50b Mikha <milenikaiqbal@gmail.com> 1743178923 +0700	checkout: moving from development to main
-f71403f26eb115013e87479b4bd994f9532cb50b 78f8b12efb6bee55bdce5ae377e45237a8e44508 Mikha <milenikaiqbal@gmail.com> 1743178929 +0700	merge development: Fast-forward
-78f8b12efb6bee55bdce5ae377e45237a8e44508 78f8b12efb6bee55bdce5ae377e45237a8e44508 Mikha <milenikaiqbal@gmail.com> 1743179082 +0700	checkout: moving from main to development
-78f8b12efb6bee55bdce5ae377e45237a8e44508 78f8b12efb6bee55bdce5ae377e45237a8e44508 Mikha <milenikaiqbal@gmail.com> 1743179095 +0700	checkout: moving from development to main
-78f8b12efb6bee55bdce5ae377e45237a8e44508 ef28bdbdffe15efc5555493eeb3b90353e6c1fb4 Mikha <milenikaiqbal@gmail.com> 1743179116 +0700	commit: fixed github actions
-ef28bdbdffe15efc5555493eeb3b90353e6c1fb4 646a83085bb9a224ef5e424b02948d34b13d39c0 Mikha <milenikaiqbal@gmail.com> 1743179651 +0700	commit: .
-646a83085bb9a224ef5e424b02948d34b13d39c0 e0ea6ab3f4c8ef7057432b9e1a82b33c5ddbc68a Mikha <milenikaiqbal@gmail.com> 1743179785 +0700	commit: fixed
-e0ea6ab3f4c8ef7057432b9e1a82b33c5ddbc68a 5928108d3e961d79a59e24d8957d9f1f1fe67230 Mikha <milenikaiqbal@gmail.com> 1743179939 +0700	commit: .
-5928108d3e961d79a59e24d8957d9f1f1fe67230 fad3673afc8df9a3b51a64deb8e83731d4d7fbe3 Mikha <milenikaiqbal@gmail.com> 1743180033 +0700	commit: .
-fad3673afc8df9a3b51a64deb8e83731d4d7fbe3 d9b399bdb287a6270cb1f52a02a5e8b0e832b317 Mikha <milenikaiqbal@gmail.com> 1743180209 +0700	commit: .
-d9b399bdb287a6270cb1f52a02a5e8b0e832b317 78f8b12efb6bee55bdce5ae377e45237a8e44508 Mikha <milenikaiqbal@gmail.com> 1743180447 +0700	checkout: moving from main to development
-78f8b12efb6bee55bdce5ae377e45237a8e44508 d9b399bdb287a6270cb1f52a02a5e8b0e832b317 Mikha <milenikaiqbal@gmail.com> 1743180455 +0700	merge main: Fast-forward
-d9b399bdb287a6270cb1f52a02a5e8b0e832b317 d9074396398342d239a60142d50f59ecd88b5bc0 Mikha <milenikaiqbal@gmail.com> 1743181330 +0700	commit: .
-d9074396398342d239a60142d50f59ecd88b5bc0 d9b399bdb287a6270cb1f52a02a5e8b0e832b317 Mikha <milenikaiqbal@gmail.com> 1743181339 +0700	checkout: moving from development to main
-d9b399bdb287a6270cb1f52a02a5e8b0e832b317 d9074396398342d239a60142d50f59ecd88b5bc0 Mikha <milenikaiqbal@gmail.com> 1743181344 +0700	merge development: Fast-forward
-d9074396398342d239a60142d50f59ecd88b5bc0 4dc72ed454e82f58dd1f05c4cee3171ec8112726 Mikha <milenikaiqbal@gmail.com> 1743182119 +0700	commit: attempting multi stage build
-4dc72ed454e82f58dd1f05c4cee3171ec8112726 d9074396398342d239a60142d50f59ecd88b5bc0 Mikha <milenikaiqbal@gmail.com> 1743182375 +0700	checkout: moving from main to development
-d9074396398342d239a60142d50f59ecd88b5bc0 4dc72ed454e82f58dd1f05c4cee3171ec8112726 Mikha <milenikaiqbal@gmail.com> 1743182380 +0700	merge main: Fast-forward
-4dc72ed454e82f58dd1f05c4cee3171ec8112726 db2c276f7742bf69e546f8506f25f8854b192677 Mikha <milenikaiqbal@gmail.com> 1743182415 +0700	commit: attempting multi stage build
-db2c276f7742bf69e546f8506f25f8854b192677 4dc72ed454e82f58dd1f05c4cee3171ec8112726 Mikha <milenikaiqbal@gmail.com> 1743182423 +0700	checkout: moving from development to main
-4dc72ed454e82f58dd1f05c4cee3171ec8112726 db2c276f7742bf69e546f8506f25f8854b192677 Mikha <milenikaiqbal@gmail.com> 1743182426 +0700	merge development: Fast-forward
-db2c276f7742bf69e546f8506f25f8854b192677 f4a0fef53a3f728995c8335f6ed517b8ec1b6905 Mikha <milenikaiqbal@gmail.com> 1743182660 +0700	commit: attempting multi-stage build
-f4a0fef53a3f728995c8335f6ed517b8ec1b6905 fa3a71a362b37c9686d05087157403a4b354222a Mikha <milenikaiqbal@gmail.com> 1743182915 +0700	commit: attempting multi-stage build
-fa3a71a362b37c9686d05087157403a4b354222a db2c276f7742bf69e546f8506f25f8854b192677 Mikha <milenikaiqbal@gmail.com> 1743183263 +0700	checkout: moving from main to development
-db2c276f7742bf69e546f8506f25f8854b192677 fa3a71a362b37c9686d05087157403a4b354222a Mikha <milenikaiqbal@gmail.com> 1743183267 +0700	merge main: Fast-forward
-fa3a71a362b37c9686d05087157403a4b354222a fa3a71a362b37c9686d05087157403a4b354222a Mikha <milenikaiqbal@gmail.com> 1743184646 +0700	checkout: moving from development to main
-fa3a71a362b37c9686d05087157403a4b354222a fa3a71a362b37c9686d05087157403a4b354222a Mikha <milenikaiqbal@gmail.com> 1743184909 +0700	checkout: moving from main to development
-fa3a71a362b37c9686d05087157403a4b354222a d0a03bff072e8356f6420e6a9730c2e5888254de Mikha <milenikaiqbal@gmail.com> 1743184964 +0700	commit: multi stage build + building mamba env in builder
-d0a03bff072e8356f6420e6a9730c2e5888254de d0a03bff072e8356f6420e6a9730c2e5888254de Mikha <milenikaiqbal@gmail.com> 1743184973 +0700	checkout: moving from development to development
-d0a03bff072e8356f6420e6a9730c2e5888254de fa3a71a362b37c9686d05087157403a4b354222a Mikha <milenikaiqbal@gmail.com> 1743185016 +0700	checkout: moving from development to main
-fa3a71a362b37c9686d05087157403a4b354222a d0a03bff072e8356f6420e6a9730c2e5888254de Mikha <milenikaiqbal@gmail.com> 1743185018 +0700	merge development: Fast-forward
-d0a03bff072e8356f6420e6a9730c2e5888254de 8a7bc9638ade5df2c7998d149a94957eed0e8bf9 Mikha <milenikaiqbal@gmail.com> 1743185481 +0700	commit: finalized Dockerfile config for minimum size
-8a7bc9638ade5df2c7998d149a94957eed0e8bf9 d0a03bff072e8356f6420e6a9730c2e5888254de Mikha <milenikaiqbal@gmail.com> 1743185490 +0700	checkout: moving from main to development
-d0a03bff072e8356f6420e6a9730c2e5888254de 8a7bc9638ade5df2c7998d149a94957eed0e8bf9 Mikha <milenikaiqbal@gmail.com> 1743185497 +0700	merge main: Fast-forward
-8a7bc9638ade5df2c7998d149a94957eed0e8bf9 8a7bc9638ade5df2c7998d149a94957eed0e8bf9 Mikha <milenikaiqbal@gmail.com> 1743185778 +0700	checkout: moving from development to main
-8a7bc9638ade5df2c7998d149a94957eed0e8bf9 8a7bc9638ade5df2c7998d149a94957eed0e8bf9 Mikha <milenikaiqbal@gmail.com> 1743185783 +0700	checkout: moving from main to development
-8a7bc9638ade5df2c7998d149a94957eed0e8bf9 8a7bc9638ade5df2c7998d149a94957eed0e8bf9 Mikha <milenikaiqbal@gmail.com> 1743185792 +0700	checkout: moving from development to main
-8a7bc9638ade5df2c7998d149a94957eed0e8bf9 8a7bc9638ade5df2c7998d149a94957eed0e8bf9 Mikha <milenikaiqbal@gmail.com> 1743185817 +0700	checkout: moving from main to main
-8a7bc9638ade5df2c7998d149a94957eed0e8bf9 bd2de2448251d37af18bd84fd94a1c9b8eeda088 Mikha <milenikaiqbal@gmail.com> 1743186408 +0700	commit: multi-stage build without tarball
-bd2de2448251d37af18bd84fd94a1c9b8eeda088 5980aaf16da5a414e54227227780fafb59f3b045 Mikha <milenikaiqbal@gmail.com> 1743187105 +0700	commit: nocache:true during build
-5980aaf16da5a414e54227227780fafb59f3b045 8a7bc9638ade5df2c7998d149a94957eed0e8bf9 Mikha <milenikaiqbal@gmail.com> 1743188333 +0700	checkout: moving from main to development
-8a7bc9638ade5df2c7998d149a94957eed0e8bf9 5980aaf16da5a414e54227227780fafb59f3b045 Mikha <milenikaiqbal@gmail.com> 1743188335 +0700	merge main: Fast-forward
-5980aaf16da5a414e54227227780fafb59f3b045 5980aaf16da5a414e54227227780fafb59f3b045 Mikha <milenikaiqbal@gmail.com> 1743189530 +0700	checkout: moving from development to main
-5980aaf16da5a414e54227227780fafb59f3b045 ccc56b87478094422e65d4cce775ad66f118c976 Mikha <milenikaiqbal@gmail.com> 1743189536 +0700	pull: Fast-forward
-ccc56b87478094422e65d4cce775ad66f118c976 5980aaf16da5a414e54227227780fafb59f3b045 Mikha <milenikaiqbal@gmail.com> 1743190101 +0700	checkout: moving from main to development
-5980aaf16da5a414e54227227780fafb59f3b045 ccc56b87478094422e65d4cce775ad66f118c976 Mikha <milenikaiqbal@gmail.com> 1743190109 +0700	checkout: moving from development to main
-ccc56b87478094422e65d4cce775ad66f118c976 cff27606a658d9657f85d134ed6aa324f1c97052 Mikha <milenikaiqbal@gmail.com> 1743190533 +0700	commit: add paths-ignore for some files
-cff27606a658d9657f85d134ed6aa324f1c97052 b86f35a69b47d8fe44304bb00ca17000bacb155d Mikha <milenikaiqbal@gmail.com> 1743190551 +0700	pull (start): checkout b86f35a69b47d8fe44304bb00ca17000bacb155d
-b86f35a69b47d8fe44304bb00ca17000bacb155d 1ce3b9928c2911db57428c43a8b71b3cccf8a96b Mikha <milenikaiqbal@gmail.com> 1743190551 +0700	pull (pick): add paths-ignore for some files
-1ce3b9928c2911db57428c43a8b71b3cccf8a96b 1ce3b9928c2911db57428c43a8b71b3cccf8a96b Mikha <milenikaiqbal@gmail.com> 1743190551 +0700	pull (finish): returning to refs/heads/main
-1ce3b9928c2911db57428c43a8b71b3cccf8a96b 5980aaf16da5a414e54227227780fafb59f3b045 Mikha <milenikaiqbal@gmail.com> 1743202889 +0700	checkout: moving from main to development
-5980aaf16da5a414e54227227780fafb59f3b045 6c9ab384e5875cbc9a32fe48e816b1cb2dae41e9 Mikha <milenikaiqbal@gmail.com> 1743206336 +0700	commit: configured TLS for both main app and filebrowser
-6c9ab384e5875cbc9a32fe48e816b1cb2dae41e9 1ce3b9928c2911db57428c43a8b71b3cccf8a96b Mikha <milenikaiqbal@gmail.com> 1743206376 +0700	checkout: moving from development to main
-1ce3b9928c2911db57428c43a8b71b3cccf8a96b 658784aeda5ce6cdbb7a990953f92a48f95d59f0 Mikha <milenikaiqbal@gmail.com> 1743206382 +0700	merge development: Merge made by the 'ort' strategy.
-658784aeda5ce6cdbb7a990953f92a48f95d59f0 7dfc0e678422f99fb25ebfd076a83ac63cc7e784 Mikha <milenikaiqbal@gmail.com> 1743206782 +0700	commit: fixed iframe to load to https instead of http
-7dfc0e678422f99fb25ebfd076a83ac63cc7e784 6c9ab384e5875cbc9a32fe48e816b1cb2dae41e9 Mikha <milenikaiqbal@gmail.com> 1743206807 +0700	checkout: moving from main to development
-6c9ab384e5875cbc9a32fe48e816b1cb2dae41e9 7dfc0e678422f99fb25ebfd076a83ac63cc7e784 Mikha <milenikaiqbal@gmail.com> 1743206811 +0700	merge main: Fast-forward
-7dfc0e678422f99fb25ebfd076a83ac63cc7e784 7dfc0e678422f99fb25ebfd076a83ac63cc7e784 Mikha <milenikaiqbal@gmail.com> 1743206836 +0700	checkout: moving from development to main
-7dfc0e678422f99fb25ebfd076a83ac63cc7e784 7dfc0e678422f99fb25ebfd076a83ac63cc7e784 Mikha <milenikaiqbal@gmail.com> 1743211517 +0700	checkout: moving from main to development
-7dfc0e678422f99fb25ebfd076a83ac63cc7e784 5b47b36b3f74e3a438c2f68a66e5047be7c0d896 Mikha <milenikaiqbal@gmail.com> 1743211597 +0700	commit: changed iframe adddress port from 8080 to 8081
-5b47b36b3f74e3a438c2f68a66e5047be7c0d896 7dfc0e678422f99fb25ebfd076a83ac63cc7e784 Mikha <milenikaiqbal@gmail.com> 1743211608 +0700	checkout: moving from development to main
-7dfc0e678422f99fb25ebfd076a83ac63cc7e784 5b47b36b3f74e3a438c2f68a66e5047be7c0d896 Mikha <milenikaiqbal@gmail.com> 1743211610 +0700	merge development: Fast-forward
-5b47b36b3f74e3a438c2f68a66e5047be7c0d896 138e871c76193238c93d37a302c4f7ddbd444fb7 Mikha <milenikaiqbal@gmail.com> 1743211718 +0700	commit: updated README.md
-138e871c76193238c93d37a302c4f7ddbd444fb7 14cc6fef334482814d59d8307800d030ea43e621 Mikha <milenikaiqbal@gmail.com> 1743360437 +0700	commit: q
-14cc6fef334482814d59d8307800d030ea43e621 5b47b36b3f74e3a438c2f68a66e5047be7c0d896 Mikha <milenikaiqbal@gmail.com> 1743360451 +0700	checkout: moving from main to development
-5b47b36b3f74e3a438c2f68a66e5047be7c0d896 14cc6fef334482814d59d8307800d030ea43e621 Mikha <milenikaiqbal@gmail.com> 1743360455 +0700	merge main: Fast-forward
-14cc6fef334482814d59d8307800d030ea43e621 f932347fce94f1459e501171596c783892db14ae Mikha <milenikaiqbal@gmail.com> 1743365145 +0700	commit: added project context txt dump
-f932347fce94f1459e501171596c783892db14ae f932347fce94f1459e501171596c783892db14ae Mikha <milenikaiqbal@gmail.com> 1743366068 +0700	checkout: moving from development to feat_queue
-f932347fce94f1459e501171596c783892db14ae 830fa9d199be7816443a2335be6aaea59e66f9f3 Mikha <milenikaiqbal@gmail.com> 1743367547 +0700	commit: modified project_context
-830fa9d199be7816443a2335be6aaea59e66f9f3 de185e5fa309761f52c9bc5e0656b0f91eeadfe6 Mikha <milenikaiqbal@gmail.com> 1743367659 +0700	commit: fixed project context
-de185e5fa309761f52c9bc5e0656b0f91eeadfe6 3d019736ce006b6f937a0d48b478b385ab3f6078 Mikha <milenikaiqbal@gmail.com> 1743368048 +0700	commit: added working queue system
-3d019736ce006b6f937a0d48b478b385ab3f6078 cc2d6824b4b807c1c59d26091d5d1d224fe77c70 Mikha <milenikaiqbal@gmail.com> 1743368396 +0700	commit: added docs for redisQ task queueing
---- END FILE: ./.git/logs/HEAD ---
-
---- START FILE: ./.git/hooks/sendemail-validate.sample ---
-#!/bin/sh
-
-# An example hook script to validate a patch (and/or patch series) before
-# sending it via email.
-#
-# The hook should exit with non-zero status after issuing an appropriate
-# message if it wants to prevent the email(s) from being sent.
-#
-# To enable this hook, rename this file to "sendemail-validate".
-#
-# By default, it will only check that the patch(es) can be applied on top of
-# the default upstream branch without conflicts in a secondary worktree. After
-# validation (successful or not) of the last patch of a series, the worktree
-# will be deleted.
-#
-# The following config variables can be set to change the default remote and
-# remote ref that are used to apply the patches against:
-#
-#   sendemail.validateRemote (default: origin)
-#   sendemail.validateRemoteRef (default: HEAD)
-#
-# Replace the TODO placeholders with appropriate checks according to your
-# needs.
-
-validate_cover_letter () {
-	file="$1"
-	# TODO: Replace with appropriate checks (e.g. spell checking).
-	true
-}
-
-validate_patch () {
-	file="$1"
-	# Ensure that the patch applies without conflicts.
-	git am -3 "$file" || return
-	# TODO: Replace with appropriate checks for this patch
-	# (e.g. checkpatch.pl).
-	true
-}
-
-validate_series () {
-	# TODO: Replace with appropriate checks for the whole series
-	# (e.g. quick build, coding style checks, etc.).
-	true
-}
-
-# main -------------------------------------------------------------------------
-
-if test "$GIT_SENDEMAIL_FILE_COUNTER" = 1
-then
-	remote=$(git config --default origin --get sendemail.validateRemote) &&
-	ref=$(git config --default HEAD --get sendemail.validateRemoteRef) &&
-	worktree=$(mktemp --tmpdir -d sendemail-validate.XXXXXXX) &&
-	git worktree add -fd --checkout "$worktree" "refs/remotes/$remote/$ref" &&
-	git config --replace-all sendemail.validateWorktree "$worktree"
-else
-	worktree=$(git config --get sendemail.validateWorktree)
-fi || {
-	echo "sendemail-validate: error: failed to prepare worktree" >&2
-	exit 1
-}
-
-unset GIT_DIR GIT_WORK_TREE
-cd "$worktree" &&
-
-if grep -q "^diff --git " "$1"
-then
-	validate_patch "$1"
-else
-	validate_cover_letter "$1"
-fi &&
-
-if test "$GIT_SENDEMAIL_FILE_COUNTER" = "$GIT_SENDEMAIL_FILE_TOTAL"
-then
-	git config --unset-all sendemail.validateWorktree &&
-	trap 'git worktree remove -ff "$worktree"' EXIT &&
-	validate_series
-fi
---- END FILE: ./.git/hooks/sendemail-validate.sample ---
-
---- START FILE: ./.git/hooks/prepare-commit-msg.sample ---
-#!/bin/sh
-#
-# An example hook script to prepare the commit log message.
-# Called by "git commit" with the name of the file that has the
-# commit message, followed by the description of the commit
-# message's source.  The hook's purpose is to edit the commit
-# message file.  If the hook fails with a non-zero status,
-# the commit is aborted.
-#
-# To enable this hook, rename this file to "prepare-commit-msg".
-
-# This hook includes three examples. The first one removes the
-# "# Please enter the commit message..." help message.
-#
-# The second includes the output of "git diff --name-status -r"
-# into the message, just before the "git status" output.  It is
-# commented because it doesn't cope with --amend or with squashed
-# commits.
-#
-# The third example adds a Signed-off-by line to the message, that can
-# still be edited.  This is rarely a good idea.
-
-COMMIT_MSG_FILE=$1
-COMMIT_SOURCE=$2
-SHA1=$3
-
-/usr/bin/perl -i.bak -ne 'print unless(m/^. Please enter the commit message/..m/^#$/)' "$COMMIT_MSG_FILE"
-
-# case "$COMMIT_SOURCE,$SHA1" in
-#  ,|template,)
-#    /usr/bin/perl -i.bak -pe '
-#       print "\n" . `git diff --cached --name-status -r`
-# 	 if /^#/ && $first++ == 0' "$COMMIT_MSG_FILE" ;;
-#  *) ;;
-# esac
-
-# SOB=$(git var GIT_COMMITTER_IDENT | sed -n 's/^\(.*>\).*$/Signed-off-by: \1/p')
-# git interpret-trailers --in-place --trailer "$SOB" "$COMMIT_MSG_FILE"
-# if test -z "$COMMIT_SOURCE"
-# then
-#   /usr/bin/perl -i.bak -pe 'print "\n" if !$first_line++' "$COMMIT_MSG_FILE"
-# fi
---- END FILE: ./.git/hooks/prepare-commit-msg.sample ---
-
---- START FILE: ./.git/hooks/pre-receive.sample ---
-#!/bin/sh
-#
-# An example hook script to make use of push options.
-# The example simply echoes all push options that start with 'echoback='
-# and rejects all pushes when the "reject" push option is used.
-#
-# To enable this hook, rename this file to "pre-receive".
-
-if test -n "$GIT_PUSH_OPTION_COUNT"
-then
-	i=0
-	while test "$i" -lt "$GIT_PUSH_OPTION_COUNT"
-	do
-		eval "value=\$GIT_PUSH_OPTION_$i"
-		case "$value" in
-		echoback=*)
-			echo "echo from the pre-receive-hook: ${value#*=}" >&2
-			;;
-		reject)
-			exit 1
-		esac
-		i=$((i + 1))
-	done
-fi
---- END FILE: ./.git/hooks/pre-receive.sample ---
-
---- START FILE: ./.git/hooks/pre-applypatch.sample ---
-#!/bin/sh
-#
-# An example hook script to verify what is about to be committed
-# by applypatch from an e-mail message.
-#
-# The hook should exit with non-zero status after issuing an
-# appropriate message if it wants to stop the commit.
-#
-# To enable this hook, rename this file to "pre-applypatch".
-
-. git-sh-setup
-precommit="$(git rev-parse --git-path hooks/pre-commit)"
-test -x "$precommit" && exec "$precommit" ${1+"$@"}
-:
---- END FILE: ./.git/hooks/pre-applypatch.sample ---
-
---- START FILE: ./.git/hooks/pre-merge-commit.sample ---
-#!/bin/sh
-#
-# An example hook script to verify what is about to be committed.
-# Called by "git merge" with no arguments.  The hook should
-# exit with non-zero status after issuing an appropriate message to
-# stderr if it wants to stop the merge commit.
-#
-# To enable this hook, rename this file to "pre-merge-commit".
-
-. git-sh-setup
-test -x "$GIT_DIR/hooks/pre-commit" &&
-        exec "$GIT_DIR/hooks/pre-commit"
-:
---- END FILE: ./.git/hooks/pre-merge-commit.sample ---
-
---- START FILE: ./.git/hooks/commit-msg.sample ---
-#!/bin/sh
-#
-# An example hook script to check the commit log message.
-# Called by "git commit" with one argument, the name of the file
-# that has the commit message.  The hook should exit with non-zero
-# status after issuing an appropriate message if it wants to stop the
-# commit.  The hook is allowed to edit the commit message file.
-#
-# To enable this hook, rename this file to "commit-msg".
-
-# Uncomment the below to add a Signed-off-by line to the message.
-# Doing this in a hook is a bad idea in general, but the prepare-commit-msg
-# hook is more suited to it.
-#
-# SOB=$(git var GIT_AUTHOR_IDENT | sed -n 's/^\(.*>\).*$/Signed-off-by: \1/p')
-# grep -qs "^$SOB" "$1" || echo "$SOB" >> "$1"
-
-# This example catches duplicate Signed-off-by lines.
-
-test "" = "$(grep '^Signed-off-by: ' "$1" |
-	 sort | uniq -c | sed -e '/^[ 	]*1[ 	]/d')" || {
-	echo >&2 Duplicate Signed-off-by lines.
-	exit 1
-}
---- END FILE: ./.git/hooks/commit-msg.sample ---
-
---- START FILE: ./.git/hooks/pre-rebase.sample ---
-#!/bin/sh
-#
-# Copyright (c) 2006, 2008 Junio C Hamano
-#
-# The "pre-rebase" hook is run just before "git rebase" starts doing
-# its job, and can prevent the command from running by exiting with
-# non-zero status.
-#
-# The hook is called with the following parameters:
-#
-# $1 -- the upstream the series was forked from.
-# $2 -- the branch being rebased (or empty when rebasing the current branch).
-#
-# This sample shows how to prevent topic branches that are already
-# merged to 'next' branch from getting rebased, because allowing it
-# would result in rebasing already published history.
-
-publish=next
-basebranch="$1"
-if test "$#" = 2
-then
-	topic="refs/heads/$2"
-else
-	topic=`git symbolic-ref HEAD` ||
-	exit 0 ;# we do not interrupt rebasing detached HEAD
-fi
-
-case "$topic" in
-refs/heads/??/*)
-	;;
-*)
-	exit 0 ;# we do not interrupt others.
-	;;
-esac
-
-# Now we are dealing with a topic branch being rebased
-# on top of master.  Is it OK to rebase it?
-
-# Does the topic really exist?
-git show-ref -q "$topic" || {
-	echo >&2 "No such branch $topic"
-	exit 1
-}
-
-# Is topic fully merged to master?
-not_in_master=`git rev-list --pretty=oneline ^master "$topic"`
-if test -z "$not_in_master"
-then
-	echo >&2 "$topic is fully merged to master; better remove it."
-	exit 1 ;# we could allow it, but there is no point.
-fi
-
-# Is topic ever merged to next?  If so you should not be rebasing it.
-only_next_1=`git rev-list ^master "^$topic" ${publish} | sort`
-only_next_2=`git rev-list ^master           ${publish} | sort`
-if test "$only_next_1" = "$only_next_2"
-then
-	not_in_topic=`git rev-list "^$topic" master`
-	if test -z "$not_in_topic"
-	then
-		echo >&2 "$topic is already up to date with master"
-		exit 1 ;# we could allow it, but there is no point.
-	else
-		exit 0
-	fi
-else
-	not_in_next=`git rev-list --pretty=oneline ^${publish} "$topic"`
-	/usr/bin/perl -e '
-		my $topic = $ARGV[0];
-		my $msg = "* $topic has commits already merged to public branch:\n";
-		my (%not_in_next) = map {
-			/^([0-9a-f]+) /;
-			($1 => 1);
-		} split(/\n/, $ARGV[1]);
-		for my $elem (map {
-				/^([0-9a-f]+) (.*)$/;
-				[$1 => $2];
-			} split(/\n/, $ARGV[2])) {
-			if (!exists $not_in_next{$elem->[0]}) {
-				if ($msg) {
-					print STDERR $msg;
-					undef $msg;
-				}
-				print STDERR " $elem->[1]\n";
-			}
-		}
-	' "$topic" "$not_in_next" "$not_in_master"
-	exit 1
-fi
-
-<<\DOC_END
-
-This sample hook safeguards topic branches that have been
-published from being rewound.
-
-The workflow assumed here is:
-
- * Once a topic branch forks from "master", "master" is never
-   merged into it again (either directly or indirectly).
-
- * Once a topic branch is fully cooked and merged into "master",
-   it is deleted.  If you need to build on top of it to correct
-   earlier mistakes, a new topic branch is created by forking at
-   the tip of the "master".  This is not strictly necessary, but
-   it makes it easier to keep your history simple.
-
- * Whenever you need to test or publish your changes to topic
-   branches, merge them into "next" branch.
-
-The script, being an example, hardcodes the publish branch name
-to be "next", but it is trivial to make it configurable via
-$GIT_DIR/config mechanism.
-
-With this workflow, you would want to know:
-
-(1) ... if a topic branch has ever been merged to "next".  Young
-    topic branches can have stupid mistakes you would rather
-    clean up before publishing, and things that have not been
-    merged into other branches can be easily rebased without
-    affecting other people.  But once it is published, you would
-    not want to rewind it.
-
-(2) ... if a topic branch has been fully merged to "master".
-    Then you can delete it.  More importantly, you should not
-    build on top of it -- other people may already want to
-    change things related to the topic as patches against your
-    "master", so if you need further changes, it is better to
-    fork the topic (perhaps with the same name) afresh from the
-    tip of "master".
-
-Let's look at this example:
-
-		   o---o---o---o---o---o---o---o---o---o "next"
-		  /       /           /           /
-		 /   a---a---b A     /           /
-		/   /               /           /
-	       /   /   c---c---c---c B         /
-	      /   /   /             \         /
-	     /   /   /   b---b C     \       /
-	    /   /   /   /             \     /
-    ---o---o---o---o---o---o---o---o---o---o---o "master"
-
-
-A, B and C are topic branches.
-
- * A has one fix since it was merged up to "next".
-
- * B has finished.  It has been fully merged up to "master" and "next",
-   and is ready to be deleted.
-
- * C has not merged to "next" at all.
-
-We would want to allow C to be rebased, refuse A, and encourage
-B to be deleted.
-
-To compute (1):
-
-	git rev-list ^master ^topic next
-	git rev-list ^master        next
-
-	if these match, topic has not merged in next at all.
-
-To compute (2):
-
-	git rev-list master..topic
-
-	if this is empty, it is fully merged to "master".
-
-DOC_END
---- END FILE: ./.git/hooks/pre-rebase.sample ---
-
---- START FILE: ./.git/hooks/post-update.sample ---
-#!/bin/sh
-#
-# An example hook script to prepare a packed repository for use over
-# dumb transports.
-#
-# To enable this hook, rename this file to "post-update".
-
-exec git update-server-info
---- END FILE: ./.git/hooks/post-update.sample ---
-
---- START FILE: ./.git/hooks/pre-push.sample ---
-#!/bin/sh
-
-# An example hook script to verify what is about to be pushed.  Called by "git
-# push" after it has checked the remote status, but before anything has been
-# pushed.  If this script exits with a non-zero status nothing will be pushed.
-#
-# This hook is called with the following parameters:
-#
-# $1 -- Name of the remote to which the push is being done
-# $2 -- URL to which the push is being done
-#
-# If pushing without using a named remote those arguments will be equal.
-#
-# Information about the commits which are being pushed is supplied as lines to
-# the standard input in the form:
-#
-#   <local ref> <local oid> <remote ref> <remote oid>
-#
-# This sample shows how to prevent push of commits where the log message starts
-# with "WIP" (work in progress).
-
-remote="$1"
-url="$2"
-
-zero=$(git hash-object --stdin </dev/null | tr '[0-9a-f]' '0')
-
-while read local_ref local_oid remote_ref remote_oid
-do
-	if test "$local_oid" = "$zero"
-	then
-		# Handle delete
-		:
-	else
-		if test "$remote_oid" = "$zero"
-		then
-			# New branch, examine all commits
-			range="$local_oid"
-		else
-			# Update to existing branch, examine new commits
-			range="$remote_oid..$local_oid"
-		fi
-
-		# Check for WIP commit
-		commit=$(git rev-list -n 1 --grep '^WIP' "$range")
-		if test -n "$commit"
-		then
-			echo >&2 "Found WIP commit in $local_ref, not pushing"
-			exit 1
-		fi
-	fi
-done
-
-exit 0
---- END FILE: ./.git/hooks/pre-push.sample ---
-
---- START FILE: ./.git/hooks/pre-commit.sample ---
-#!/bin/sh
-#
-# An example hook script to verify what is about to be committed.
-# Called by "git commit" with no arguments.  The hook should
-# exit with non-zero status after issuing an appropriate message if
-# it wants to stop the commit.
-#
-# To enable this hook, rename this file to "pre-commit".
-
-if git rev-parse --verify HEAD >/dev/null 2>&1
-then
-	against=HEAD
-else
-	# Initial commit: diff against an empty tree object
-	against=$(git hash-object -t tree /dev/null)
-fi
-
-# If you want to allow non-ASCII filenames set this variable to true.
-allownonascii=$(git config --type=bool hooks.allownonascii)
-
-# Redirect output to stderr.
-exec 1>&2
-
-# Cross platform projects tend to avoid non-ASCII filenames; prevent
-# them from being added to the repository. We exploit the fact that the
-# printable range starts at the space character and ends with tilde.
-if [ "$allownonascii" != "true" ] &&
-	# Note that the use of brackets around a tr range is ok here, (it's
-	# even required, for portability to Solaris 10's /usr/bin/tr), since
-	# the square bracket bytes happen to fall in the designated range.
-	test $(git diff-index --cached --name-only --diff-filter=A -z $against |
-	  LC_ALL=C tr -d '[ -~]\0' | wc -c) != 0
-then
-	cat <<\EOF
-Error: Attempt to add a non-ASCII file name.
-
-This can cause problems if you want to work with people on other platforms.
-
-To be portable it is advisable to rename the file.
-
-If you know what you are doing you can disable this check using:
-
-  git config hooks.allownonascii true
-EOF
-	exit 1
-fi
-
-# If there are whitespace errors, print the offending file names and fail.
-exec git diff-index --check --cached $against --
---- END FILE: ./.git/hooks/pre-commit.sample ---
-
---- START FILE: ./.git/hooks/fsmonitor-watchman.sample ---
-#!/usr/bin/perl
-
-use strict;
-use warnings;
-use IPC::Open2;
-
-# An example hook script to integrate Watchman
-# (https://facebook.github.io/watchman/) with git to speed up detecting
-# new and modified files.
-#
-# The hook is passed a version (currently 2) and last update token
-# formatted as a string and outputs to stdout a new update token and
-# all files that have been modified since the update token. Paths must
-# be relative to the root of the working tree and separated by a single NUL.
-#
-# To enable this hook, rename this file to "query-watchman" and set
-# 'git config core.fsmonitor .git/hooks/query-watchman'
-#
-my ($version, $last_update_token) = @ARGV;
-
-# Uncomment for debugging
-# print STDERR "$0 $version $last_update_token\n";
-
-# Check the hook interface version
-if ($version ne 2) {
-	die "Unsupported query-fsmonitor hook version '$version'.\n" .
-	    "Falling back to scanning...\n";
-}
-
-my $git_work_tree = get_working_dir();
-
-my $retry = 1;
-
-my $json_pkg;
-eval {
-	require JSON::XS;
-	$json_pkg = "JSON::XS";
-	1;
-} or do {
-	require JSON::PP;
-	$json_pkg = "JSON::PP";
-};
-
-launch_watchman();
-
-sub launch_watchman {
-	my $o = watchman_query();
-	if (is_work_tree_watched($o)) {
-		output_result($o->{clock}, @{$o->{files}});
-	}
-}
-
-sub output_result {
-	my ($clockid, @files) = @_;
-
-	# Uncomment for debugging watchman output
-	# open (my $fh, ">", ".git/watchman-output.out");
-	# binmode $fh, ":utf8";
-	# print $fh "$clockid\n@files\n";
-	# close $fh;
-
-	binmode STDOUT, ":utf8";
-	print $clockid;
-	print "\0";
-	local $, = "\0";
-	print @files;
-}
-
-sub watchman_clock {
-	my $response = qx/watchman clock "$git_work_tree"/;
-	die "Failed to get clock id on '$git_work_tree'.\n" .
-		"Falling back to scanning...\n" if $? != 0;
-
-	return $json_pkg->new->utf8->decode($response);
-}
-
-sub watchman_query {
-	my $pid = open2(\*CHLD_OUT, \*CHLD_IN, 'watchman -j --no-pretty')
-	or die "open2() failed: $!\n" .
-	"Falling back to scanning...\n";
-
-	# In the query expression below we're asking for names of files that
-	# changed since $last_update_token but not from the .git folder.
-	#
-	# To accomplish this, we're using the "since" generator to use the
-	# recency index to select candidate nodes and "fields" to limit the
-	# output to file names only. Then we're using the "expression" term to
-	# further constrain the results.
-	my $last_update_line = "";
-	if (substr($last_update_token, 0, 1) eq "c") {
-		$last_update_token = "\"$last_update_token\"";
-		$last_update_line = qq[\n"since": $last_update_token,];
-	}
-	my $query = <<"	END";
-		["query", "$git_work_tree", {$last_update_line
-			"fields": ["name"],
-			"expression": ["not", ["dirname", ".git"]]
-		}]
-	END
-
-	# Uncomment for debugging the watchman query
-	# open (my $fh, ">", ".git/watchman-query.json");
-	# print $fh $query;
-	# close $fh;
-
-	print CHLD_IN $query;
-	close CHLD_IN;
-	my $response = do {local $/; <CHLD_OUT>};
-
-	# Uncomment for debugging the watch response
-	# open ($fh, ">", ".git/watchman-response.json");
-	# print $fh $response;
-	# close $fh;
-
-	die "Watchman: command returned no output.\n" .
-	"Falling back to scanning...\n" if $response eq "";
-	die "Watchman: command returned invalid output: $response\n" .
-	"Falling back to scanning...\n" unless $response =~ /^\{/;
-
-	return $json_pkg->new->utf8->decode($response);
-}
-
-sub is_work_tree_watched {
-	my ($output) = @_;
-	my $error = $output->{error};
-	if ($retry > 0 and $error and $error =~ m/unable to resolve root .* directory (.*) is not watched/) {
-		$retry--;
-		my $response = qx/watchman watch "$git_work_tree"/;
-		die "Failed to make watchman watch '$git_work_tree'.\n" .
-		    "Falling back to scanning...\n" if $? != 0;
-		$output = $json_pkg->new->utf8->decode($response);
-		$error = $output->{error};
-		die "Watchman: $error.\n" .
-		"Falling back to scanning...\n" if $error;
-
-		# Uncomment for debugging watchman output
-		# open (my $fh, ">", ".git/watchman-output.out");
-		# close $fh;
-
-		# Watchman will always return all files on the first query so
-		# return the fast "everything is dirty" flag to git and do the
-		# Watchman query just to get it over with now so we won't pay
-		# the cost in git to look up each individual file.
-		my $o = watchman_clock();
-		$error = $output->{error};
-
-		die "Watchman: $error.\n" .
-		"Falling back to scanning...\n" if $error;
-
-		output_result($o->{clock}, ("/"));
-		$last_update_token = $o->{clock};
-
-		eval { launch_watchman() };
-		return 0;
-	}
-
-	die "Watchman: $error.\n" .
-	"Falling back to scanning...\n" if $error;
-
-	return 1;
-}
-
-sub get_working_dir {
-	my $working_dir;
-	if ($^O =~ 'msys' || $^O =~ 'cygwin') {
-		$working_dir = Win32::GetCwd();
-		$working_dir =~ tr/\\/\//;
-	} else {
-		require Cwd;
-		$working_dir = Cwd::cwd();
-	}
-
-	return $working_dir;
-}
---- END FILE: ./.git/hooks/fsmonitor-watchman.sample ---
-
---- START FILE: ./.git/hooks/push-to-checkout.sample ---
-#!/bin/sh
-
-# An example hook script to update a checked-out tree on a git push.
-#
-# This hook is invoked by git-receive-pack(1) when it reacts to git
-# push and updates reference(s) in its repository, and when the push
-# tries to update the branch that is currently checked out and the
-# receive.denyCurrentBranch configuration variable is set to
-# updateInstead.
-#
-# By default, such a push is refused if the working tree and the index
-# of the remote repository has any difference from the currently
-# checked out commit; when both the working tree and the index match
-# the current commit, they are updated to match the newly pushed tip
-# of the branch. This hook is to be used to override the default
-# behaviour; however the code below reimplements the default behaviour
-# as a starting point for convenient modification.
-#
-# The hook receives the commit with which the tip of the current
-# branch is going to be updated:
-commit=$1
-
-# It can exit with a non-zero status to refuse the push (when it does
-# so, it must not modify the index or the working tree).
-die () {
-	echo >&2 "$*"
-	exit 1
-}
-
-# Or it can make any necessary changes to the working tree and to the
-# index to bring them to the desired state when the tip of the current
-# branch is updated to the new commit, and exit with a zero status.
-#
-# For example, the hook can simply run git read-tree -u -m HEAD "$1"
-# in order to emulate git fetch that is run in the reverse direction
-# with git push, as the two-tree form of git read-tree -u -m is
-# essentially the same as git switch or git checkout that switches
-# branches while keeping the local changes in the working tree that do
-# not interfere with the difference between the branches.
-
-# The below is a more-or-less exact translation to shell of the C code
-# for the default behaviour for git's push-to-checkout hook defined in
-# the push_to_deploy() function in builtin/receive-pack.c.
-#
-# Note that the hook will be executed from the repository directory,
-# not from the working tree, so if you want to perform operations on
-# the working tree, you will have to adapt your code accordingly, e.g.
-# by adding "cd .." or using relative paths.
-
-if ! git update-index -q --ignore-submodules --refresh
-then
-	die "Up-to-date check failed"
-fi
-
-if ! git diff-files --quiet --ignore-submodules --
-then
-	die "Working directory has unstaged changes"
-fi
-
-# This is a rough translation of:
-#
-#   head_has_history() ? "HEAD" : EMPTY_TREE_SHA1_HEX
-if git cat-file -e HEAD 2>/dev/null
-then
-	head=HEAD
-else
-	head=$(git hash-object -t tree --stdin </dev/null)
-fi
-
-if ! git diff-index --quiet --cached --ignore-submodules $head --
-then
-	die "Working directory has staged changes"
-fi
-
-if ! git read-tree -u -m "$commit"
-then
-	die "Could not update working tree to new HEAD"
-fi
---- END FILE: ./.git/hooks/push-to-checkout.sample ---
-
---- START FILE: ./.git/hooks/applypatch-msg.sample ---
-#!/bin/sh
-#
-# An example hook script to check the commit log message taken by
-# applypatch from an e-mail message.
-#
-# The hook should exit with non-zero status after issuing an
-# appropriate message if it wants to stop the commit.  The hook is
-# allowed to edit the commit message file.
-#
-# To enable this hook, rename this file to "applypatch-msg".
-
-. git-sh-setup
-commitmsg="$(git rev-parse --git-path hooks/commit-msg)"
-test -x "$commitmsg" && exec "$commitmsg" ${1+"$@"}
-:
---- END FILE: ./.git/hooks/applypatch-msg.sample ---
-
---- START FILE: ./.git/hooks/update.sample ---
-#!/bin/sh
-#
-# An example hook script to block unannotated tags from entering.
-# Called by "git receive-pack" with arguments: refname sha1-old sha1-new
-#
-# To enable this hook, rename this file to "update".
-#
-# Config
-# ------
-# hooks.allowunannotated
-#   This boolean sets whether unannotated tags will be allowed into the
-#   repository.  By default they won't be.
-# hooks.allowdeletetag
-#   This boolean sets whether deleting tags will be allowed in the
-#   repository.  By default they won't be.
-# hooks.allowmodifytag
-#   This boolean sets whether a tag may be modified after creation. By default
-#   it won't be.
-# hooks.allowdeletebranch
-#   This boolean sets whether deleting branches will be allowed in the
-#   repository.  By default they won't be.
-# hooks.denycreatebranch
-#   This boolean sets whether remotely creating branches will be denied
-#   in the repository.  By default this is allowed.
-#
-
-# --- Command line
-refname="$1"
-oldrev="$2"
-newrev="$3"
-
-# --- Safety check
-if [ -z "$GIT_DIR" ]; then
-	echo "Don't run this script from the command line." >&2
-	echo " (if you want, you could supply GIT_DIR then run" >&2
-	echo "  $0 <ref> <oldrev> <newrev>)" >&2
-	exit 1
-fi
-
-if [ -z "$refname" -o -z "$oldrev" -o -z "$newrev" ]; then
-	echo "usage: $0 <ref> <oldrev> <newrev>" >&2
-	exit 1
-fi
-
-# --- Config
-allowunannotated=$(git config --type=bool hooks.allowunannotated)
-allowdeletebranch=$(git config --type=bool hooks.allowdeletebranch)
-denycreatebranch=$(git config --type=bool hooks.denycreatebranch)
-allowdeletetag=$(git config --type=bool hooks.allowdeletetag)
-allowmodifytag=$(git config --type=bool hooks.allowmodifytag)
-
-# check for no description
-projectdesc=$(sed -e '1q' "$GIT_DIR/description")
-case "$projectdesc" in
-"Unnamed repository"* | "")
-	echo "*** Project description file hasn't been set" >&2
-	exit 1
-	;;
-esac
-
-# --- Check types
-# if $newrev is 0000...0000, it's a commit to delete a ref.
-zero=$(git hash-object --stdin </dev/null | tr '[0-9a-f]' '0')
-if [ "$newrev" = "$zero" ]; then
-	newrev_type=delete
-else
-	newrev_type=$(git cat-file -t $newrev)
-fi
-
-case "$refname","$newrev_type" in
-	refs/tags/*,commit)
-		# un-annotated tag
-		short_refname=${refname##refs/tags/}
-		if [ "$allowunannotated" != "true" ]; then
-			echo "*** The un-annotated tag, $short_refname, is not allowed in this repository" >&2
-			echo "*** Use 'git tag [ -a | -s ]' for tags you want to propagate." >&2
-			exit 1
-		fi
-		;;
-	refs/tags/*,delete)
-		# delete tag
-		if [ "$allowdeletetag" != "true" ]; then
-			echo "*** Deleting a tag is not allowed in this repository" >&2
-			exit 1
-		fi
-		;;
-	refs/tags/*,tag)
-		# annotated tag
-		if [ "$allowmodifytag" != "true" ] && git rev-parse $refname > /dev/null 2>&1
-		then
-			echo "*** Tag '$refname' already exists." >&2
-			echo "*** Modifying a tag is not allowed in this repository." >&2
-			exit 1
-		fi
-		;;
-	refs/heads/*,commit)
-		# branch
-		if [ "$oldrev" = "$zero" -a "$denycreatebranch" = "true" ]; then
-			echo "*** Creating a branch is not allowed in this repository" >&2
-			exit 1
-		fi
-		;;
-	refs/heads/*,delete)
-		# delete branch
-		if [ "$allowdeletebranch" != "true" ]; then
-			echo "*** Deleting a branch is not allowed in this repository" >&2
-			exit 1
-		fi
-		;;
-	refs/remotes/*,commit)
-		# tracking branch
-		;;
-	refs/remotes/*,delete)
-		# delete tracking branch
-		if [ "$allowdeletebranch" != "true" ]; then
-			echo "*** Deleting a tracking branch is not allowed in this repository" >&2
-			exit 1
-		fi
-		;;
-	*)
-		# Anything else (is there anything else?)
-		echo "*** Update hook: unknown type of update to ref $refname of type $newrev_type" >&2
-		exit 1
-		;;
-esac
-
-# --- Finished
-exit 0
---- END FILE: ./.git/hooks/update.sample ---
-
---- START FILE: ./.git/info/exclude ---
-# git ls-files --others --exclude-from=.git/info/exclude
-# Lines that start with '#' are comments.
-# For a project mostly in C, the following would be a good set of
-# exclude patterns (uncomment them if you want to use them):
-# *.[oa]
-# *~
---- END FILE: ./.git/info/exclude ---
-
---- START FILE: ./.git/config ---
-[core]
-	repositoryformatversion = 0
-	filemode = true
-	bare = false
-	logallrefupdates = true
-[remote "origin"]
-	url = git@github.com:mikha-22/bioinformatics-webapp.git
-	fetch = +refs/heads/*:refs/remotes/origin/*
-[branch "main"]
-	remote = origin
-	merge = refs/heads/main
-[branch "development"]
-	remote = origin
-	merge = refs/heads/development
-[pull]
-	rebase = true
-[branch "feat_backend"]
-	remote = origin
-	merge = refs/heads/feat_backend
-[branch "feat_frontend"]
-	remote = origin
-	merge = refs/heads/feat_frontend
-[branch "feat_queue"]
-	remote = origin
-	merge = refs/heads/feat_queue
---- END FILE: ./.git/config ---
 
 --- START FILE: ./conda_env.yml ---
 name: bio-webapp
@@ -3245,31 +1193,29 @@ PROJECT_DIR="/home/mikha/labs/bioinformatics-webapp"
 OUTPUT_FILE="project_context.txt" # Output file will be created inside PROJECT_DIR
 MAX_SIZE_BYTES=1048576 # 1MB limit (1 * 1024 * 1024) - Adjust as needed
 
-# Directories to exclude (paths relative to PROJECT_DIR)
-# Using an array for easier reading/management
+# Directories to exclude (paths relative to PROJECT_DIR, anchored)
+# IMPORTANT: Use anchors like './'
 EXCLUDE_PATHS=(
-    "./.git"
-    "./bioinformatics/data"
-    "./bioinformatics/logs"
-    "./bioinformatics/results"
-    "./tls"
-    "./__pycache__"
-    "./node_modules"
-    "./venv"
-    "./build"
-    "./dist"
-    "./target"
-    # Add any other specific directories if needed
-    # e.g., "./some_other_vendor_dir"
+    "./.git/" # Trailing slash helps match directory specifically
+    "./bioinformatics/data/"
+    "./bioinformatics/logs/"
+    "./bioinformatics/results/"
+    "./tls/"
+    "./__pycache__/"
+    "./node_modules/"
+    "./venv/"
+    "./build/"
+    "./dist/"
+    "./target/"
 )
 
-# Specific files to exclude by name (relative to PROJECT_DIR)
-# The output file itself is the primary one. Add others if necessary.
+# Specific file patterns to exclude (can use wildcards)
 EXCLUDE_FILES=(
     "$OUTPUT_FILE"
-    "*.pyc" # Also exclude python bytecode directly
-    # "*.log" # You could exclude all logs here instead of the dir, but dir is safer
-    "filebrowser.db" # Exclude the specific db file in docker/
+    "*.pyc"
+    "*.pyo"
+    "docker/filebrowser.db" # Be specific
+    # Add others if needed, e.g., "*.log", "*.swp"
 )
 # --- End Configuration ---
 
@@ -3277,7 +1223,17 @@ EXCLUDE_FILES=(
 cd "$PROJECT_DIR" || { echo "Error: Could not change directory to $PROJECT_DIR"; exit 1; }
 
 echo "Scanning directory: $(pwd)"
-echo "Excluding paths matching: ${EXCLUDE_PATHS[@]}"
+# Construct grep -v patterns for exclusion
+exclude_grep_pattern=$(printf -- '-e ^%s.* ' "${EXCLUDE_PATHS[@]}")
+for file_pattern in "${EXCLUDE_FILES[@]}"; do
+    # Need to handle wildcards differently for file patterns if needed,
+    # but for simple names/extensions, direct match is ok.
+    # For simple matching of full names or extensions at end:
+     exclude_grep_pattern+="-e /${file_pattern//\./\\.}$ " # Match end of line
+     exclude_grep_pattern+="-e ^\./${file_pattern//\./\\.}$ " # Match files in root
+done
+
+echo "Excluding paths starting with: ${EXCLUDE_PATHS[@]}"
 echo "Excluding files matching: ${EXCLUDE_FILES[@]}"
 echo "Skipping files larger than $MAX_SIZE_BYTES bytes."
 echo "Outputting to: $(pwd)/$OUTPUT_FILE"
@@ -3285,78 +1241,58 @@ echo "Outputting to: $(pwd)/$OUTPUT_FILE"
 # Clear the output file before starting
 > "$OUTPUT_FILE"
 
-# 2. Construct the find command arguments for exclusion
-find_exclude_args=()
-# Add directory path exclusions with -prune
-for exclude_path in "${EXCLUDE_PATHS[@]}"; do
-    find_exclude_args+=(-o -path "$exclude_path" -type d)
-done
-# Remove the leading '-o' if it exists (only happens if array is not empty)
-[[ "${find_exclude_args[0]}" == "-o" ]] && find_exclude_args=("${find_exclude_args[@]:1}")
-# Add the -prune action
-find_exclude_args+=(-prune)
+# 2. Find ALL files, then use grep -v to filter, then process
+echo "Finding files and filtering..."
+find . -type f -print | # Print all file paths, one per line
+  grep -v $exclude_grep_pattern | # Exclude paths/files matching the patterns
+  while IFS= read -r file; do
+    # file path is relative like ./path/to/file.txt
 
-# Add specific filename exclusions
-find_name_exclude_args=()
-for exclude_file in "${EXCLUDE_FILES[@]}"; do
-     find_name_exclude_args+=(-o -name "$exclude_file")
-done
-# Remove the leading '-o'
-[[ "${find_name_exclude_args[0]}" == "-o" ]] && find_name_exclude_args=("${find_name_exclude_args[@]:1}")
+    # Skip if file doesn't exist (grep might pass weird things?)
+    [ ! -f "$file" ] && continue
 
-# 3. Use find to locate files, excluding specified paths/files, then pipe to grep for binary check
-#    find .                    # Start search from current dir (.)
-#    \( args \) -prune         # Exclude specified directory paths *before* descending
-#    -o                        # OR (if not pruned)
-#    \( name_args \)           # Exclude specified file names
-#    -o                        # OR (if not pruned and not excluded file name)
-#    -type f -print0           # Print the path if it's a file, null-separated
+    # Check if file is likely text using grep -I
+    # This is less efficient than doing it once, but more reliable with find+grep -v
+    if ! grep -Iq . "$file"; then
+        # echo "[Skipping Binary]: $file" # Optional debug
+        continue
+    fi
 
-#    xargs -0 grep -I -Z -l '.' # Read null-sep files, run grep -I (binary check), output null-sep filenames
-#    while read ...            # Read null-separated filenames
+    # Check file size (Linux syntax)
+    current_size=$(stat -c%s "$file" 2>/dev/null)
 
-echo "Running find command..."
-find . \
-    \( "${find_exclude_args[@]}" \) \
-    -o \
-    \( "${find_name_exclude_args[@]}" \) \
-    -o \
-    -type f -print0 |
-    xargs -0 --no-run-if-empty grep -I -Z -l '.' |
-    while IFS= read -r -d $'\0' file; do
-        # file path is relative like ./path/to/file.txt
+    if [ -z "$current_size" ]; then
+        echo "--- WARNING: Could not get size for ${file}. Skipping. ---" >> "$OUTPUT_FILE"
+        echo "" >> "$OUTPUT_FILE"
+        continue
+    fi
 
-        # Check file size (Linux syntax)
-        current_size=$(stat -c%s "$file" 2>/dev/null)
+    # Skip empty files
+    if [ "$current_size" -eq 0 ]; then
+        # echo "[Skipping Empty]: $file" # Optional debug
+        continue
+    fi
 
-        if [ -z "$current_size" ]; then
-            echo "--- WARNING: Could not get size for ${file}. Skipping. ---" >> "$OUTPUT_FILE"
-            echo "" >> "$OUTPUT_FILE"
-            continue
-        fi
-
-        echo "--- START FILE: ${file} ---" >> "$OUTPUT_FILE"
-        if [ "$current_size" -lt "$MAX_SIZE_BYTES" ]; then
-            # Append content or error message to the output file
-            # Using LC_ALL=C to potentially speed up cat and avoid locale issues
-            if LC_ALL=C cat -- "${file}" >> "$OUTPUT_FILE"; then
-                # Add a newline after successful cat if file doesn't end with one
-                [[ $(tail -c1 "${file}" | wc -l) -eq 0 ]] && echo >> "$OUTPUT_FILE"
-            else
-                echo >> "$OUTPUT_FILE" # Ensure newline before error message
-                echo "--- ERROR READING FILE: ${file} (Code: $?) ---" >> "$OUTPUT_FILE"
-            fi
+    echo "--- START FILE: ${file} ---" >> "$OUTPUT_FILE"
+    if [ "$current_size" -lt "$MAX_SIZE_BYTES" ]; then
+        # Append content or error message
+        if LC_ALL=C cat -- "${file}" >> "$OUTPUT_FILE"; then
+            [[ $(tail -c1 "${file}" | wc -l) -eq 0 ]] && echo >> "$OUTPUT_FILE"
         else
-            echo "--- SKIPPED (Too large: ${current_size} bytes): ${file} ---" >> "$OUTPUT_FILE"
+            echo >> "$OUTPUT_FILE"
+            echo "--- ERROR READING FILE: ${file} (Code: $?) ---" >> "$OUTPUT_FILE"
         fi
-        echo "--- END FILE: ${file} ---" >> "$OUTPUT_FILE"
-        echo "" >> "$OUTPUT_FILE" # Add a blank line for separation
-    done
+    else
+        echo "--- SKIPPED (Too large: ${current_size} bytes): ${file} ---" >> "$OUTPUT_FILE"
+    fi
+    echo "--- END FILE: ${file} ---" >> "$OUTPUT_FILE"
+    echo "" >> "$OUTPUT_FILE"
+done
 
 echo "Finished creating $OUTPUT_FILE"
 ls -lh "$OUTPUT_FILE"
 
-# Optional: Go back to the directory you were in before running the script
+# Optional: Go back
 # cd - > /dev/null
 --- END FILE: ./contextualize.sh ---
 
@@ -3367,166 +1303,6 @@ bioinformatics/data/*
 bioinformatics/results/*
 
 --- END FILE: ./.gitignore ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_03_reference_genome.log ---
-Simulated reference genome processing
---- END FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_03_reference_genome.log ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_01_forward_reads.log ---
-Simulated forward read processing
---- END FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_01_forward_reads.log ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_aligned_reads.bai ---
-Simulated BAM index
---- END FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_aligned_reads.bai ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_aligned_reads.bam ---
-Simulated BAM alignment
---- END FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_aligned_reads.bam ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_pipeline_summary.txt ---
-Pipeline summary
---- END FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_pipeline_summary.txt ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_coverage_report.txt ---
-Simulated coverage report
---- END FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_coverage_report.txt ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_02_reverse_reads.log ---
-Simulated reverse read processing
---- END FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_02_reverse_reads.log ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_04_target_regions.log ---
-Simulated target region processing
---- END FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_04_target_regions.log ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_variants.vcf ---
-Simulated variant calls
---- END FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_variants.vcf ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_05_known_variants.log ---
-Simulated known variant processing
---- END FILE: ./bioinformatics/results/run_20250331_035258_datasample1/datasample1_05_known_variants.log ---
-
---- START FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_03_reference_genome.log ---
-Simulated reference genome processing
---- END FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_03_reference_genome.log ---
-
---- START FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_01_forward_reads.log ---
-Simulated forward read processing
---- END FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_01_forward_reads.log ---
-
---- START FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_aligned_reads.bai ---
-Simulated BAM index
---- END FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_aligned_reads.bai ---
-
---- START FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_aligned_reads.bam ---
-Simulated BAM alignment
---- END FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_aligned_reads.bam ---
-
---- START FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_pipeline_summary.txt ---
-Pipeline summary
---- END FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_pipeline_summary.txt ---
-
---- START FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_coverage_report.txt ---
-Simulated coverage report
---- END FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_coverage_report.txt ---
-
---- START FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_02_reverse_reads.log ---
-Simulated reverse read processing
---- END FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_02_reverse_reads.log ---
-
---- START FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_04_target_regions.log ---
-Simulated target region processing
---- END FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_04_target_regions.log ---
-
---- START FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_variants.vcf ---
-Simulated variant calls
---- END FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_variants.vcf ---
-
---- START FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_05_known_variants.log ---
-Simulated known variant processing
---- END FILE: ./bioinformatics/results/run_20250330_185513_datasample1/datasample1_05_known_variants.log ---
-
---- START FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_03_reference_genome.log ---
-Simulated reference genome processing
---- END FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_03_reference_genome.log ---
-
---- START FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_aligned_reads.bam ---
-Simulated BAM alignment
---- END FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_aligned_reads.bam ---
-
---- START FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_variants.vcf ---
-Simulated variant calls
---- END FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_variants.vcf ---
-
---- START FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_coverage_report.txt ---
-Simulated coverage report
---- END FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_coverage_report.txt ---
-
---- START FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_aligned_reads.bai ---
-Simulated BAM index
---- END FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_aligned_reads.bai ---
-
---- START FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_05_known_variants.log ---
-Simulated known variant processing
---- END FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_05_known_variants.log ---
-
---- START FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_01_forward_reads.log ---
-Simulated forward read processing
---- END FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_01_forward_reads.log ---
-
---- START FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_04_target_regions.log ---
-Simulated target region processing
---- END FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_04_target_regions.log ---
-
---- START FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_02_reverse_reads.log ---
-Simulated reverse read processing
---- END FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_02_reverse_reads.log ---
-
---- START FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_pipeline_summary.txt ---
-Pipeline summary
---- END FILE: ./bioinformatics/results/run_20250330_190838_datasample2/datasample2_pipeline_summary.txt ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_03_reference_genome.log ---
-Simulated reference genome processing
---- END FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_03_reference_genome.log ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_01_forward_reads.log ---
-Simulated forward read processing
---- END FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_01_forward_reads.log ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_aligned_reads.bai ---
-Simulated BAM index
---- END FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_aligned_reads.bai ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_aligned_reads.bam ---
-Simulated BAM alignment
---- END FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_aligned_reads.bam ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_pipeline_summary.txt ---
-Pipeline summary
---- END FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_pipeline_summary.txt ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_coverage_report.txt ---
-Simulated coverage report
---- END FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_coverage_report.txt ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_02_reverse_reads.log ---
-Simulated reverse read processing
---- END FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_02_reverse_reads.log ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_04_target_regions.log ---
-Simulated target region processing
---- END FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_04_target_regions.log ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_variants.vcf ---
-Simulated variant calls
---- END FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_variants.vcf ---
-
---- START FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_05_known_variants.log ---
-Simulated known variant processing
---- END FILE: ./bioinformatics/results/run_20250331_035608_datasample1/datasample1_05_known_variants.log ---
 
 --- START FILE: ./CHANGELOG.MD ---
 # Week 1 - 20250321
