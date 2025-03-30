@@ -43,14 +43,14 @@ This is the recommended method for deployment, as it packages the application an
 2.  **Run the Docker container:**
 
     ```bash
-    docker run --rm -p 8000:8000 -p 8080:8080 -v /path/to/your/bioinformatics:/data ghcr.io/mikha-22/bioinformatics-webapp:latest
+    docker run --rm -p 8000:8000 -p 8081:8080 -v /path/to/your/bioinformatics:/data ghcr.io/mikha-22/bioinformatics-webapp:latest
     ```
 
     **Parameters :**
 
     *   `--rm`:  Removes the container automatically after it exits.
     *   `-p 8000:8000`: Maps port 8000 on your host machine to port 8000 inside the container (for the Uvicorn web application).
-    *   `-p 8080:8080`: Maps port 8080 on your host machine to port 8080 inside the container (for the File Browser).
+    *   `-p 8081:8080`: Maps port 8081 on your host machine to port 8080 inside the container (for the File Browser).
     *   `-v /path/to/your/bioinformatics:/data`:  **Important:**  Maps a directory on your host machine to the `/data` directory inside the container.  **Replace `/path/to/your/bioinformatics` with the actual path to your `bioinformatics` directory** (containing `data`, `logs`, and `results` subdirectories) on your system. This allows the web application to access and store data persistently.
     *   `ghcr.io/mikha-22/bioinformatics-webapp:latest`: Specifies the Docker image to run.
 
