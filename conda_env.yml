@@ -6,7 +6,8 @@ dependencies:
   - python
   - fastapi
   - uvicorn[standard]
-  - gunicorn
+  - rq
+  - redis
   #  - samtools
   #  - bcftools
   #  - gatk4

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- Configuration ---
-PROJECT_DIR="/home/mikha/labs/temp/bioinformatics-webapp"
+PROJECT_DIR="/home/mikha/labs/bioinformatics-webapp"
 OUTPUT_FILE="project_context.txt" # Output file will be created inside PROJECT_DIR
 MAX_SIZE_BYTES=1048576 # 1MB limit (1 * 1024 * 1024) - Adjust as needed
 
