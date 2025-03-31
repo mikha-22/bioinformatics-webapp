@@ -2,7 +2,158 @@
 
 {% block title %}Bioinformatics Webapp - Home{% endblock %}
 
+{% block head %}
+    <!-- Font Awesome is included in base.html, Bootstrap Icons might be needed -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        .dashboard-card { margin-bottom: 1.5rem; }
+        .list-group-item-action { cursor: pointer; } /* Make list items look clickable */
+        .recent-job-item, .recent-result-item {
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem 1rem; /* Adjust padding */
+        }
+        .recent-job-item .job-status,
+        .recent-result-item .result-date {
+            font-size: 0.8em;
+            color: #6c757d; /* Bootstrap secondary text color */
+            white-space: nowrap;
+            margin-left: 1rem;
+        }
+        .recent-job-item .job-id {
+            font-family: monospace;
+            font-size: 0.85em;
+        }
+        .recent-job-item .job-status i {
+             margin-right: 4px;
+             vertical-align: middle;
+        }
+        .recent-result-item .result-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 70%; /* Prevent long names from pushing date off */
+        }
+        #loading-recent-jobs, #loading-recent-results,
+        #error-recent-jobs, #error-recent-results,
+        #no-recent-jobs, #no-recent-results {
+            padding: 0.6rem 1rem;
+            font-style: italic;
+        }
+    </style>
+{% endblock %}
+
 {% block content %}
-    <h1>Welcome to Your Bioinformatics App</h1>
-    <p>This is the main page of your application.</p>
+    <div class="jumbotron jumbotron-fluid bg-light p-4 mb-4 rounded">
+        <div class="container">
+            <h1 class="display-4">Bioinformatics Pipeline</h1>
+            <p class="lead">Stage, run, and manage your bioinformatics analysis pipelines.</p>
+            <!-- Simple App Overview -->
+            <p>Use this application to process sequencing data through a standard pipeline involving alignment, variant calling, and annotation (using files like FASTQ, FASTA, BED, and optional VCF). Monitor job progress and browse results easily.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Quick Actions Column -->
+        <div class="col-md-4">
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <i class="fas fa-rocket mr-1"></i> Quick Actions
+                </div>
+                <div class="list-group list-group-flush">
+                    <a href="/run_pipeline" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-play-circle fa-fw mr-2 text-primary"></i>Stage New Run</span>
+                        <i class="fas fa-chevron-right text-muted small"></i>
+                    </a>
+                    <a href="/jobs" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-tasks fa-fw mr-2 text-info"></i>View Jobs Dashboard</span>
+                         <i class="fas fa-chevron-right text-muted small"></i>
+                    </a>
+                    <a href="/results" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-chart-bar fa-fw mr-2 text-success"></i>Browse Results</span>
+                         <i class="fas fa-chevron-right text-muted small"></i>
+                    </a>
+                    <!-- Button to trigger File Browser overlay -->
+                    <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" id="openFileBrowserBtn">
+                         <span><i class="fas fa-folder-open fa-fw mr-2 text-warning"></i>Manage Data Files</span>
+                         <i class="fas fa-chevron-right text-muted small"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity Column -->
+        <div class="col-md-8">
+            <div class="row">
+                <!-- Recent Jobs Card -->
+                <div class="col-lg-6">
+                    <div class="card dashboard-card">
+                        <div class="card-header">
+                            <i class="fas fa-history mr-1"></i> Recent Jobs
+                        </div>
+                        <ul class="list-group list-group-flush" id="recent-jobs-list">
+                            <li class="list-group-item text-muted" id="loading-recent-jobs" style="display: none;">
+                                <i class="fas fa-spinner fa-spin mr-1"></i> Loading...
+                            </li>
+                             <li class="list-group-item text-danger" id="error-recent-jobs" style="display: none;">
+                                <i class="fas fa-exclamation-triangle mr-1"></i> Error loading jobs.
+                            </li>
+                            <li class="list-group-item text-muted" id="no-recent-jobs" style="display: none;">
+                                No recent jobs found.
+                            </li>
+                            <!-- Job items will be injected here by JS -->
+                        </ul>
+                        <div class="card-footer text-center bg-light">
+                             <a href="/jobs" class="small text-muted">View All Jobs <i class="fas fa-angle-right ml-1"></i></a>
+                         </div>
+                    </div>
+                </div>
+
+                <!-- Recent Results Card -->
+                <div class="col-lg-6">
+                    <div class="card dashboard-card">
+                        <div class="card-header">
+                           <i class="fas fa-folder-check mr-1"></i> Recent Results
+                        </div>
+                        <ul class="list-group list-group-flush" id="recent-results-list">
+                             <li class="list-group-item text-muted" id="loading-recent-results" style="display: none;">
+                                 <i class="fas fa-spinner fa-spin mr-1"></i> Loading...
+                             </li>
+                             <li class="list-group-item text-danger" id="error-recent-results" style="display: none;">
+                                <i class="fas fa-exclamation-triangle mr-1"></i> Error loading results.
+                            </li>
+                            <li class="list-group-item text-muted" id="no-recent-results" style="display: none;">
+                                No recent results found.
+                            </li>
+                            <!-- Result items will be injected here by JS -->
+                        </ul>
+                        <div class="card-footer text-center bg-light">
+                             <a href="/results" class="small text-muted">View All Results <i class="fas fa-angle-right ml-1"></i></a>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+    <!-- Add a new JS file specifically for the index page -->
+    <script src="/frontend/static/index.js"></script>
+    <script>
+        // Add event listener for the Manage Data Files button
+        // This finds the hidden button from base.html and simulates a click
+        document.getElementById('openFileBrowserBtn')?.addEventListener('click', () => {
+            const showButton = document.getElementById('showFileBrowser');
+            if(showButton) {
+                showButton.click();
+            } else {
+                console.error('Could not find the File Browser trigger button.');
+                // Optionally provide feedback to the user here
+            }
+        });
+    </script>
 {% endblock %}

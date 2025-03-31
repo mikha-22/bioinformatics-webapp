@@ -508,49 +508,71 @@ async def start_job(staged_job_id: str):
         logger.exception(f"Failed to start/enqueue staged job {staged_job_id}.")
         raise HTTPException(status_code=500, detail="Server error: Could not start job.")
 
-
 @app.get("/job_status/{job_id}", summary="Get RQ Job Status")
 async def get_job_status(job_id: str):
     if not redis_conn:
         raise HTTPException(status_code=503, detail="Status check unavailable (Redis).")
     try:
-        job = Job.fetch(job_id, connection=redis_conn, serializer=pipeline_queue.serializer)
-        job.refresh() # Ensure meta is loaded
+        # Fetch with the correct serializer if needed (often default is fine)
+        job = Job.fetch(job_id, connection=redis_conn) # Removed specific serializer arg for simplicity
+        job.refresh() # Ensure meta is loaded, especially after task completion
     except NoSuchJobError:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found.")
     except redis.exceptions.RedisError as e:
          logger.error(f"Redis error fetching RQ job {job_id}: {e}")
          raise HTTPException(status_code=503, detail="Service unavailable: Could not connect to status backend.")
     except Exception as e:
-        logger.exception(f"Unexpected error fetching job {job_id}.")
+        # Catch potential deserialization errors or other issues
+        logger.exception(f"Unexpected error fetching or refreshing job {job_id}.")
         raise HTTPException(status_code=500, detail=f"Server error fetching job status.")
 
     status = job.get_status()
     result = None
+    # --- Get metadata safely ---
     meta_data = job.meta or {}
     error_info_summary = None
+
     try:
         if status == JobStatus.FINISHED:
+            # Result might contain resource info if task returns it, but meta is canonical
             result = job.result
         elif status == JobStatus.FAILED:
+            # Prioritize specific error message from meta if task set it
             error_info_summary = meta_data.get('error_message', "Job failed processing.")
+            # Add stderr snippet if available
+            stderr_snippet = meta_data.get('stderr_snippet')
+            if stderr_snippet:
+                error_info_summary += f" (stderr: {stderr_snippet}...)"
+            # Fallback to exc_info if specific message not set
             if error_info_summary == "Job failed processing." and job.exc_info:
                  try:
                      lines = job.exc_info.strip().split('\n')
-                     if lines: error_info_summary = lines[-1]
+                     if lines: error_info_summary = lines[-1] # Get last line of traceback
                  except Exception: pass
     except Exception as e:
         logger.exception(f"Error accessing result/error info for job {job_id} (status: {status}).")
-        error_info_summary = "Could not retrieve job result/error details."
+        # Don't overwrite error_info_summary if already set
+        if not error_info_summary:
+             error_info_summary = "Could not retrieve job result/error details."
+
+    # --- Explicitly include resource stats from meta if they exist ---
+    resource_stats = {
+        "peak_memory_mb": meta_data.get("peak_memory_mb"),
+        "average_cpu_percent": meta_data.get("average_cpu_percent"),
+        "duration_seconds": meta_data.get("duration_seconds")
+    }
 
     return JSONResponse(content={
-        "job_id": job_id, "status": status, "result": result, "error": error_info_summary,
-        "meta": meta_data,
+        "job_id": job_id,
+        "status": status,
+        "result": result, # This might be redundant if info is in meta
+        "error": error_info_summary,
+        "meta": meta_data, # Include the full meta for potential future use
+        "resources": resource_stats, # <-- Add the specific resource stats
         "enqueued_at": dt_to_timestamp(job.enqueued_at),
         "started_at": dt_to_timestamp(job.started_at),
         "ended_at": dt_to_timestamp(job.ended_at)
-    })
-
+        })
 
 @app.post("/stop_job/{job_id}", status_code=200, summary="Cancel Running/Queued Job")
 async def stop_job(job_id: str):

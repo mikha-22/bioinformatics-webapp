@@ -8,6 +8,7 @@ dependencies:
   - uvicorn[standard]
   - rq
   - redis
+  - psutil
   #  - samtools
   #  - bcftools
   #  - gatk4
