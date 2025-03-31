@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
 
-{% block title %}Run WES Pipeline{% endblock %}
+{% block title %}Stage a New Pipeline Run{% endblock %}
 
 {% block head %}
     <link rel="stylesheet" href="/frontend/static/run_pipeline.css">
 {% endblock %}
 
 {% block content %}
-    <h1>Run WES Pipeline</h1>
-    <p class="lead">Please select the required input files for the pipeline. Only files located in the <code>bioinformatics/data</code> directory with the specified extensions will be shown.</p>
+    <h1>Stage a Pipeline Run</h1>
+    <p class="lead">Select the required input files for the pipeline. Only files located in the <code>bioinformatics/data</code> directory with the specified extensions will be shown. Once staged, you can start the job from the <a href="/jobs">Jobs Dashboard</a>.</p>
 
     <form id="pipeline-form">
         <div class="form-group">
@@ -43,14 +43,14 @@
             <label for="knownVariants">Known Variants (VCF/VCF.GZ) (Optional)</label>
             <select class="form-control" id="knownVariants">
                 <option value="" disabled selected>Select Known Variants File (Optional)</option>
-                <option value="">None</option>
+                {# JS adds the "None" option dynamically #}
             </select>
         </div>
 
-        <!-- *** MODIFIED BUTTON *** -->
-        <button type="button" class="btn btn-primary" id="addToQueueBtn" disabled>Add to Queue</button>
-        <!-- *** END MODIFIED BUTTON *** -->
-        <div id="pipeline-status" class="mt-3"></div> <!-- Keep status div for messages -->
+        <!-- *** UPDATED BUTTON TEXT *** -->
+        <button type="button" class="btn btn-primary" id="addToStagingBtn" disabled>Add to Staging</button>
+        <!-- *** END UPDATED BUTTON TEXT *** -->
+        <div id="pipeline-status" class="mt-3"></div> <!-- Status messages appear here -->
     </form>
 {% endblock %}
 
