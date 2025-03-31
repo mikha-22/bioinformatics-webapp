@@ -1,3 +1,4 @@
+--- START FILE: ./frontend/templates/pages/run_pipeline/run_pipeline.html ---
 {% extends 'base.html' %}
 
 {% block title %}Run Bioinformatics Pipeline{% endblock %}
@@ -47,11 +48,14 @@
             </select>
         </div>
 
-        <button type="button" class="btn btn-primary" id="runPipelineBtn" disabled>Run Pipeline</button>
-        <div id="pipeline-status" class="mt-3"></div>
+        <!-- *** MODIFIED BUTTON *** -->
+        <button type="button" class="btn btn-primary" id="addToQueueBtn" disabled>Add to Queue</button>
+        <!-- *** END MODIFIED BUTTON *** -->
+        <div id="pipeline-status" class="mt-3"></div> <!-- Keep status div for messages -->
     </form>
 {% endblock %}
 
 {% block scripts %}
     <script src="/frontend/static/run_pipeline.js"></script>
 {% endblock %}
+--- END FILE: ./frontend/templates/pages/run_pipeline/run_pipeline.html ---

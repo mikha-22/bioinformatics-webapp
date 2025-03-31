@@ -1,3 +1,4 @@
+--- START FILE: ./frontend/templates/base.html ---
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -24,6 +25,11 @@
                 <li class="nav-item {% if request.url.path == '/run_pipeline' %}active{% endif %}">
                     <a class="nav-link" href="/run_pipeline">Run Pipeline</a>
                 </li>
+                <!-- *** NEW JOBS LINK *** -->
+                <li class="nav-item {% if request.url.path == '/jobs' %}active{% endif %}">
+                    <a class="nav-link" href="/jobs">Jobs Queue</a>
+                </li>
+                <!-- *** END NEW JOBS LINK *** -->
                 <li class="nav-item {% if request.url.path == '/results' %}active{% endif %}">
                     <a class="nav-link" href="/results">Results</a>
                 </li>
@@ -49,10 +55,11 @@
     </div>
 
     <footer class="mt-5 bg-light text-center py-3">
-        <p>&copy; 2025 Bioinformatics Webapp</p>
+        <p>© 2025 Bioinformatics Webapp</p>
     </footer>
 
     <script src="/frontend/static/main.js"></script>
     <script src="/frontend/static/floating_iframe.js"></script> {% block scripts %}{% endblock %}
 </body>
 </html>
+--- END FILE: ./frontend/templates/base.html ---

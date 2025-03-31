@@ -1,3 +1,4 @@
+--- START FILE: ./frontend/static/run_pipeline.js ---
 document.addEventListener('DOMContentLoaded', function() {
     // --- DOM Element References ---
     const forwardReadsSelect = document.getElementById('forwardReads');
@@ -5,13 +6,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const referenceGenomeSelect = document.getElementById('referenceGenome');
     const targetRegionsSelect = document.getElementById('targetRegions');
     const knownVariantsSelect = document.getElementById('knownVariants');
-    const runPipelineBtn = document.getElementById('runPipelineBtn');
+    // *** Updated button ID ***
+    const addToQueueBtn = document.getElementById('addToQueueBtn');
     const pipelineStatusDiv = document.getElementById('pipeline-status');
     const mandatorySelects = [forwardReadsSelect, reverseReadsSelect, referenceGenomeSelect, targetRegionsSelect];
 
     // --- State Variables ---
-    let currentJobId = null;    // Store the ID of the currently running/polling job
-    let pollingInterval = null; // Store the interval timer for polling
+    // *** No longer need currentJobId or pollingInterval here for RQ polling ***
+    // let currentJobId = null;
+    // let pollingInterval = null;
 
     // --- Helper Functions ---
 
@@ -48,116 +51,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /**
      * Updates the UI elements (button, status text) based on the current state.
-     * @param {boolean} isRunning Is a job currently running or being polled?
+     * @param {boolean} isSubmitting Is a job currently being submitted?
      * @param {string} statusMessage The message to display in the status div.
+     * @param {string} messageType 'info', 'success', 'error' for styling (optional)
      */
-    function updateUI(isRunning, statusMessage) {
+    function updateUI(isSubmitting, statusMessage, messageType = 'info') {
         pipelineStatusDiv.textContent = statusMessage;
-        runPipelineBtn.disabled = isRunning;
-        runPipelineBtn.textContent = isRunning ? 'Pipeline Running...' : 'Run Pipeline';
+        pipelineStatusDiv.className = `mt-3 alert alert-${messageType === 'info' ? 'secondary' : messageType}`; // Add Bootstrap alert classes
+
+        addToQueueBtn.disabled = isSubmitting || !checkMandatoryFiles(); // Disable if submitting or files not selected
+        addToQueueBtn.textContent = isSubmitting ? 'Adding...' : 'Add to Queue';
     }
 
-    /**
-     * Stops the periodic polling for job status.
-     */
-    function stopPolling() {
-        if (pollingInterval) {
-            clearInterval(pollingInterval);
-            pollingInterval = null;
-            console.log("Stopped polling for job status.");
-            // Reset UI only if the job is confirmed finished/failed by pollJobStatus
-        }
-        currentJobId = null; // Clear current job ID when stopping
-    }
-
-    /**
-     * Fetches the status for a given job ID from the backend API.
-     * Updates the UI based on the fetched status.
-     * Stops polling if the job is finished or failed.
-     * @param {string} jobId The ID of the job to check.
-     */
-    function pollJobStatus(jobId) {
-        console.log(`Polling status for job ${jobId}...`);
-        if (!jobId) {
-            console.warn("pollJobStatus called without a job ID.");
-            stopPolling(); // Should not happen, but safety check
-            updateUI(false, "Error: No job ID to track.");
-            return;
-        }
-
-        fetch(`/job_status/${jobId}`)
-            .then(response => {
-                if (!response.ok) {
-                    // Handle server errors (like 404 Not Found, 500 Server Error)
-                    return response.json().then(errData => {
-                        throw new Error(`HTTP error ${response.status}: ${errData.detail || response.statusText}`);
-                    });
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log("Job Status Data:", data);
-                let statusMessage = `Job ${data.job_id}: ${data.status}`;
-                let jobFinished = false;
-
-                switch (data.status) {
-                    case 'queued':
-                        statusMessage += ' - Waiting for worker...';
-                        break;
-                    case 'started':
-                        statusMessage += ' - Running...';
-                        // Future: Could update a progress bar based on job.meta if implemented
-                        break;
-                    case 'finished':
-                        statusMessage += ' - Completed!';
-                        if (data.result) {
-                            if (data.result.status === 'success') {
-                                statusMessage += data.result.results_path ? ` Results: ${data.result.results_path}` : '';
-                                // Optional: Automatically refresh results page or show link
-                                // window.location.href = '/results'; // Or update dynamically
-                            } else { // Handle non-success results if task returns them
-                                statusMessage += ` Status: ${data.result.message || 'Finished with issues.'}`;
-                            }
-                        }
-                        jobFinished = true;
-                        break;
-                    case 'failed':
-                        statusMessage += ' - Failed!';
-                        // Show a user-friendly error. Detailed error logged by server & visible in RQ dashboard.
-                        statusMessage += ' Check server logs for details.';
-                        console.error("Job Failed:", data.error || "No error details provided.");
-                        jobFinished = true;
-                        break;
-                    case 'deferred':
-                        statusMessage += ' - Deferred. Waiting for dependency.';
-                        break;
-                     case 'scheduled':
-                        statusMessage += ' - Scheduled for later execution.';
-                        break;
-                    default:
-                        statusMessage += ' - Unknown status.';
-                        break;
-                }
-
-                // Update UI only if the polling is still for the *current* job
-                if (currentJobId === jobId) {
-                    updateUI(!jobFinished, statusMessage);
-                    if (jobFinished) {
-                        stopPolling(); // Stop polling if job is finished or failed
-                    }
-                } else {
-                     console.log(`Received status for old job ${jobId}, but current job is ${currentJobId}. Ignoring.`);
-                }
-            })
-            .catch(error => {
-                console.error('Error polling job status:', error);
-                // Update UI only if the polling is still for the *current* job
-                 if (currentJobId === jobId) {
-                    updateUI(false, `Error checking job status: ${error.message}. Please try again later.`);
-                    stopPolling(); // Stop polling on error
-                 }
-            });
-    }
+    // *** Polling functions (pollJobStatus, stopPolling) are removed from this file ***
+    // *** as polling is not initiated from here anymore.              ***
 
     // --- Initial Setup ---
 
@@ -178,34 +85,37 @@ document.addEventListener('DOMContentLoaded', function() {
             populateDropdown(knownVariantsSelect, data, ['.vcf', '.vcf.gz']);
 
             // Initial check to enable button if selections might be pre-filled
-             runPipelineBtn.disabled = !checkMandatoryFiles();
+             addToQueueBtn.disabled = !checkMandatoryFiles();
         })
         .catch(error => {
             console.error('Error fetching file list:', error);
-            updateUI(false, 'Error fetching file list. Cannot run pipeline.');
-            runPipelineBtn.disabled = true; // Keep button disabled
+            updateUI(false, 'Error fetching file list. Cannot run pipeline.', 'error');
+            addToQueueBtn.disabled = true; // Keep button disabled
         });
 
     // Add event listeners to mandatory selects to enable/disable the run button
     mandatorySelects.forEach(select => {
         select.addEventListener('change', () => {
-            runPipelineBtn.disabled = !checkMandatoryFiles();
+            // Enable button only if mandatory files are selected and not currently submitting
+            const isSubmitting = addToQueueBtn.textContent === 'Adding...';
+            addToQueueBtn.disabled = isSubmitting || !checkMandatoryFiles();
+            if (!isSubmitting) {
+                pipelineStatusDiv.textContent = ''; // Clear status on selection change if not submitting
+                pipelineStatusDiv.className = 'mt-3'; // Reset classes
+            }
         });
     });
 
 
-    // --- Run Pipeline Button Event Listener ---
-    runPipelineBtn.addEventListener('click', function() {
+    // --- Add to Queue Button Event Listener ---
+    addToQueueBtn.addEventListener('click', function() {
         if (!checkMandatoryFiles()) {
-            updateUI(false, 'Please select all mandatory input files.');
+            updateUI(false, 'Please select all mandatory input files.', 'warning');
             return; // Exit if mandatory files aren't selected
         }
 
-        // Stop any previous polling before starting a new job
-        stopPolling();
-
         // Update UI to indicate job submission
-        updateUI(true, 'Sending job to queue...');
+        updateUI(true, 'Adding job to queue...', 'info');
 
         // Prepare payload for the backend API
         const payload = {
@@ -217,38 +127,44 @@ document.addEventListener('DOMContentLoaded', function() {
             known_variants_file: knownVariantsSelect.value === "" ? null : knownVariantsSelect.value
         };
 
-        // Send the request to the backend to enqueue the job
+        // Send the request to the backend to STAGE the job
         fetch('/run_pipeline', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         })
         .then(response => {
-            // Check if the request was accepted (status code 202) or if there was an error
-            if (response.status === 202) {
-                return response.json(); // Job was likely queued successfully
+            // Check for successful staging (status code 200) or errors
+            if (response.ok) { // Status 200-299
+                return response.json(); // Job was likely staged successfully
             } else {
-                 // Handle other statuses like 400 (Bad Request), 500 (Server Error), 503 (Service Unavailable)
+                 // Handle errors like 400 (Bad Request), 500 (Server Error), 503 (Service Unavailable)
                 return response.json().then(errData => {
-                     throw new Error(`Failed to queue job (${response.status}): ${errData.detail || response.statusText}`);
+                     throw new Error(`Failed to stage job (${response.status}): ${errData.detail || response.statusText}`);
                 });
             }
         })
         .then(data => {
-            if (data.job_id) {
-                currentJobId = data.job_id; // Store the new job ID
-                updateUI(true, `Job ${currentJobId} queued. Waiting for status...`);
-                // Start polling immediately and then periodically
-                pollJobStatus(currentJobId); // Initial poll
-                pollingInterval = setInterval(() => pollJobStatus(currentJobId), 5000); // Poll every 5 seconds
+            // Job was successfully staged by the backend
+            if (data.staged_job_id) {
+                updateUI(false, `Success! Job staged with ID: ${data.staged_job_id}. Go to the 'Jobs Queue' page to start it.`, 'success');
+                // *** DO NOT START POLLING HERE ***
+                // Clear form selections? Optional.
+                // forwardReadsSelect.value = "";
+                // reverseReadsSelect.value = "";
+                // referenceGenomeSelect.value = "";
+                // targetRegionsSelect.value = "";
+                // knownVariantsSelect.value = "";
+                // addToQueueBtn.disabled = true; // Disable button again after success until new selections
             } else {
-                // Should not happen if status is 202, but handle defensively
-                updateUI(false, data.message || 'Failed to queue job (no job ID received).');
+                // Should not happen if status is 200 and backend logic is correct
+                updateUI(false, data.message || 'Failed to stage job (no staged job ID received).', 'error');
             }
         })
         .catch(error => {
-            console.error('Error submitting pipeline job:', error);
-            updateUI(false, `Error submitting job: ${error.message}`);
+            console.error('Error submitting pipeline job for staging:', error);
+            updateUI(false, `Error staging job: ${error.message}`, 'error');
         });
     });
 });
+--- END FILE: ./frontend/static/run_pipeline.js ---
