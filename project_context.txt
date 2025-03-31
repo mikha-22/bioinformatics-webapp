@@ -378,6 +378,7 @@ dependencies:
   - uvicorn[standard]
   - rq
   - redis
+  - psutil
   #  - samtools
   #  - bcftools
   #  - gatk4
@@ -686,9 +687,160 @@ dependencies:
 
 {% block title %}Bioinformatics Webapp - Home{% endblock %}
 
+{% block head %}
+    <!-- Font Awesome is included in base.html, Bootstrap Icons might be needed -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        .dashboard-card { margin-bottom: 1.5rem; }
+        .list-group-item-action { cursor: pointer; } /* Make list items look clickable */
+        .recent-job-item, .recent-result-item {
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem 1rem; /* Adjust padding */
+        }
+        .recent-job-item .job-status,
+        .recent-result-item .result-date {
+            font-size: 0.8em;
+            color: #6c757d; /* Bootstrap secondary text color */
+            white-space: nowrap;
+            margin-left: 1rem;
+        }
+        .recent-job-item .job-id {
+            font-family: monospace;
+            font-size: 0.85em;
+        }
+        .recent-job-item .job-status i {
+             margin-right: 4px;
+             vertical-align: middle;
+        }
+        .recent-result-item .result-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 70%; /* Prevent long names from pushing date off */
+        }
+        #loading-recent-jobs, #loading-recent-results,
+        #error-recent-jobs, #error-recent-results,
+        #no-recent-jobs, #no-recent-results {
+            padding: 0.6rem 1rem;
+            font-style: italic;
+        }
+    </style>
+{% endblock %}
+
 {% block content %}
-    <h1>Welcome to Your Bioinformatics App</h1>
-    <p>This is the main page of your application.</p>
+    <div class="jumbotron jumbotron-fluid bg-light p-4 mb-4 rounded">
+        <div class="container">
+            <h1 class="display-4">Bioinformatics Pipeline</h1>
+            <p class="lead">Stage, run, and manage your bioinformatics analysis pipelines.</p>
+            <!-- Simple App Overview -->
+            <p>Use this application to process sequencing data through a standard pipeline involving alignment, variant calling, and annotation (using files like FASTQ, FASTA, BED, and optional VCF). Monitor job progress and browse results easily.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Quick Actions Column -->
+        <div class="col-md-4">
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <i class="fas fa-rocket mr-1"></i> Quick Actions
+                </div>
+                <div class="list-group list-group-flush">
+                    <a href="/run_pipeline" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-play-circle fa-fw mr-2 text-primary"></i>Stage New Run</span>
+                        <i class="fas fa-chevron-right text-muted small"></i>
+                    </a>
+                    <a href="/jobs" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-tasks fa-fw mr-2 text-info"></i>View Jobs Dashboard</span>
+                         <i class="fas fa-chevron-right text-muted small"></i>
+                    </a>
+                    <a href="/results" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-chart-bar fa-fw mr-2 text-success"></i>Browse Results</span>
+                         <i class="fas fa-chevron-right text-muted small"></i>
+                    </a>
+                    <!-- Button to trigger File Browser overlay -->
+                    <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" id="openFileBrowserBtn">
+                         <span><i class="fas fa-folder-open fa-fw mr-2 text-warning"></i>Manage Data Files</span>
+                         <i class="fas fa-chevron-right text-muted small"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity Column -->
+        <div class="col-md-8">
+            <div class="row">
+                <!-- Recent Jobs Card -->
+                <div class="col-lg-6">
+                    <div class="card dashboard-card">
+                        <div class="card-header">
+                            <i class="fas fa-history mr-1"></i> Recent Jobs
+                        </div>
+                        <ul class="list-group list-group-flush" id="recent-jobs-list">
+                            <li class="list-group-item text-muted" id="loading-recent-jobs" style="display: none;">
+                                <i class="fas fa-spinner fa-spin mr-1"></i> Loading...
+                            </li>
+                             <li class="list-group-item text-danger" id="error-recent-jobs" style="display: none;">
+                                <i class="fas fa-exclamation-triangle mr-1"></i> Error loading jobs.
+                            </li>
+                            <li class="list-group-item text-muted" id="no-recent-jobs" style="display: none;">
+                                No recent jobs found.
+                            </li>
+                            <!-- Job items will be injected here by JS -->
+                        </ul>
+                        <div class="card-footer text-center bg-light">
+                             <a href="/jobs" class="small text-muted">View All Jobs <i class="fas fa-angle-right ml-1"></i></a>
+                         </div>
+                    </div>
+                </div>
+
+                <!-- Recent Results Card -->
+                <div class="col-lg-6">
+                    <div class="card dashboard-card">
+                        <div class="card-header">
+                           <i class="fas fa-folder-check mr-1"></i> Recent Results
+                        </div>
+                        <ul class="list-group list-group-flush" id="recent-results-list">
+                             <li class="list-group-item text-muted" id="loading-recent-results" style="display: none;">
+                                 <i class="fas fa-spinner fa-spin mr-1"></i> Loading...
+                             </li>
+                             <li class="list-group-item text-danger" id="error-recent-results" style="display: none;">
+                                <i class="fas fa-exclamation-triangle mr-1"></i> Error loading results.
+                            </li>
+                            <li class="list-group-item text-muted" id="no-recent-results" style="display: none;">
+                                No recent results found.
+                            </li>
+                            <!-- Result items will be injected here by JS -->
+                        </ul>
+                        <div class="card-footer text-center bg-light">
+                             <a href="/results" class="small text-muted">View All Results <i class="fas fa-angle-right ml-1"></i></a>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+    <!-- Add a new JS file specifically for the index page -->
+    <script src="/frontend/static/index.js"></script>
+    <script>
+        // Add event listener for the Manage Data Files button
+        // This finds the hidden button from base.html and simulates a click
+        document.getElementById('openFileBrowserBtn')?.addEventListener('click', () => {
+            const showButton = document.getElementById('showFileBrowser');
+            if(showButton) {
+                showButton.click();
+            } else {
+                console.error('Could not find the File Browser trigger button.');
+                // Optionally provide feedback to the user here
+            }
+        });
+    </script>
 {% endblock %}
 --- END FILE: ./frontend/templates/pages/index/index.html ---
 
@@ -1302,6 +1454,199 @@ a:hover {
 /* You can add more global styles here as needed, such as for navigation, footers, etc. */
 --- END FILE: ./frontend/static/main.css ---
 
+--- START FILE: ./frontend/static/index.js ---
+// frontend/static/index.js
+document.addEventListener('DOMContentLoaded', function() {
+
+    // --- DOM Elements ---
+    const recentJobsList = document.getElementById('recent-jobs-list');
+    const loadingRecentJobs = document.getElementById('loading-recent-jobs');
+    const errorRecentJobs = document.getElementById('error-recent-jobs');
+    const noRecentJobs = document.getElementById('no-recent-jobs');
+
+    const recentResultsList = document.getElementById('recent-results-list');
+    const loadingRecentResults = document.getElementById('loading-recent-results');
+    const errorRecentResults = document.getElementById('error-recent-results');
+    const noRecentResults = document.getElementById('no-recent-results');
+
+    const MAX_ITEMS = 5; // Max number of recent items to display
+
+    // --- Helper Functions ---
+
+    /** Formats a timestamp (seconds since epoch) into a locale string, or returns 'N/A' */
+    function formatTimestamp(timestamp) {
+        if (!timestamp) return 'N/A';
+        try {
+            // Use locale string for better readability
+            return new Date(timestamp * 1000).toLocaleString(undefined, {
+                dateStyle: 'short',
+                timeStyle: 'short'
+            });
+        } catch (e) {
+            return 'Invalid Date';
+        }
+    }
+
+     /** Gets a Bootstrap/FontAwesome icon class based on job status */
+    function getJobStatusClassAndIcon(status) {
+        switch (status) {
+            case 'staged':   return { class: 'text-secondary', icon: 'bi bi-pause-circle' };
+            case 'queued':   return { class: 'text-primary', icon: 'bi bi-hourglass-split' };
+            case 'started':  return { class: 'text-info', icon: 'fas fa-sync-alt fa-spin' }; // Use spinning icon for running
+            case 'finished': return { class: 'text-success', icon: 'bi bi-check-circle-fill' };
+            case 'failed':   return { class: 'text-danger', icon: 'bi bi-x-octagon-fill' };
+            case 'stopped':
+            case 'canceled': return { class: 'text-muted', icon: 'bi bi-stop-circle' };
+            default:         return { class: 'text-muted', icon: 'bi bi-question-circle' };
+        }
+    }
+
+     /** Toggles visibility of list status elements */
+    function showListStatus(listElement, loading, error, noData, dataFound) {
+        if (loading) loading.style.display = dataFound ? 'none' : 'block';
+        if (error) error.style.display = 'none';
+        if (noData) noData.style.display = 'none';
+
+        if (!dataFound) {
+            if (loading) loading.style.display = 'block';
+        }
+    }
+
+    function displayListError(listElement, loading, error, noData) {
+         if (loading) loading.style.display = 'none';
+         if (error) error.style.display = 'block';
+         if (noData) noData.style.display = 'none';
+         // Clear any previous data items
+         listElement.querySelectorAll('.recent-job-item, .recent-result-item').forEach(item => item.remove());
+    }
+
+     function displayNoData(listElement, loading, error, noData) {
+         if (loading) loading.style.display = 'none';
+         if (error) error.style.display = 'none';
+         if (noData) noData.style.display = 'block';
+         // Clear any previous data items
+         listElement.querySelectorAll('.recent-job-item, .recent-result-item').forEach(item => item.remove());
+     }
+
+
+    // --- Fetch and Render Functions ---
+
+    async function fetchAndRenderRecentJobs() {
+        showListStatus(recentJobsList, loadingRecentJobs, errorRecentJobs, noRecentJobs, false);
+
+        try {
+            const response = await fetch('/jobs_list');
+            if (!response.ok) {
+                throw new Error(`HTTP error ${response.status}`);
+            }
+            const jobs = await response.json();
+
+            loadingRecentJobs.style.display = 'none'; // Hide loading indicator
+
+            // Clear previous items
+            recentJobsList.querySelectorAll('.recent-job-item').forEach(item => item.remove());
+
+            if (!jobs || jobs.length === 0) {
+                 displayNoData(recentJobsList, loadingRecentJobs, errorRecentJobs, noRecentJobs);
+                return;
+            }
+
+             showListStatus(recentJobsList, loadingRecentJobs, errorRecentJobs, noRecentJobs, true);
+
+            // Backend already sorts by time desc, just take the top N
+            const recent = jobs.slice(0, MAX_ITEMS);
+
+            recent.forEach(job => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item recent-job-item'; // Add specific class
+
+                const statusInfo = getJobStatusClassAndIcon(job.status);
+                const displayTime = job.status === 'staged' ? job.staged_at : (job.ended_at || job.started_at || job.enqueued_at);
+                const timeLabel = job.status === 'staged' ? 'Staged:' : (job.ended_at ? 'Ended:' : (job.started_at ? 'Started:' : 'Queued:'));
+
+                li.innerHTML = `
+                     <a href="/jobs" class="text-decoration-none text-dark d-flex flex-column flex-grow-1">
+                         <span class="job-id" title="${job.id}">${job.id.substring(0, 18)}...</span>
+                         <small class="text-muted">${job.description || 'No description'}</small>
+                     </a>
+                     <span class="job-status ${statusInfo.class}" title="${job.status}">
+                        <i class="${statusInfo.icon}"></i>
+                        <span class="ml-1 d-none d-lg-inline">${job.status.charAt(0).toUpperCase() + job.status.slice(1)}</span>
+                        <div class="small text-muted">${timeLabel} ${formatTimestamp(displayTime)}</div>
+                    </span>
+
+                `;
+                // Make the whole item link to jobs page for now, could refine later
+                 li.addEventListener('click', () => window.location.href = '/jobs'); // Simple navigation
+                recentJobsList.appendChild(li);
+            });
+
+        } catch (error) {
+            console.error('Error fetching recent jobs:', error);
+             displayListError(recentJobsList, loadingRecentJobs, errorRecentJobs, noRecentJobs);
+        }
+    }
+
+    async function fetchAndRenderRecentResults() {
+        showListStatus(recentResultsList, loadingRecentResults, errorRecentResults, noRecentResults, false);
+
+        try {
+            const response = await fetch('/get_results'); // Fetches run directories
+            if (!response.ok) {
+                throw new Error(`HTTP error ${response.status}`);
+            }
+            let runs = await response.json();
+
+             loadingRecentResults.style.display = 'none'; // Hide loading indicator
+
+             // Clear previous items
+             recentResultsList.querySelectorAll('.recent-result-item').forEach(item => item.remove());
+
+            if (!runs || runs.length === 0) {
+                 displayNoData(recentResultsList, loadingRecentResults, errorRecentResults, noRecentResults);
+                return;
+            }
+
+            showListStatus(recentResultsList, loadingRecentResults, errorRecentResults, noRecentResults, true);
+
+
+            // Sort by modified time descending (most recent first) client-side
+            runs.sort((a, b) => (b.modified_time || 0) - (a.modified_time || 0));
+
+            const recent = runs.slice(0, MAX_ITEMS);
+
+            recent.forEach(run => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item list-group-item-action recent-result-item'; // Make it actionable
+
+                // Create link to the specific result, highlighting it
+                const resultLink = `/results?highlight=${encodeURIComponent(run.name)}`;
+
+                li.innerHTML = `
+                    <span class="result-name" title="${run.name}">${run.name}</span>
+                    <span class="result-date">
+                        ${formatTimestamp(run.modified_time)}
+                        <i class="fas fa-chevron-right ml-2 small text-muted"></i>
+                    </span>
+                `;
+                // Make the list item clickable
+                 li.addEventListener('click', () => window.location.href = resultLink);
+                recentResultsList.appendChild(li);
+            });
+
+        } catch (error) {
+            console.error('Error fetching recent results:', error);
+             displayListError(recentResultsList, loadingRecentResults, errorRecentResults, noRecentResults);
+        }
+    }
+
+    // --- Initial Load ---
+    fetchAndRenderRecentJobs();
+    fetchAndRenderRecentResults();
+
+});
+--- END FILE: ./frontend/static/index.js ---
+
 --- START FILE: ./frontend/static/floating_iframe.js ---
 document.addEventListener('DOMContentLoaded', function() {
     const showButton = document.getElementById('showFileBrowser');
@@ -1366,17 +1711,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-     /** Formats duration in seconds into H:MM:SS or M:SS */
-     function formatDuration(seconds) {
+    /** Formats duration in seconds into Hh Mm Ss or Mm Ss */
+    function formatDuration(seconds) {
         if (seconds === null || seconds === undefined || seconds < 0) return 'N/A';
+        if (seconds < 1) return "< 1s"; // Handle very short durations
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
         const s = Math.floor(seconds % 60);
         let str = "";
-        if (h > 0) str += `${h}:`;
-        str += `${m.toString().padStart(h > 0 ? 2 : 1, '0')}:`; // Pad minutes if hours present
-        str += s.toString().padStart(2, '0');
-        return str;
+        if (h > 0) str += `${h}h `;
+        if (m > 0 || h > 0) str += `${m.toString().padStart(h > 0 ? 2 : 1, '0')}m `; // Pad minutes if hours present
+        str += `${s.toString().padStart(2, '0')}s`;
+        return str.trim(); // Trim trailing space if only seconds
     }
 
     /** Calculates duration between two timestamps */
@@ -1402,8 +1748,15 @@ document.addEventListener('DOMContentLoaded', function() {
     /** Safely get nested property */
     function getNested(obj, path, defaultValue = null) {
         try {
-            return path.split('.').reduce((o, k) => (o || {})[k], obj) || defaultValue;
+            // Handle cases where obj might be null or undefined early
+            if (!obj) return defaultValue;
+            // Reduce the path
+            const result = path.split('.').reduce((o, k) => (o || {})[k], obj);
+            // Return the result if it's not undefined, otherwise return defaultValue
+            // Important: Check for undefined specifically, as 0 or false are valid values
+            return result !== undefined ? result : defaultValue;
         } catch (e) {
+            // Catch potential errors during reduction (e.g., accessing property of null)
             return defaultValue;
         }
     }
@@ -1428,17 +1781,15 @@ document.addEventListener('DOMContentLoaded', function() {
         // Prioritize meta.input_params.input_filenames if available (for rerunning/displaying original selection)
         let displayParams = getNested(job, 'meta.input_params.input_filenames', getNested(job, 'meta.input_params', {}));
         // If it's a staged job, the params are directly in meta.input_params
-        if (job.status === 'staged' && Object.keys(displayParams).length === 0) {
+        if (job.status === 'staged' && Object.keys(displayParams || {}).length === 0) {
             displayParams = getNested(job, 'meta.input_params', {});
         }
 
         let paramsHtml = '<div class="job-parameters">';
-        if (Object.keys(displayParams).length > 0) {
+        if (displayParams && Object.keys(displayParams).length > 0) {
             paramsHtml += Object.entries(displayParams)
-                 // Adjust key display for 'input_filenames' structure if present
                  .map(([key, value]) => {
                       const displayKey = key.replace(/_/g, ' ');
-                      // Handle both direct paths/values and nested structure
                       const displayValue = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : (value || 'None');
                       return `<div><small>${displayKey}:</small> <kbd>${displayValue}</kbd></div>`;
                   })
@@ -1464,7 +1815,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // --- Manage Polling ---
         // Decide whether to start polling based on the initial status
-        // --- MODIFIED: Only poll if the job is NOT staged AND NOT terminal ---
+        // Only poll if the job is NOT staged AND NOT terminal
         if (job.status !== 'staged' && !TERMINAL_STATUSES.includes(job.status)) {
             console.log(`[Polling Check] Job ${job.id} has status ${job.status}, starting polling.`); // Optional debug log
             startPolling(job.id);
@@ -1473,17 +1824,60 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-     /** Updates the time cell content */
+    /** Updates the time cell content, now including resource usage - CORRECTED */
     function updateTimeCell(cell, job) {
-        const durationSec = calculateDuration(job.started_at, job.ended_at);
-        cell.innerHTML = `
+        // Try to get duration from meta first (more precise), fallback to calculated
+        // Ensure meta exists before accessing duration_seconds
+        const metaDuration = getNested(job, 'meta.duration_seconds', null); // Use getNested for safety
+        const calculatedDuration = calculateDuration(job.started_at, job.ended_at);
+        // Use metaDuration if it's a valid number, otherwise use calculated if it's valid, else null
+        let durationSec = (typeof metaDuration === 'number') ? metaDuration : ((typeof calculatedDuration === 'number') ? calculatedDuration : null);
+
+        // --- Get resource stats from the new 'resources' field or fallback to meta ---
+        // Use optional chaining and nullish coalescing for safer access
+        const resources = job?.resources ?? job?.meta ?? {};
+        const peakMem = resources.peak_memory_mb; // Access directly, check validity below
+        const avgCpu = resources.average_cpu_percent;
+
+        let resourceHtml = '';
+        // Check if the job status indicates completion where stats should exist
+        if (job.status === 'finished' || job.status === 'failed') {
+             // Display value if it's a number, otherwise show 'N/A'
+             resourceHtml += `Peak Mem: ${(typeof peakMem === 'number' ? peakMem + ' MB' : 'N/A')}<br>`;
+             resourceHtml += `Avg CPU: ${(typeof avgCpu === 'number' ? avgCpu + '%' : 'N/A')}<br>`;
+        }
+         // Show placeholder if running
+         else if (job.status === 'started') {
+             resourceHtml = `<i class="fas fa-cogs fa-spin fa-fw text-muted" title="Monitoring Resources..."></i> Monitoring...<br>`;
+         }
+         // Default for other states (queued, staged, etc.)
+         else {
+             resourceHtml = '<span class="text-muted">-</span><br>';
+         }
+
+        // --- CORRECTED INNERHTML CONSTRUCTION ---
+        // Build the final HTML string step-by-step
+        let finalHtml = `
             <div style="font-size: 0.85em;">
                 ${job.status === 'staged' ? 'Staged:' : 'Enqueued:'} ${formatTimestamp(job.enqueued_at || job.staged_at)}<br>
                 Started: ${formatTimestamp(job.started_at)}<br>
                 Ended: ${formatTimestamp(job.ended_at)}<br>
-                Duration: ${formatDuration(durationSec)}
-            </div>
         `;
+
+        // Only add the horizontal rule and duration/resources if the job has at least started
+        if (job.started_at || durationSec !== null) {
+             finalHtml += `<hr class="my-1">`; // Add the divider
+             finalHtml += `Duration: ${formatDuration(durationSec)}<br>`; // Add duration
+             finalHtml += resourceHtml; // Add the resource info string
+        } else {
+             // For staged jobs, maybe show nothing extra or just a placeholder
+             finalHtml += '<hr class="my-1"><span class="text-muted">-</span><br>';
+        }
+
+        finalHtml += `</div>`; // Close the main div
+
+        // Set the cell's content to the fully constructed HTML
+        cell.innerHTML = finalHtml;
     }
 
 
@@ -1502,6 +1896,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             case 'started':
                 statusHtml = `<span class="job-status-text text-info"><i class="fas fa-sync-alt fa-spin"></i> Running</span>`;
+                // Use progress from meta if available
                 const progress = getNested(job, 'meta.progress', null);
                 if (progress !== null) {
                      statusHtml += `<div class="progress mt-1" style="height: 5px;"><div class="progress-bar" role="progressbar" style="width: ${progress}%;" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100"></div></div>`;
@@ -1512,6 +1907,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             case 'failed':
                 statusHtml = `<span class="job-status-text text-danger"><i class="bi bi-x-octagon-fill"></i> Failed</span>`;
+                // Display error summary directly if available
+                // The 'error' field in the response should now contain the summary
+                if (job.error) {
+                     statusHtml += `<br><small class="text-danger" title="${job.error}">Error: ${job.error.substring(0, 50)}${job.error.length > 50 ? '...' : ''}</small>`;
+                 }
                 break;
             case 'stopped':
             case 'canceled':
@@ -1527,23 +1927,27 @@ document.addEventListener('DOMContentLoaded', function() {
          } else if (job.status === 'queued' || job.status === 'started') {
              buttonsHtml = `<button class="btn btn-danger btn-sm ${BUTTON_CLASS_STOP}" data-job-id="${job.id}">Stop</button>`;
          } else if (job.status === 'finished') {
+             // Use optional chaining for safer access
              const resultsPath = getNested(job, 'result.results_path', null);
              if (resultsPath) {
                   const dirName = resultsPath.split('/').pop();
                   buttonsHtml = `<a href="/results?highlight=${encodeURIComponent(dirName)}" class="btn btn-info btn-sm ${BUTTON_CLASS_RESULTS}" title="View results folder">Results</a>`;
+             } else {
+                  buttonsHtml = `<span class="text-muted small">No results link</span>`; // Handle case where path isn't returned
              }
          } else if (job.status === 'failed') {
-             buttonsHtml = `<button class="btn btn-secondary btn-sm ${BUTTON_CLASS_ERROR_DETAILS}" data-error="${job.error || 'No details available.'}">Details</button>`;
-             // Check if we have the necessary params to enable rerun
+             // Use the summarized error from the job data for the button dataset
+             buttonsHtml = `<button class="btn btn-secondary btn-sm ${BUTTON_CLASS_ERROR_DETAILS}" data-error="${job.error || 'No details available.'}" title="Show Error Details">Details</button>`;
+             // Check if we have the necessary params to enable rerun (using meta)
              const rerunParams = getNested(job, 'meta.input_params.input_filenames', getNested(job, 'meta.input_params', {}));
-             if (Object.keys(rerunParams).length > 0 && rerunParams.forward_reads) { // Basic check for presence of essential param
-                 buttonsHtml += ` <button class="btn btn-warning btn-sm ${BUTTON_CLASS_RERUN}" data-job-id="${job.id}">Rerun</button>`;
+             if (rerunParams && Object.keys(rerunParams).length > 0 && rerunParams.forward_reads) { // Basic check
+                 buttonsHtml += ` <button class="btn btn-warning btn-sm ${BUTTON_CLASS_RERUN}" data-job-id="${job.id}" title="Re-stage job with same inputs">Rerun</button>`;
              }
          } else if (job.status === 'stopped' || job.status === 'canceled') {
-             // Optionally add Rerun button for stopped/canceled jobs
+             // Optionally add Rerun button for stopped/canceled jobs (using meta)
              const rerunParams = getNested(job, 'meta.input_params.input_filenames', getNested(job, 'meta.input_params', {}));
-             if (Object.keys(rerunParams).length > 0 && rerunParams.forward_reads) {
-                 buttonsHtml += ` <button class="btn btn-warning btn-sm ${BUTTON_CLASS_RERUN}" data-job-id="${job.id}">Rerun</button>`;
+             if (rerunParams && Object.keys(rerunParams).length > 0 && rerunParams.forward_reads) {
+                 buttonsHtml += ` <button class="btn btn-warning btn-sm ${BUTTON_CLASS_RERUN}" data-job-id="${job.id}" title="Re-stage job with same inputs">Rerun</button>`;
              }
          }
 
@@ -1553,13 +1957,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /** Updates an existing row with new job data */
     function updateJobRow(row, job) {
-        // Update parameters cell (useful if meta could change, though unlikely for inputs)
-        // const paramsCell = row.cells[1];
-        // updateParamsCell(paramsCell, job); // You'd need to create this helper if needed
-
-        // Update time cell
+        // Update time cell (includes resources now)
         updateTimeCell(row.cells[2], job);
-        // Update action cell
+        // Update action cell (includes error summary now)
         updateActionCell(row.cells[3], job);
         // Update row styling class
         row.className = `job-state-${job.status || 'unknown'}`;
@@ -1567,13 +1967,15 @@ document.addEventListener('DOMContentLoaded', function() {
          // --- Manage Polling ---
          // Stop polling if the job has reached a terminal state
          if (TERMINAL_STATUSES.includes(job.status)) {
-            // console.log(`Detected terminal state (${job.status}) for ${job.id}. Stopping polling.`); // Debug
             stopPolling(job.id);
          } else if (!jobPollingIntervals[job.id]) {
              // This case should ideally not happen if polling was managed correctly
              // but as a safeguard, start polling if it's active but not polling.
-             console.warn(`Job ${job.id} is active (${job.status}) but was not polling. Restarting polling.`);
-             startPolling(job.id);
+             // Only start if it's actually in a pollable state
+             if (job.status !== 'staged' && !TERMINAL_STATUSES.includes(job.status)) {
+                console.warn(`Job ${job.id} is active (${job.status}) but was not polling. Restarting polling.`);
+                startPolling(job.id);
+             }
          }
     }
 
@@ -1587,7 +1989,6 @@ document.addEventListener('DOMContentLoaded', function() {
         noJobsRow.style.display = 'none';
         errorJobsRow.style.display = 'none';
 
-        // --- FIX FOR ORDERING & REFRESH ---
         // 1. Store IDs of jobs currently being polled BEFORE clearing
         const currentlyPollingIds = new Set(Object.keys(jobPollingIntervals));
 
@@ -1624,12 +2025,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!activeJobIdsThisFetch.has(jobId)) {
                      // Find the job in the fetched list to double-check its status
                      const fetchedJob = jobs.find(j => j.id === jobId);
-                     if (fetchedJob && fetchedJob.status === 'staged') {
-                         // Don't log stopping for staged, it's expected
-                     } else {
-                        // console.log(`Stopping polling for ${jobId} as it's no longer active or present.`); // Debug
+                     if (!fetchedJob || fetchedJob.status === 'staged' || TERMINAL_STATUSES.includes(fetchedJob.status)) {
+                         // console.log(`Stopping polling for ${jobId} as it's no longer active or present.`); // Debug
+                         stopPolling(jobId);
                      }
-                    stopPolling(jobId);
                 }
             });
 
@@ -1650,52 +2049,56 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /** Polls the status of a single job */
     async function pollJobStatus(jobId) {
-         // console.log(`Polling job ${jobId}...`); // Debug logging
+        // Check if still polling before making the request
+        if (!jobPollingIntervals[jobId]) {
+            // console.log(`Polling interval for ${jobId} already cleared, skipping fetch.`);
+            return;
+        }
+
         try {
             const response = await fetch(`/job_status/${jobId}`);
             const row = jobsTableBody.querySelector(`tr[data-job-id="${jobId}"]`);
 
+            // If row disappeared before fetch completed, stop polling
+            if (!row) {
+                 console.warn(`Row for ${jobId} disappeared during poll request. Stopping polling.`);
+                 stopPolling(jobId);
+                 return;
+            }
+
             if (!response.ok) {
                  if (response.status === 404) {
-                     console.warn(`Job ${jobId} not found during polling. Stopping polling.`);
+                     console.warn(`Job ${jobId} not found during polling (404). Stopping polling and removing row.`);
                      stopPolling(jobId);
-                      // Do NOT mark as "Not Found" in the UI here, as the job might just be transitioning
-                      // from staged to queued and the refresh hasn't caught up yet. Let fetchJobsList handle it.
-                      // if(row) {
-                      //     row.cells[3].innerHTML = `<span class="text-danger">Not Found</span>`;
-                      //     row.className = 'job-state-unknown';
-                      // }
+                     row.remove(); // Remove the row as job is gone
                  } else {
                      const errorData = await response.json().catch(() => ({ detail: response.statusText }));
                      console.error(`Error polling job ${jobId} (${response.status}): ${errorData.detail}`);
-                     // Optionally add logic to stop polling after multiple consecutive errors
+                     // Optionally stop polling after multiple consecutive errors -> Maybe add a counter?
+                     // For now, let it continue trying unless it's a 404
                  }
                  return;
             }
 
             const job = await response.json();
 
-            if (row) {
-                // console.log(`Updating row for ${jobId} with status: ${job.status}`); // Debug
-                updateJobRow(row, job); // Update existing row
-            } else {
-                 // Job appeared during polling but wasn't in initial list? Stop polling.
-                 console.warn(`Polled job ${jobId} but no row found (likely removed/refreshed). Stopping polling.`);
-                 stopPolling(jobId);
-             }
+            // Row still exists, update it
+            updateJobRow(row, job); // Update existing row with new data (including resources)
+
 
         } catch (error) {
             console.error(`Network error polling job ${jobId}:`, error);
-            // Optionally add logic to stop polling if network fails repeatedly
+            // Optionally stop polling if network fails repeatedly
+            // stopPolling(jobId); // Uncomment to stop on network errors
         }
     }
 
     /** Starts polling for a specific job ID if not already polling */
     function startPolling(jobId) {
         if (!jobPollingIntervals[jobId]) {
-            // console.log(`Starting polling for ${jobId}`); // Debug
             // Poll immediately once to get initial running state faster
-            pollJobStatus(jobId);
+            pollJobStatus(jobId); // Fire off the first poll
+            // Then set the interval
             jobPollingIntervals[jobId] = setInterval(() => pollJobStatus(jobId), POLLING_INTERVAL_MS);
         }
     }
@@ -1703,7 +2106,7 @@ document.addEventListener('DOMContentLoaded', function() {
     /** Stops polling for a specific job ID */
     function stopPolling(jobId) {
         if (jobPollingIntervals[jobId]) {
-             // console.log(`Stopping polling for ${jobId}`); // Debug
+            // console.log(`Stopping polling for ${jobId}`); // Debug
             clearInterval(jobPollingIntervals[jobId]);
             delete jobPollingIntervals[jobId];
         }
@@ -1723,18 +2126,20 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch(`/start_job/${stagedJobId}`, { method: 'POST', headers: { 'Accept': 'application/json' } });
             const result = await response.json();
 
-            if (!response.ok) { // Check status code (e.g., 202 Accepted is OK)
+            // Expecting 202 Accepted on success
+            if (!response.ok || response.status !== 202) {
                 throw new Error(result.detail || `Failed to start job (${response.status})`);
             }
 
             showGlobalStatus(`Job ${result.job_id} enqueued successfully. Refreshing list...`, 'success');
             // Trigger a refresh to show the newly enqueued job correctly
-             await fetchJobsList(); // Make sure refresh completes before potentially re-enabling button
+             await fetchJobsList(); // Make sure refresh completes
 
         } catch (error) {
             console.error(`Error starting job ${stagedJobId}:`, error);
             showGlobalStatus(`Error starting job ${stagedJobId}: ${error.message}`, 'danger');
             // Re-enable button only if the row still exists and shows the start button
+            // (Could have been removed by a concurrent refresh)
             const existingButton = jobsTableBody.querySelector(`button[data-staged-id="${stagedJobId}"]`);
             if (existingButton) {
                 existingButton.disabled = false;
@@ -1755,13 +2160,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch(`/stop_job/${jobId}`, { method: 'POST', headers: { 'Accept': 'application/json' } });
             const result = await response.json();
 
-             if (!response.ok) { // Check status code (e.g., 200 OK is fine)
+             if (!response.ok) { // Check status code (e.g., 200 OK is expected)
                  throw new Error(result.detail || `Failed to stop job (${response.status})`);
              }
 
             showGlobalStatus(`Stop request for ${jobId}: ${result.message}`, 'info');
-            // Poll will eventually update the status, or force an immediate poll:
-            await pollJobStatus(jobId); // Request immediate update and wait for it
+            // Force an immediate poll to update status quicker
+            await pollJobStatus(jobId);
 
         } catch (error) {
             console.error(`Error stopping job ${jobId}:`, error);
@@ -1805,7 +2210,7 @@ document.addEventListener('DOMContentLoaded', function() {
                  known_variants_file: inputParams.known_variants || null // Send null if undefined/null/empty
              };
 
-             // Call the staging endpoint
+             // Call the staging endpoint (which now returns 200 OK on success)
              const stageResponse = await fetch('/run_pipeline', {
                  method: 'POST',
                  headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -1813,7 +2218,7 @@ document.addEventListener('DOMContentLoaded', function() {
              });
              const stageResult = await stageResponse.json();
 
-             if (!stageResponse.ok) { // Check for 200 OK on staging
+             if (!stageResponse.ok) { // Check for non-2xx status
                  throw new Error(stageResult.detail || `Failed to re-stage job (${stageResponse.status})`);
              }
 
@@ -1834,8 +2239,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
      /** Handle Error Details Button Click */
      function handleErrorDetailsClick(button) {
+         // Get the error from the button's data attribute
+         // Use the full error message from job.error (passed via updateActionCell)
          const errorMsg = button.dataset.error || "No specific error message provided.";
-         errorModalText.textContent = errorMsg;
+
+         // Get additional details from meta if available (example: stderr snippet)
+         // This part is simplified as getting full meta client-side is tricky without extra storage
+         // We rely on the summary provided in job.error from the backend status response.
+         let extraDetails = "";
+         // Potential future enhancement: If backend included stderr_snippet directly in job.error or a separate field...
+         // const stderrSnippet = button.dataset.stderr; // If we added data-stderr="..."
+         // if (stderrSnippet) extraDetails = `\n\nStderr Snippet:\n${stderrSnippet}`;
+
+         errorModalText.textContent = errorMsg + extraDetails; // Display error summary
          errorModal.style.display = "block";
      }
 
@@ -2994,49 +3410,71 @@ async def start_job(staged_job_id: str):
         logger.exception(f"Failed to start/enqueue staged job {staged_job_id}.")
         raise HTTPException(status_code=500, detail="Server error: Could not start job.")
 
-
 @app.get("/job_status/{job_id}", summary="Get RQ Job Status")
 async def get_job_status(job_id: str):
     if not redis_conn:
         raise HTTPException(status_code=503, detail="Status check unavailable (Redis).")
     try:
-        job = Job.fetch(job_id, connection=redis_conn, serializer=pipeline_queue.serializer)
-        job.refresh() # Ensure meta is loaded
+        # Fetch with the correct serializer if needed (often default is fine)
+        job = Job.fetch(job_id, connection=redis_conn) # Removed specific serializer arg for simplicity
+        job.refresh() # Ensure meta is loaded, especially after task completion
     except NoSuchJobError:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found.")
     except redis.exceptions.RedisError as e:
          logger.error(f"Redis error fetching RQ job {job_id}: {e}")
          raise HTTPException(status_code=503, detail="Service unavailable: Could not connect to status backend.")
     except Exception as e:
-        logger.exception(f"Unexpected error fetching job {job_id}.")
+        # Catch potential deserialization errors or other issues
+        logger.exception(f"Unexpected error fetching or refreshing job {job_id}.")
         raise HTTPException(status_code=500, detail=f"Server error fetching job status.")
 
     status = job.get_status()
     result = None
+    # --- Get metadata safely ---
     meta_data = job.meta or {}
     error_info_summary = None
+
     try:
         if status == JobStatus.FINISHED:
+            # Result might contain resource info if task returns it, but meta is canonical
             result = job.result
         elif status == JobStatus.FAILED:
+            # Prioritize specific error message from meta if task set it
             error_info_summary = meta_data.get('error_message', "Job failed processing.")
+            # Add stderr snippet if available
+            stderr_snippet = meta_data.get('stderr_snippet')
+            if stderr_snippet:
+                error_info_summary += f" (stderr: {stderr_snippet}...)"
+            # Fallback to exc_info if specific message not set
             if error_info_summary == "Job failed processing." and job.exc_info:
                  try:
                      lines = job.exc_info.strip().split('\n')
-                     if lines: error_info_summary = lines[-1]
+                     if lines: error_info_summary = lines[-1] # Get last line of traceback
                  except Exception: pass
     except Exception as e:
         logger.exception(f"Error accessing result/error info for job {job_id} (status: {status}).")
-        error_info_summary = "Could not retrieve job result/error details."
+        # Don't overwrite error_info_summary if already set
+        if not error_info_summary:
+             error_info_summary = "Could not retrieve job result/error details."
+
+    # --- Explicitly include resource stats from meta if they exist ---
+    resource_stats = {
+        "peak_memory_mb": meta_data.get("peak_memory_mb"),
+        "average_cpu_percent": meta_data.get("average_cpu_percent"),
+        "duration_seconds": meta_data.get("duration_seconds")
+    }
 
     return JSONResponse(content={
-        "job_id": job_id, "status": status, "result": result, "error": error_info_summary,
-        "meta": meta_data,
+        "job_id": job_id,
+        "status": status,
+        "result": result, # This might be redundant if info is in meta
+        "error": error_info_summary,
+        "meta": meta_data, # Include the full meta for potential future use
+        "resources": resource_stats, # <-- Add the specific resource stats
         "enqueued_at": dt_to_timestamp(job.enqueued_at),
         "started_at": dt_to_timestamp(job.started_at),
         "ended_at": dt_to_timestamp(job.ended_at)
-    })
-
+        })
 
 @app.post("/stop_job/{job_id}", status_code=200, summary="Cancel Running/Queued Job")
 async def stop_job(job_id: str):
@@ -3074,25 +3512,28 @@ async def stop_job(job_id: str):
 --- END FILE: ./backend/app/app.py ---
 
 --- START FILE: ./backend/app/tasks.py ---
-# backend/app/tasks.py
+# ./backend/app/tasks.py
 import subprocess
 import logging
 from pathlib import Path
-import time # Can be used for debugging/simulating work
+import time
+import psutil # <-- Import psutil
+import math   # <-- For rounding
+
 # --- RQ Import for getting job context ---
 from rq import get_current_job
 
 # --- Configure Logging for RQ Worker ---
-# Use a standard format WITHOUT job_id here.
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s' # <-- REMOVED [Job %(job_id)s]
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__) # Use the specific module logger
 
 # --- Path Definitions ---
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_BASE_DIR = PROJECT_ROOT / "bioinformatics" / "results"
+MONITORING_INTERVAL_SECONDS = 5 # Check resource usage every 5 seconds
 
 # --- Helper to get Job ID within the task ---
 def get_current_job_id():
@@ -3111,20 +3552,16 @@ def run_pipeline_task(
 ):
     """
     The background task function executed by the RQ worker.
-    Runs the pipeline.sh script, logs output, and handles errors.
+    Runs the pipeline.sh script, logs output, monitors resources, and handles errors.
     Returns a dictionary with status and results path/message on completion.
     """
-    job_id = get_current_job_id() # Get the job ID
+    job = get_current_job()
+    job_id = job.id if job else "N/A (Not in RQ context)"
 
-    # Add the job ID manually to log messages within the task
     logger.info(f"[Job {job_id}] Starting pipeline task...")
     logger.info(f"[Job {job_id}] Pipeline Script: {pipeline_script_path_str}")
-    logger.info(f"[Job {job_id}] Forward Reads: {forward_reads_path_str}")
-    logger.info(f"[Job {job_id}] Reverse Reads: {reverse_reads_path_str}")
-    logger.info(f"[Job {job_id}] Reference Genome: {reference_genome_path_str}")
-    logger.info(f"[Job {job_id}] Target Regions: {target_regions_path_str}")
+    # Log other inputs as before...
     logger.info(f"[Job {job_id}] Known Variants: {known_variants_path_str or 'N/A'}")
-
 
     command = [
         "bash",
@@ -3136,54 +3573,141 @@ def run_pipeline_task(
         known_variants_path_str or "", # Pass empty string if None/empty
     ]
 
-    # Determine the correct working directory for pipeline.sh
     script_working_dir = Path(pipeline_script_path_str).parent
     logger.info(f"[Job {job_id}] Running command in directory: {script_working_dir}")
     logger.info(f"[Job {job_id}] Command: {' '.join(command)}")
 
+    # --- Resource Monitoring Variables ---
+    peak_memory_mb = 0
+    cpu_percentages = []
+    process_psutil = None
+    start_time = time.time()
 
     try:
-        # Execute the pipeline script
-        process = subprocess.run(
+        # --- Use Popen for non-blocking execution ---
+        process = subprocess.Popen(
             command,
-            cwd=str(script_working_dir), # Run from the script's directory
-            capture_output=True,         # Capture stdout/stderr
-            text=True,                   # Decode output as text
-            check=True,                  # Raise CalledProcessError on non-zero exit
-            timeout=7200                 # Example: 2-hour timeout
+            cwd=str(script_working_dir),
+            stdout=subprocess.PIPE,      # Capture stdout
+            stderr=subprocess.PIPE,      # Capture stderr
+            text=True                    # Decode output as text
         )
 
-        logger.info(f"[Job {job_id}] Pipeline script finished successfully.")
-        # logger.debug(f"[Job {job_id}] STDOUT:\n{process.stdout}") # Uncomment for debugging
+        logger.info(f"[Job {job_id}] Pipeline process started with PID: {process.pid}")
 
-        # --- Attempt to find the results directory name ---
-        results_dir_name = None
-        for line in process.stdout.splitlines():
-            # *** IMPORTANT: Adjust this prefix based on your pipeline.sh ACTUAL output ***
-            prefix = "Created results directory: "
-            if line.startswith(prefix):
-                results_dir_name = line[len(prefix):].strip()
-                break
+        try:
+            process_psutil = psutil.Process(process.pid)
+            # Read initial CPU and Memory (optional, but good practice)
+            process_psutil.cpu_percent(interval=None) # First call returns 0.0 or None, prime it
+            time.sleep(0.1) # Short sleep before first real measurement
 
-        if results_dir_name:
-             results_path = str(RESULTS_BASE_DIR / results_dir_name)
-             logger.info(f"[Job {job_id}] Identified results directory: {results_path}")
-             return {"status": "success", "results_path": results_path}
-        else:
-             logger.warning(f"[Job {job_id}] Could not determine results directory from pipeline output.")
-             return {"status": "success", "message": "Pipeline finished, but results directory unclear from output."}
+        except psutil.NoSuchProcess:
+            logger.warning(f"[Job {job_id}] Process {process.pid} finished before monitoring could start.")
+            process_psutil = None # Ensure it's None if process is gone
 
-    except subprocess.CalledProcessError as e:
-        logger.error(f"[Job {job_id}] Pipeline script failed with return code {e.returncode}.")
-        logger.error(f"[Job {job_id}] STDERR:\n{e.stderr}")
-        raise e
+        # --- Monitoring Loop ---
+        while process.poll() is None: # While process is running
+            if process_psutil:
+                try:
+                    # Get CPU Usage (interval helps average over the period)
+                    cpu = process_psutil.cpu_percent(interval=MONITORING_INTERVAL_SECONDS)
+                    if cpu is not None: # Can be None on first call if interval=0/None
+                         cpu_percentages.append(cpu)
+
+                    # Get Memory Usage (RSS)
+                    mem_info = process_psutil.memory_info()
+                    current_memory_mb = mem_info.rss / (1024 * 1024) # Convert bytes to MB
+                    peak_memory_mb = max(peak_memory_mb, current_memory_mb)
+
+                    # Optional: Update job meta periodically (more overhead)
+                    # if job:
+                    #     job.meta['current_cpu'] = cpu
+                    #     job.meta['peak_memory_mb_so_far'] = round(peak_memory_mb, 1)
+                    #     job.save_meta()
+
+                except psutil.NoSuchProcess:
+                    logger.warning(f"[Job {job_id}] Process {process.pid} ended during monitoring loop.")
+                    break # Exit loop if process is gone
+                except Exception as monitor_err:
+                    logger.error(f"[Job {job_id}] Error during resource monitoring: {monitor_err}")
+                    # Decide whether to break or continue monitoring if possible
+                    time.sleep(MONITORING_INTERVAL_SECONDS) # Avoid tight loop on error
+            else:
+                 # Process finished too quickly, just wait normally
+                 time.sleep(MONITORING_INTERVAL_SECONDS)
+
+
+        # --- Process Finished - Get Output and Final Status ---
+        stdout, stderr = process.communicate() # Get remaining output
+        return_code = process.returncode
+        end_time = time.time()
+        duration_seconds = end_time - start_time
+
+        logger.info(f"[Job {job_id}] Pipeline process {process.pid} finished with code {return_code} after {duration_seconds:.2f}s.")
+
+        # Calculate average CPU
+        average_cpu = sum(cpu_percentages) / len(cpu_percentages) if cpu_percentages else 0
+
+        # --- Update Job Meta with Final Stats ---
+        if job:
+            job.meta['peak_memory_mb'] = round(peak_memory_mb, 1)
+            job.meta['average_cpu_percent'] = round(average_cpu, 1)
+            job.meta['duration_seconds'] = round(duration_seconds, 2)
+            # Remove temporary keys if used
+            # job.meta.pop('current_cpu', None)
+            # job.meta.pop('peak_memory_mb_so_far', None)
+            job.save_meta()
+            logger.info(f"[Job {job_id}] Saved final resource stats to job meta.")
+
+        # --- Handle Success/Failure ---
+        if return_code == 0:
+            logger.info(f"[Job {job_id}] Pipeline script finished successfully.")
+            # logger.debug(f"[Job {job_id}] STDOUT:\n{stdout}")
+
+            # Attempt to find results directory (same logic as before)
+            results_dir_name = None
+            for line in stdout.splitlines():
+                prefix = "Created results directory: " # Make sure this matches pipeline.sh output
+                if line.startswith(prefix):
+                    results_dir_name = line[len(prefix):].strip()
+                    break
+
+            if results_dir_name:
+                 results_path = str(RESULTS_BASE_DIR / results_dir_name)
+                 logger.info(f"[Job {job_id}] Identified results directory: {results_path}")
+                 # Include stats in return value as well (optional, already in meta)
+                 return {"status": "success", "results_path": results_path, "resources": job.meta}
+            else:
+                 logger.warning(f"[Job {job_id}] Could not determine results directory from pipeline output.")
+                 return {"status": "success", "message": "Pipeline finished, results dir unclear.", "resources": job.meta}
+
+        else: # Non-zero return code
+             error_message = f"Pipeline script failed with return code {return_code}."
+             logger.error(f"[Job {job_id}] {error_message}")
+             logger.error(f"[Job {job_id}] STDERR:\n{stderr}")
+             # Store specific error in meta
+             if job:
+                 job.meta['error_message'] = error_message
+                 job.meta['stderr_snippet'] = stderr[:1000] # Store first 1000 chars
+                 job.save_meta()
+             # Re-raise an exception so RQ marks the job as failed
+             raise subprocess.CalledProcessError(return_code, command, output=stdout, stderr=stderr)
+
     except subprocess.TimeoutExpired as e:
-        logger.error(f"[Job {job_id}] Pipeline script timed out after {e.timeout} seconds.")
-        stderr_output = e.stderr.decode('utf-8', errors='ignore') if e.stderr else 'N/A'
-        logger.error(f"[Job {job_id}] STDERR captured before timeout:\n{stderr_output}")
+        # This is less likely with Popen unless communicate() times out
+        logger.error(f"[Job {job_id}] Pipeline script command timed out.")
+        stderr_output = e.stderr if e.stderr else 'N/A'
+        if job:
+            job.meta['error_message'] = "Pipeline timed out."
+            job.meta['stderr_snippet'] = stderr_output[:1000]
+            job.save_meta()
         raise e
     except Exception as e:
         logger.exception(f"[Job {job_id}] An unexpected error occurred during pipeline execution.")
-        raise e
+        if job:
+            job.meta['error_message'] = f"Unexpected task error: {type(e).__name__}"
+            job.meta['error_details'] = str(e)
+            job.save_meta()
+        raise e # Re-raise for RQ failure handling
 --- END FILE: ./backend/app/tasks.py ---
 
