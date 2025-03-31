@@ -418,7 +418,6 @@ dependencies:
 --- END FILE: ./frontend/templates/pages/results/results.html ---
 
 --- START FILE: ./frontend/templates/pages/jobs/jobs.html ---
---- START FILE: ./frontend/templates/pages/jobs/jobs.html ---
 {% extends 'base.html' %}
 
 {% block title %}Jobs Queue{% endblock %}
@@ -496,9 +495,7 @@ dependencies:
     <script src="/frontend/static/jobs.js"></script>
 {% endblock %}
 --- END FILE: ./frontend/templates/pages/jobs/jobs.html ---
---- END FILE: ./frontend/templates/pages/jobs/jobs.html ---
 
---- START FILE: ./frontend/templates/pages/run_pipeline/run_pipeline.html ---
 --- START FILE: ./frontend/templates/pages/run_pipeline/run_pipeline.html ---
 {% extends 'base.html' %}
 
@@ -560,7 +557,6 @@ dependencies:
     <script src="/frontend/static/run_pipeline.js"></script>
 {% endblock %}
 --- END FILE: ./frontend/templates/pages/run_pipeline/run_pipeline.html ---
---- END FILE: ./frontend/templates/pages/run_pipeline/run_pipeline.html ---
 
 --- START FILE: ./frontend/templates/pages/index/index.html ---
 {% extends 'base.html' %}
@@ -573,7 +569,6 @@ dependencies:
 {% endblock %}
 --- END FILE: ./frontend/templates/pages/index/index.html ---
 
---- START FILE: ./frontend/templates/base.html ---
 --- START FILE: ./frontend/templates/base.html ---
 <!DOCTYPE html>
 <html lang="en">
@@ -638,7 +633,6 @@ dependencies:
     <script src="/frontend/static/floating_iframe.js"></script> {% block scripts %}{% endblock %}
 </body>
 </html>
---- END FILE: ./frontend/templates/base.html ---
 --- END FILE: ./frontend/templates/base.html ---
 
 --- START FILE: ./frontend/static/results.js ---
@@ -883,7 +877,6 @@ document.addEventListener('DOMContentLoaded', function() {
 --- END FILE: ./frontend/static/floating_iframe.js ---
 
 --- START FILE: ./frontend/static/jobs.js ---
---- START FILE: ./frontend/static/jobs.js ---
 document.addEventListener('DOMContentLoaded', function() {
     const jobsTableBody = document.querySelector('#staged-jobs-table tbody');
     const loadingIndicator = document.getElementById('loading-jobs');
@@ -1035,9 +1028,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fetchStagedJobs();
 });
 --- END FILE: ./frontend/static/jobs.js ---
---- END FILE: ./frontend/static/jobs.js ---
 
---- START FILE: ./frontend/static/run_pipeline.js ---
 --- START FILE: ./frontend/static/run_pipeline.js ---
 document.addEventListener('DOMContentLoaded', function() {
     // --- DOM Element References ---
@@ -1207,7 +1198,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
---- END FILE: ./frontend/static/run_pipeline.js ---
 --- END FILE: ./frontend/static/run_pipeline.js ---
 
 --- START FILE: ./frontend/static/results.css ---
@@ -1546,6 +1536,7 @@ from typing import List, Dict, Any # Added Any
 from pydantic import BaseModel
 import uuid # <-- Import UUID
 import json # <-- Import JSON
+import time
 
 # --- RQ / Redis Imports ---
 import redis
