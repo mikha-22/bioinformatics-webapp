@@ -1,4 +1,3 @@
---- START FILE: ./frontend/static/jobs.js ---
 document.addEventListener('DOMContentLoaded', function() {
     const jobsTableBody = document.querySelector('#staged-jobs-table tbody');
     const loadingIndicator = document.getElementById('loading-jobs');
@@ -149,4 +148,3 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Initial Load ---
     fetchStagedJobs();
 });
---- END FILE: ./frontend/static/jobs.js ---

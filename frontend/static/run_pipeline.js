@@ -1,4 +1,3 @@
---- START FILE: ./frontend/static/run_pipeline.js ---
 document.addEventListener('DOMContentLoaded', function() {
     // --- DOM Element References ---
     const forwardReadsSelect = document.getElementById('forwardReads');
@@ -167,4 +166,3 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
---- END FILE: ./frontend/static/run_pipeline.js ---
