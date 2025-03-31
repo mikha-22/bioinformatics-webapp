@@ -68,7 +68,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], # Be more specific in production
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE"], # Added DELETE if needed later
+    allow_methods=["GET", "POST", "DELETE"], # Added DELETE
     allow_headers=["*"],
 )
 
@@ -83,7 +83,7 @@ redis_conn = None
 pipeline_queue = None
 
 try:
-    redis_conn = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=False)
+    redis_conn = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=False) # Keep decode_responses=False for RQ compatibility
     redis_conn.ping()
     logger.info(f"Successfully connected to Redis at {REDIS_HOST}:{REDIS_PORT}")
     pipeline_queue = Queue(PIPELINE_QUEUE_NAME, connection=redis_conn)
@@ -107,7 +107,6 @@ def get_filebrowser_config() -> Dict[str, Any]:
             with open(settings_path, 'r') as f:
                 fb_settings = json.load(f)
                 config["baseURL"] = fb_settings.get("baseURL", "/filebrowser").strip('/')
-                # Add other settings if needed
             logger.info(f"Loaded File Browser config: baseURL=/{config['baseURL']}")
         else:
             logger.warning(f"File Browser settings not found at {settings_path}, using default baseURL.")
@@ -130,21 +129,17 @@ def dt_to_timestamp(dt: Optional[datetime.datetime]) -> Optional[float]:
 
 def get_safe_path(base_dir: Path, requested_path: str) -> Path:
     """Safely join a base directory and a requested path, preventing path traversal."""
-    # Decode URL component
     decoded_path_str = urllib.parse.unquote(requested_path)
-    # Create Path object
     requested = Path(decoded_path_str)
 
-    # Ensure the requested path is relative and does not contain '..'
     if requested.is_absolute() or '..' in requested.parts:
         logger.warning(f"Attempted path traversal: {requested_path}")
         raise HTTPException(status_code=400, detail="Invalid path requested.")
 
-    # Join with base directory
     full_path = (base_dir / requested).resolve()
 
-    # Check if the resolved path is still within the base directory
-    if base_dir.resolve() not in full_path.parents and full_path != base_dir.resolve():
+    # Check if the resolved path is still within the base directory OR is the base directory itself
+    if base_dir.resolve() != full_path and base_dir.resolve() not in full_path.parents:
          logger.warning(f"Attempted path traversal resolved outside base: {full_path} (Base: {base_dir.resolve()})")
          raise HTTPException(status_code=400, detail="Invalid path requested.")
 
@@ -158,7 +153,6 @@ def get_directory_contents(directory: Path, list_dirs: bool = False, list_files:
         logger.warning(f"Directory not found or is not a directory: {directory}")
         return items
     try:
-        # Sort directories first, then files, alphabetically
         sorted_paths = sorted(
             list(directory.iterdir()),
             key=lambda p: (not p.is_dir(), p.name.lower())
@@ -171,35 +165,36 @@ def get_directory_contents(directory: Path, list_dirs: bool = False, list_files:
             if (is_dir and list_dirs) or (not is_dir and list_files):
                 try:
                     stat_result = item_path.stat()
+                    # Generate File Browser link ONLY if listing directories (for runs list)
+                    # Make sure the link generation is safe (URL encode the directory name part)
+                    fb_link = None
+                    if is_dir and list_dirs:
+                        # Construct relative path from RESULTS_DIR for FB link if needed, or just use name
+                        # For simplicity, just use the name here assuming FB root is DATA_DIR parent or similar
+                        fb_link = f"/{fb_base_url}/files/{urllib.parse.quote(item_path.name)}"
+
                     item_info = {
                         "name": item_path.name,
                         "is_dir": is_dir,
                         "modified_time": stat_result.st_mtime,
                         "size": stat_result.st_size if not is_dir else None,
                         "extension": item_path.suffix.lower() if not is_dir else None,
-                        # Generate File Browser link ONLY if listing directories (for runs list)
-                        "filebrowser_link": f"/{fb_base_url}/files/{urllib.parse.quote(item_path.name)}" if is_dir and list_dirs else None
+                        "filebrowser_link": fb_link
                     }
                     items.append(item_info)
                 except OSError as stat_e:
                     logger.error(f"Could not get stat for item {item_path}: {stat_e}")
-                    # Optionally add a placeholder for inaccessible items
                     items.append({
-                        "name": item_path.name,
-                        "is_dir": is_dir,
+                        "name": item_path.name, "is_dir": is_dir,
                         "error": "Could not access item metadata."
                     })
-
     except OSError as list_e:
         logger.error(f"Error reading directory {directory}: {list_e}")
-        # Consider raising an exception or returning an error indicator
         raise HTTPException(status_code=500, detail=f"Error reading directory: {directory.name}") from list_e
-
     return items
 
 
 # --- Validation Helper ---
-# (No changes needed in validate_pipeline_input)
 def validate_pipeline_input(input_data: PipelineInput) -> tuple[Dict[str, Path], str | None, List[str]]:
     """Validates input files exist and returns paths and errors."""
     validation_errors = []
@@ -207,10 +202,14 @@ def validate_pipeline_input(input_data: PipelineInput) -> tuple[Dict[str, Path],
     known_variants_path_str = None
 
     try:
-        paths_map["forward_reads"] = DATA_DIR / input_data.forward_reads_file
-        paths_map["reverse_reads"] = DATA_DIR / input_data.reverse_reads_file
-        paths_map["reference_genome"] = DATA_DIR / input_data.reference_genome_file
-        paths_map["target_regions"] = DATA_DIR / input_data.target_regions_file
+        # Ensure DATA_DIR exists before proceeding
+        if not DATA_DIR.is_dir():
+             raise FileNotFoundError(f"Data directory not found: {DATA_DIR}")
+
+        paths_map["forward_reads"] = get_safe_path(DATA_DIR, input_data.forward_reads_file)
+        paths_map["reverse_reads"] = get_safe_path(DATA_DIR, input_data.reverse_reads_file)
+        paths_map["reference_genome"] = get_safe_path(DATA_DIR, input_data.reference_genome_file)
+        paths_map["target_regions"] = get_safe_path(DATA_DIR, input_data.target_regions_file)
 
         required_files_display_map = {
             "Forward Reads": paths_map["forward_reads"],
@@ -220,25 +219,33 @@ def validate_pipeline_input(input_data: PipelineInput) -> tuple[Dict[str, Path],
         }
         for name, file_path in required_files_display_map.items():
             if not file_path.is_file():
-                validation_errors.append(f"{name} file not found: {file_path.name}")
+                # Use the original filename from input_data for user-friendly error
+                original_filename = getattr(input_data, f"{name.lower().replace(' ', '_')}_file", file_path.name)
+                validation_errors.append(f"{name} file not found: {original_filename}")
 
         if input_data.known_variants_file and input_data.known_variants_file.lower() != "none":
-            known_variants_path = DATA_DIR / input_data.known_variants_file
+            known_variants_path = get_safe_path(DATA_DIR, input_data.known_variants_file)
             if not known_variants_path.is_file():
-                 validation_errors.append(f"Known Variants file not found: {known_variants_path.name}")
+                 validation_errors.append(f"Known Variants file not found: {input_data.known_variants_file}")
             else:
                  known_variants_path_str = str(known_variants_path)
                  paths_map["known_variants"] = known_variants_path
 
+    except FileNotFoundError as e: # Catch specific data dir error
+         logger.error(str(e))
+         # Return a user-friendly error without exposing full path
+         raise HTTPException(status_code=500, detail="Server configuration error: Cannot access data directory.")
+    except HTTPException: # Re-raise exceptions from get_safe_path
+        raise
     except Exception as e:
          logger.error(f"Error constructing file paths during validation: {e}")
-         raise HTTPException(status_code=400, detail="Invalid file name format provided.")
+         # Use a generic error for unexpected issues
+         raise HTTPException(status_code=400, detail="Invalid file name or path provided.")
 
     return paths_map, known_variants_path_str, validation_errors
 
 
 # --- HTML Routes ---
-# (No changes needed for HTML routes serving templates, including /results)
 @app.get("/", response_class=HTMLResponse, summary="Serve Main Home Page")
 async def main_page(request: Request):
     return templates.TemplateResponse("pages/index/index.html", {"request": request})
@@ -249,16 +256,12 @@ async def run_pipeline_page(request: Request):
 
 @app.get("/results", response_class=HTMLResponse, summary="Serve Results Page")
 async def results_page(request: Request):
-    # Ensure RESULTS_DIR exists (or log error)
     try:
         RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     except OSError as e:
          logger.error(f"Could not create or access results directory {RESULTS_DIR}: {e}")
-         # Render template anyway, JS will show error
-    # Extract highlight parameter if present
     highlight = request.query_params.get("highlight")
     return templates.TemplateResponse("pages/results/results.html", {"request": request, "highlight": highlight})
-
 
 @app.get("/jobs", response_class=HTMLResponse, summary="Serve Jobs Page")
 async def jobs_page(request: Request):
@@ -271,166 +274,175 @@ async def get_data():
     if not DATA_DIR.exists():
          logger.error(f"Data directory does not exist: {DATA_DIR}")
          raise HTTPException(status_code=500, detail="Server configuration error: Data directory not found.")
-
-    fb_config = get_filebrowser_config() # Keep getting config in case helper uses it internally
-
+    fb_config = get_filebrowser_config()
     try:
-        # Get the detailed contents first using the helper
-        # We want only files listed for this endpoint's purpose
         full_contents = get_directory_contents(
-            DATA_DIR,
-            list_dirs=False, # Don't list directories
-            list_files=True,  # DO list files
-            fb_base_url=fb_config["baseURL"]
+            DATA_DIR, list_dirs=False, list_files=True, fb_base_url=fb_config["baseURL"]
         )
-
-        # --- NEW: Simplify the response to match the response_model ---
-        # The model List[Dict[str, str]] expects {'name': 'some_name', 'type': 'file'/'directory'}
-        simplified_response = []
-        for item in full_contents:
-            # Ensure we only process files returned by the helper
-            if not item.get("is_dir", True): # Check 'is_dir' is explicitly False
-                simplified_response.append({
-                    "name": item.get("name", "Unknown"), # Get the name
-                    "type": "file" # Hardcode type as 'file' since we only asked for files
-                })
-        # --- End Simplification ---
-
-        return simplified_response # Return the simplified list
-
+        # Simplify to match List[Dict[str, str]] model {'name': ..., 'type': 'file'}
+        simplified_response = [
+            {"name": item.get("name", "Unknown"), "type": "file"}
+            for item in full_contents if not item.get("is_dir", True)
+        ]
+        return simplified_response
     except HTTPException as e:
-        # Propagate specific exceptions raised by get_directory_contents or get_safe_path
         logger.error(f"HTTPException in /get_data processing: {e.detail}")
         raise e
     except Exception as e:
-        # Catch any other unexpected errors during processing
         logger.exception(f"Unexpected error processing data directory contents for /get_data: {e}")
         raise HTTPException(status_code=500, detail="Internal server error processing data list.")
-    
-# --- MODIFIED: /get_results API Route ---
+
 @app.get("/get_results", response_model=List[Dict[str, Any]], summary="List Result Run Directories")
 async def get_results_runs(fb_config: Dict = Depends(get_filebrowser_config)):
     """Lists the subdirectories (pipeline runs) within the main results directory."""
     if not RESULTS_DIR.exists():
         logger.warning(f"Results directory not found: {RESULTS_DIR}. Returning empty list.")
         return []
-    # Use helper to list ONLY directories and include File Browser link
     return get_directory_contents(RESULTS_DIR, list_dirs=True, list_files=False, fb_base_url=fb_config["baseURL"])
 
-
-# --- NEW: API Route to Get Files WITHIN a Result Directory ---
 @app.get("/get_results/{run_dir_name:path}", response_model=List[Dict[str, Any]], summary="List Files in a Specific Run Directory")
 async def get_results_run_files(run_dir_name: str):
-    """
-    Lists the files and subdirectories within a specific pipeline run directory.
-    The run_dir_name is URL-decoded automatically by FastAPI.
-    """
+    """Lists the files and subdirectories within a specific pipeline run directory."""
     logger.info(f"Request to list files for run directory: {run_dir_name}")
-
-    # Validate the path is within RESULTS_DIR
     try:
         target_run_dir = get_safe_path(RESULTS_DIR, run_dir_name)
     except HTTPException as e:
-        # Propagate the HTTPException from get_safe_path
         raise e
     except Exception as e:
         logger.error(f"Unexpected error validating path for {run_dir_name}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error during path validation.")
 
-
     if not target_run_dir.exists() or not target_run_dir.is_dir():
          logger.warning(f"Requested run directory not found or not a directory: {target_run_dir}")
          raise HTTPException(status_code=404, detail=f"Run directory '{run_dir_name}' not found.")
 
-    # Use helper to list ONLY files (and potentially subdirs if needed later)
-    # File Browser links aren't needed for inner files
     fb_config = get_filebrowser_config()
     return get_directory_contents(target_run_dir, list_dirs=True, list_files=True, fb_base_url=fb_config["baseURL"])
 
 
 # --- Jobs List Route ---
-# (No changes needed for /jobs_list)
 @app.get("/jobs_list", response_model=List[Dict[str, Any]], summary="List All Relevant Jobs")
 async def get_jobs_list():
     if not redis_conn or not pipeline_queue:
         raise HTTPException(status_code=503, detail="Service unavailable: Cannot connect to job storage.")
     all_jobs_dict = {}
+
+    # 1. Get Staged Jobs
     try:
+        # Use redis_conn with decode_responses=False for keys/values
         staged_jobs_raw = redis_conn.hgetall(STAGED_JOBS_KEY)
         for job_id_bytes, job_details_bytes in staged_jobs_raw.items():
             try:
                 job_id = job_id_bytes.decode('utf-8')
                 details = json.loads(job_details_bytes.decode('utf-8'))
                 all_jobs_dict[job_id] = {
-                    "id": job_id,
+                    "id": job_id, # Use 'id' consistently for this endpoint
                     "status": "staged",
                     "description": details.get("description", "N/A"),
                     "enqueued_at": None, "started_at": None, "ended_at": None,
                     "result": None, "error": None,
-                    "meta": {"input_params": details.get("input_filenames", details)}, # Prioritize input_filenames
+                    "meta": {"input_params": details.get("input_filenames", details)},
                     "staged_at": details.get("staged_at")
                 }
             except (UnicodeDecodeError, json.JSONDecodeError, TypeError) as e:
                 logger.error(f"Error decoding/parsing staged job data for key {job_id_bytes}: {e}")
     except redis.exceptions.RedisError as e:
         logger.error(f"Redis error fetching staged jobs: {e}")
+        # Continue to fetch RQ jobs even if staged jobs fail
 
-    MAX_REGISTRY_JOBS = 50
-    registries = {
+    # 2. Get RQ Jobs from Registries
+    MAX_REGISTRY_JOBS = 50 # Limit history fetched
+    registries_to_check = {
+        "queued": pipeline_queue, # Use queue directly for queued jobs
         "started": StartedJobRegistry(queue=pipeline_queue),
         "finished": FinishedJobRegistry(queue=pipeline_queue),
         "failed": FailedJobRegistry(queue=pipeline_queue),
     }
-    for status_name, registry in registries.items():
+    # Add other registries if needed (deferred, scheduled)
+
+    for status_name, registry_or_queue in registries_to_check.items():
         try:
-            limit = -1 if status_name == "started" else MAX_REGISTRY_JOBS
-            job_ids = registry.get_job_ids(0, limit)
+            job_ids = []
+            if isinstance(registry_or_queue, Queue):
+                # Queue.get_job_ids() gets currently queued jobs
+                job_ids = registry_or_queue.get_job_ids()
+            elif isinstance(registry_or_queue, (StartedJobRegistry, FinishedJobRegistry, FailedJobRegistry)):
+                # Registries have different methods, limit finished/failed
+                limit = -1 if status_name == "started" else MAX_REGISTRY_JOBS
+                job_ids = registry_or_queue.get_job_ids(0, limit)
+            else:
+                 logger.warning(f"Unsupported type for job fetching: {type(registry_or_queue)}")
+                 continue
+
             if job_ids:
+                # Fetch jobs in batch
                 jobs = Job.fetch_many(job_ids, connection=redis_conn, serializer=pipeline_queue.serializer)
                 for job in jobs:
+                    # Ensure job exists and hasn't been replaced by a newer status from another registry
+                    # (e.g., avoid showing finished if we already have failed)
+                    # Prioritize Failed > Finished > Started > Queued > Staged
                     if job and (job.id not in all_jobs_dict or all_jobs_dict[job.id]['status'] == 'staged'):
                         job.refresh() # Ensure meta is loaded
+                        current_status = job.get_status()
                         error_summary = None
-                        if job.get_status() == JobStatus.FAILED:
+                        if current_status == JobStatus.FAILED:
                             error_summary = job.meta.get('error_message', "Job failed processing.")
+                            stderr = job.meta.get('stderr_snippet')
                             if error_summary == "Job failed processing." and job.exc_info:
                                 try:
                                     lines = job.exc_info.strip().split('\n')
                                     if lines: error_summary = lines[-1]
                                 except Exception: pass
+                            if stderr: error_summary += f" (stderr: {stderr}...)" # Append snippet
 
+                        # Store with 'id' key
                         all_jobs_dict[job.id] = {
-                            "id": job.id, "status": job.get_status(),
+                            "id": job.id, # Use 'id' consistently
+                            "status": current_status,
                             "description": job.description or "N/A",
                             "enqueued_at": dt_to_timestamp(job.enqueued_at),
                             "started_at": dt_to_timestamp(job.started_at),
                             "ended_at": dt_to_timestamp(job.ended_at),
-                            "result": job.result, "error": error_summary,
-                            "meta": job.meta or {}, "staged_at": None
+                            "result": job.result,
+                            "error": error_summary,
+                            "meta": job.meta or {},
+                            "staged_at": None, # Not applicable to RQ jobs
+                             # Add resource stats directly if available in meta (for consistency)
+                            "resources": {
+                                "peak_memory_mb": job.meta.get("peak_memory_mb"),
+                                "average_cpu_percent": job.meta.get("average_cpu_percent"),
+                                "duration_seconds": job.meta.get("duration_seconds")
+                            }
                         }
         except redis.exceptions.RedisError as e:
             logger.error(f"Redis error fetching {status_name} jobs: {e}")
         except Exception as e:
             logger.exception(f"Unexpected error fetching {status_name} jobs.")
 
+
+    # 3. Sort and Return
     all_jobs_list = sorted(
         all_jobs_dict.values(),
-        key=lambda j: j.get('enqueued_at') or j.get('staged_at') or time.time(),
+        # Sort by enqueue/stage time descending (newest first)
+        key=lambda j: j.get('enqueued_at') or j.get('staged_at') or 0, # Use 0 as fallback time
         reverse=True
     )
     return all_jobs_list
 
 
 # --- Staging and Job Control Routes ---
-# (No changes needed for /run_pipeline, /start_job, /job_status, /stop_job)
+
 @app.post("/run_pipeline", status_code=200, summary="Stage Pipeline Job")
 async def stage_pipeline_job(input_data: PipelineInput):
+    """Validates inputs, generates a unique ID, and stores job details in Redis hash."""
     if not redis_conn:
         raise HTTPException(status_code=503, detail="Service unavailable (Redis).")
     pipeline_script_path = BACKEND_APP_DIR / "pipeline.sh"
     if not pipeline_script_path.is_file():
-        raise HTTPException(status_code=500, detail="Server config error: Pipeline script missing.")
+        logger.error(f"Pipeline script not found at: {pipeline_script_path}")
+        raise HTTPException(status_code=500, detail="Server configuration error: Pipeline script missing.")
 
+    # Validate inputs and get absolute paths
     paths_map, known_variants_path_str, validation_errors = validate_pipeline_input(input_data)
     if validation_errors:
         raise HTTPException(status_code=400, detail=f"Input file error(s): {'; '.join(validation_errors)}")
@@ -443,18 +455,19 @@ async def stage_pipeline_job(input_data: PipelineInput):
             "reverse_reads_path": str(paths_map["reverse_reads"]),
             "reference_genome_path": str(paths_map["reference_genome"]),
             "target_regions_path": str(paths_map["target_regions"]),
-            "known_variants_path": known_variants_path_str,
+            "known_variants_path": known_variants_path_str, # Can be None
             "description": f"Pipeline for {input_data.forward_reads_file}",
             "staged_at": time.time(),
-            "input_filenames": { # Store original inputs
+            "input_filenames": { # Store original relative filenames for potential rerun
                  "forward_reads": input_data.forward_reads_file,
                  "reverse_reads": input_data.reverse_reads_file,
                  "reference_genome": input_data.reference_genome_file,
                  "target_regions": input_data.target_regions_file,
-                 "known_variants": input_data.known_variants_file
+                 "known_variants": input_data.known_variants_file # Can be None
             }
         }
-        redis_conn.hset(STAGED_JOBS_KEY, staged_job_id, json.dumps(job_details))
+        # Store as bytes in Redis hash
+        redis_conn.hset(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'), json.dumps(job_details).encode('utf-8'))
         logger.info(f"Staged job {staged_job_id}")
         return JSONResponse(status_code=200, content={"message": "Job staged.", "staged_job_id": staged_job_id})
     except redis.exceptions.RedisError as e:
@@ -464,111 +477,128 @@ async def stage_pipeline_job(input_data: PipelineInput):
         logger.exception("Failed to stage pipeline job.")
         raise HTTPException(status_code=500, detail="Server error: Could not stage job.")
 
-
 @app.post("/start_job/{staged_job_id}", status_code=202, summary="Enqueue Staged Job")
 async def start_job(staged_job_id: str):
+    """Retrieves staged job details, enqueues it to RQ, and removes staged entry."""
     if not redis_conn or not pipeline_queue:
         raise HTTPException(status_code=503, detail="Background job service unavailable.")
     try:
-        job_details_json_bytes = redis_conn.hget(STAGED_JOBS_KEY, staged_job_id)
+        # Fetch bytes from Redis
+        job_details_json_bytes = redis_conn.hget(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
         if not job_details_json_bytes:
             raise HTTPException(status_code=404, detail=f"Staged job {staged_job_id} not found.")
 
+        # Decode and parse JSON
         job_details = json.loads(job_details_json_bytes.decode('utf-8'))
         required_keys = ["pipeline_script_path", "forward_reads_path", "reverse_reads_path", "reference_genome_path", "target_regions_path"]
         if not all(key in job_details for key in required_keys):
+             logger.error(f"Corrupted staged job data for {staged_job_id}: Missing keys.")
              raise HTTPException(status_code=500, detail="Corrupted staged job data.")
 
         job_args = (
             job_details["pipeline_script_path"], job_details["forward_reads_path"],
             job_details["reverse_reads_path"], job_details["reference_genome_path"],
-            job_details["target_regions_path"], job_details.get("known_variants_path", ""),
+            job_details["target_regions_path"], job_details.get("known_variants_path"), # Pass None if missing
         )
         job_meta = {
-            "input_params": job_details.get("input_filenames", {}),
+            "input_params": job_details.get("input_filenames", {}), # Keep original filenames
             "staged_job_id_origin": staged_job_id
         }
+
+        # Enqueue the job
         job = pipeline_queue.enqueue(
             f=run_pipeline_task, args=job_args, meta=job_meta,
-            job_id_prefix="bio_pipeline_", job_timeout='2h',
-            result_ttl=86400, failure_ttl=604800,
+            job_id_prefix="bio_pipeline_", job_timeout='2h', # Example timeout
+            result_ttl=86400, # Keep result 1 day
+            failure_ttl=604800, # Keep failed 1 week
             description=job_details.get("description", f"Run from {staged_job_id}")
         )
+
         logger.info(f"Enqueued RQ job {job.id} from staged {staged_job_id}")
-        redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id)
+
+        # Remove the staged job entry AFTER successful enqueue
+        redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
         logger.info(f"Removed staged job {staged_job_id}.")
+
         return JSONResponse(status_code=202, content={"message": "Job enqueued.", "job_id": job.id})
+
     except redis.exceptions.RedisError as e:
          logger.error(f"Redis error starting job {staged_job_id}: {e}")
          raise HTTPException(status_code=503, detail="Service unavailable starting job.")
     except json.JSONDecodeError as e:
         logger.error(f"Error decoding JSON for staged job {staged_job_id}: {e}")
+        # Consider removing the corrupted entry?
+        # redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
         raise HTTPException(status_code=500, detail="Corrupted staged job data.")
     except Exception as e:
         logger.exception(f"Failed to start/enqueue staged job {staged_job_id}.")
         raise HTTPException(status_code=500, detail="Server error: Could not start job.")
 
-@app.get("/job_status/{job_id}", summary="Get RQ Job Status")
+
+@app.get("/job_status/{job_id}", summary="Get RQ Job Status and Details")
 async def get_job_status(job_id: str):
+    """Fetches RQ job status, result/error, metadata, and resource usage."""
     if not redis_conn:
         raise HTTPException(status_code=503, detail="Status check unavailable (Redis).")
     try:
-        # Fetch with the correct serializer if needed (often default is fine)
-        job = Job.fetch(job_id, connection=redis_conn) # Removed specific serializer arg for simplicity
-        job.refresh() # Ensure meta is loaded, especially after task completion
+        # Fetch with the correct serializer if needed
+        job = Job.fetch(job_id, connection=redis_conn, serializer=pipeline_queue.serializer)
+        job.refresh() # Load meta, status etc.
     except NoSuchJobError:
+        # Before raising 404, check if it was a staged job that never started
+        # This check is less critical now that staging is separate, but can be useful
+        if job_id.startswith("staged_"):
+             staged_exists = redis_conn.hexists(STAGED_JOBS_KEY, job_id.encode('utf-8'))
+             if staged_exists:
+                  # It's a staged job, return specific status? Or let 404 stand?
+                  # For now, let 404 stand, as it's not an *RQ* job.
+                  pass # Or potentially return a custom "staged" status here if needed
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found.")
     except redis.exceptions.RedisError as e:
          logger.error(f"Redis error fetching RQ job {job_id}: {e}")
          raise HTTPException(status_code=503, detail="Service unavailable: Could not connect to status backend.")
     except Exception as e:
-        # Catch potential deserialization errors or other issues
         logger.exception(f"Unexpected error fetching or refreshing job {job_id}.")
         raise HTTPException(status_code=500, detail=f"Server error fetching job status.")
 
     status = job.get_status()
     result = None
-    # --- Get metadata safely ---
     meta_data = job.meta or {}
     error_info_summary = None
 
     try:
         if status == JobStatus.FINISHED:
-            # Result might contain resource info if task returns it, but meta is canonical
-            result = job.result
+            result = job.result # Contains {'status': 'success', 'results_path': ...}
         elif status == JobStatus.FAILED:
-            # Prioritize specific error message from meta if task set it
             error_info_summary = meta_data.get('error_message', "Job failed processing.")
-            # Add stderr snippet if available
             stderr_snippet = meta_data.get('stderr_snippet')
-            if stderr_snippet:
-                error_info_summary += f" (stderr: {stderr_snippet}...)"
-            # Fallback to exc_info if specific message not set
             if error_info_summary == "Job failed processing." and job.exc_info:
                  try:
                      lines = job.exc_info.strip().split('\n')
                      if lines: error_info_summary = lines[-1] # Get last line of traceback
-                 except Exception: pass
+                 except Exception: pass # Ignore parsing errors
+            if stderr_snippet:
+                 error_info_summary += f" (stderr: {stderr_snippet}...)"
     except Exception as e:
         logger.exception(f"Error accessing result/error info for job {job_id} (status: {status}).")
-        # Don't overwrite error_info_summary if already set
         if not error_info_summary:
              error_info_summary = "Could not retrieve job result/error details."
 
-    # --- Explicitly include resource stats from meta if they exist ---
+    # --- Explicitly include resource stats from meta ---
     resource_stats = {
         "peak_memory_mb": meta_data.get("peak_memory_mb"),
         "average_cpu_percent": meta_data.get("average_cpu_percent"),
         "duration_seconds": meta_data.get("duration_seconds")
     }
 
+    # Return structure consistent for JS side (use job_id key)
     return JSONResponse(content={
-        "job_id": job_id,
+        "job_id": job.id, # Key is 'job_id' for the response
         "status": status,
-        "result": result, # This might be redundant if info is in meta
+        "result": result, # Result from task return
         "error": error_info_summary,
-        "meta": meta_data, # Include the full meta for potential future use
-        "resources": resource_stats, # <-- Add the specific resource stats
+        "meta": meta_data, # Full meta
+        "resources": resource_stats, # Extracted resources
         "enqueued_at": dt_to_timestamp(job.enqueued_at),
         "started_at": dt_to_timestamp(job.started_at),
         "ended_at": dt_to_timestamp(job.ended_at)
@@ -576,28 +606,37 @@ async def get_job_status(job_id: str):
 
 @app.post("/stop_job/{job_id}", status_code=200, summary="Cancel Running/Queued Job")
 async def stop_job(job_id: str):
+    """Sends a stop signal to an RQ job."""
     if not redis_conn:
         raise HTTPException(status_code=503, detail="Service unavailable (Redis).")
     logger.info(f"Request to stop job: {job_id}")
     try:
         job = Job.fetch(job_id, connection=redis_conn)
         status = job.get_status()
-        if job.is_finished or job.is_failed or job.is_canceled or job.is_stopped:
+        if job.is_finished or job.is_failed or job.is_stopped: # No need to check canceled separately
+             logger.warning(f"Attempted to stop job {job_id} which is already in state: {status}")
              return JSONResponse(status_code=200, content={"message": f"Job already {status}.", "job_id": job_id})
+        if job.is_canceled: # RQ terminology might differ slightly, cover explicit cancel
+            logger.warning(f"Attempted to stop job {job_id} which was already canceled.")
+            return JSONResponse(status_code=200, content={"message": f"Job already canceled.", "job_id": job_id})
 
+        # Use RQ's preferred method
         from rq.command import send_stop_job_command
         message = "Stop signal sent."
         try:
             send_stop_job_command(redis_conn, job.id)
             logger.info(f"Sent stop signal command for job {job_id}.")
+            # Optionally update meta immediately?
+            # job.meta['status_override'] = 'stopping'
+            # job.save_meta()
         except Exception as sig_err:
-            logger.warning(f"Could not send stop signal for job {job_id}. Error: {sig_err}")
-            # Fallback? Maybe not necessary if signal sent anyway.
-            # job.cancel() # Avoid generic cancel if signal is preferred
+            # Fallback or just log error? Sending the signal is best-effort.
+            logger.warning(f"Could not send stop signal command via RQ for job {job_id}. Error: {sig_err}. Job might continue.")
             message = "Stop signal attempted (check worker logs)."
 
         logger.info(f"Stop request processed for job {job_id}.")
         return JSONResponse(status_code=200, content={"message": message, "job_id": job_id})
+
     except NoSuchJobError:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found.")
     except redis.exceptions.RedisError as e:
@@ -607,3 +646,37 @@ async def stop_job(job_id: str):
         logger.exception(f"Unexpected error stopping job {job_id}.")
         raise HTTPException(status_code=500, detail=f"Server error stopping job.")
 
+
+# --- NEW: DELETE Endpoint for Staged Jobs ---
+@app.delete("/remove_staged_job/{staged_job_id}", status_code=200, summary="Remove a Staged Job")
+async def remove_staged_job(staged_job_id: str):
+    """Removes a job from the staged jobs Redis hash."""
+    if not redis_conn:
+        raise HTTPException(status_code=503, detail="Service unavailable (Redis).")
+    logger.info(f"Request to remove staged job: {staged_job_id}")
+
+    try:
+        # Attempt to delete the key from the hash
+        # hdel returns the number of fields that were removed
+        num_deleted = redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
+
+        if num_deleted == 1:
+            logger.info(f"Successfully removed staged job: {staged_job_id}")
+            return JSONResponse(status_code=200, content={"message": f"Staged job '{staged_job_id}' removed successfully.", "staged_job_id": staged_job_id})
+        elif num_deleted == 0:
+            logger.warning(f"Attempted to remove non-existent staged job: {staged_job_id}")
+            raise HTTPException(status_code=404, detail=f"Staged job '{staged_job_id}' not found.")
+        else:
+            # Should not happen with hdel on a single key
+            logger.error(f"Unexpected result from hdel for {staged_job_id}: {num_deleted}")
+            raise HTTPException(status_code=500, detail="Internal server error during job removal.")
+
+    except redis.exceptions.RedisError as e:
+        logger.error(f"Redis error removing staged job {staged_job_id}: {e}")
+        raise HTTPException(status_code=503, detail="Service unavailable: Could not remove job.")
+    except HTTPException as e:
+        # Re-raise HTTPExceptions (like the 404)
+        raise e
+    except Exception as e:
+        logger.exception(f"Unexpected error removing staged job {staged_job_id}.")
+        raise HTTPException(status_code=500, detail="Server error removing job.")

@@ -7,12 +7,13 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
         #jobs-table .action-cell {
-            width: 150px; /* Adjust as needed */
+            width: 170px; /* Increased width slightly for remove button */
             text-align: center;
             vertical-align: middle;
         }
         #jobs-table .btn {
-             margin: 2px; /* Spacing between multiple buttons */
+             margin: 2px 3px; /* Spacing between multiple buttons */
+             min-width: 55px; /* Ensure buttons have minimum width */
         }
         .job-status-text {
             display: inline-block;
@@ -25,12 +26,14 @@
         .action-cell .bi { /* Include Bootstrap Icons if used */
              margin-right: 4px;
         }
-         .job-state-staged { background-color: #f8f9fa; }
-         .job-state-queued { background-color: #eef; }
-         .job-state-started { background-color: #e6ffed; }
-         .job-state-finished { background-color: #d4edda; } /* Bootstrap success light */
+         /* Job State Backgrounds */
+         .job-state-staged { background-color: #f8f9fa; } /* Light grey */
+         .job-state-queued { background-color: #e3f2fd; } /* Lighter blue */
+         .job-state-started { background-color: #e6ffed; } /* Light green */
+         .job-state-finished { background-color: #d1e7dd; } /* Bootstrap success light */
          .job-state-failed { background-color: #f8d7da; } /* Bootstrap danger light */
-         .job-state-stopped, .job-state-canceled { background-color: #eee; opacity: 0.7; }
+         .job-state-stopped, .job-state-canceled { background-color: #e9ecef; opacity: 0.8; } /* Slightly darker grey, more opaque */
+         .job-state-unknown { background-color: #fff; }
 
         /* Parameter display */
         .job-parameters {
@@ -39,23 +42,28 @@
             margin-top: 5px;
             padding-left: 10px;
             border-left: 2px solid #ccc;
+            max-width: 250px; /* Limit width */
+            overflow: hidden; /* Hide overflow */
+            text-overflow: ellipsis; /* Add ellipsis */
+            white-space: normal; /* Allow wrapping within limits */
         }
         .job-parameters kbd {
             background-color: #eee;
             padding: 1px 3px;
             border-radius: 3px;
             font-size: 0.75rem;
+            word-break: break-all; /* Break long filenames */
         }
-
-        /* Make table slightly less wide if needed */
-        /* .table-responsive { max-width: 95%; margin: auto; } */
+        .job-parameters div {
+            margin-bottom: 2px;
+        }
 
          /* Modal styles (simple) */
         .modal { display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
-        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; }
+        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 5px; }
         .close-modal { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
         .close-modal:hover, .close-modal:focus { color: black; text-decoration: none; cursor: pointer; }
-        .modal-body pre { background-color: #eee; padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; }
+        .modal-body pre { background-color: #eee; padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; }
 
     </style>
 {% endblock %}
@@ -64,7 +72,7 @@
     <h1 class="mb-4">Jobs Dashboard</h1>
     <p>Overview of staged, running, and recently completed pipeline jobs.</p>
 
-    <div id="jobs-status-global" class="mb-3"></div> <!-- For global loading/error messages -->
+    <div id="jobs-status-global" class="mb-3" style="display: none;"></div> <!-- For global loading/error messages -->
 
     <button class="btn btn-secondary btn-sm mb-3" id="refresh-jobs-btn">
         <i class="fas fa-sync-alt"></i> Refresh List
@@ -76,7 +84,7 @@
                 <tr>
                     <th scope="col">Job ID / Description</th>
                     <th scope="col">Parameters</th>
-                    <th scope="col">Time Info</th>
+                    <th scope="col">Time Info / Resources</th>
                     <th scope="col" class="action-cell">Status / Action</th>
                 </tr>
             </thead>
