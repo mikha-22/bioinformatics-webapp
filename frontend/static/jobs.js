@@ -1,265 +1,498 @@
 // frontend/static/jobs.js
 document.addEventListener('DOMContentLoaded', function() {
-    const jobsTableBody = document.querySelector('#staged-jobs-table tbody');
-    const statusDiv = document.getElementById('jobs-status');
+    const jobsTableBody = document.querySelector('#jobs-table tbody');
+    const globalStatusDiv = document.getElementById('jobs-status-global');
     const refreshButton = document.getElementById('refresh-jobs-btn');
+    const loadingRow = document.getElementById('loading-jobs-row');
+    const noJobsRow = document.getElementById('no-jobs-row');
+    const errorJobsRow = document.getElementById('error-jobs-row');
+    const errorModal = document.getElementById('error-modal');
+    const errorModalText = document.getElementById('error-modal-text');
 
-    // --- NEW: Constants for CSS classes ---
-    const START_BUTTON_CLASS = 'btn-start-job';
-    const STOP_BUTTON_CLASS = 'btn-stop-job';
+    // --- State ---
+    let jobPollingIntervals = {}; // Store polling intervals {jobId: intervalId}
+    const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds
+    const TERMINAL_STATUSES = ['finished', 'failed', 'stopped', 'canceled']; // Job statuses that don't need further polling
 
-    /**
-     * Fetches staged jobs from the backend API.
-     * NOTE: This only fetches STAGED jobs. Running jobs initiated
-     * in this session will remain visually until refresh, but
-     * won't be fetched again by this function.
-     */
-    async function fetchStagedJobs() {
-        clearStatus();
-        // Clear only rows that are NOT marked as running/enqueued
-        Array.from(jobsTableBody.querySelectorAll('tr:not(.job-enqueued)')).forEach(row => {
-            if (row.id !== 'loading-jobs-row' && row.id !== 'no-jobs-row' && row.id !== 'error-jobs-row') {
-                row.remove();
-            }
-        });
+    // --- CSS Classes (makes changes easier) ---
+    const BUTTON_CLASS_START = 'btn-start-job';
+    const BUTTON_CLASS_STOP = 'btn-stop-job';
+    const BUTTON_CLASS_RERUN = 'btn-rerun-job';
+    const BUTTON_CLASS_RESULTS = 'btn-view-results';
+    const BUTTON_CLASS_ERROR_DETAILS = 'btn-error-details';
 
-        const loadingRow = document.getElementById('loading-jobs-row');
-        const noJobsRow = document.getElementById('no-jobs-row');
-        const errorJobsRow = document.getElementById('error-jobs-row');
-
-        loadingRow.style.display = ''; // Show loading
-        noJobsRow.style.display = 'none';
-        errorJobsRow.style.display = 'none';
-
-
+    // --- Helper Functions --- (Keep formatTimestamp, formatDuration, calculateDuration, showGlobalStatus, clearGlobalStatus, getNested as they were)
+     /** Formats a timestamp (seconds since epoch) into a locale string, or returns 'N/A' */
+     function formatTimestamp(timestamp) {
+        if (!timestamp) return 'N/A';
         try {
-            const response = await fetch('/staged_jobs');
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ detail: response.statusText }));
-                throw new Error(`Failed to fetch staged jobs (${response.status}): ${errorData.detail}`);
-            }
-            const stagedJobs = await response.json();
-            loadingRow.style.display = 'none'; // Hide loading
-            displayJobs(stagedJobs);
-        } catch (error) {
-            console.error('Error fetching staged jobs:', error);
-            showStatus(`Error loading jobs: ${error.message}`, 'danger');
-            loadingRow.style.display = 'none'; // Hide loading
-            errorJobsRow.style.display = ''; // Show error row
+            return new Date(timestamp * 1000).toLocaleString();
+        } catch (e) {
+            return 'Invalid Date';
         }
     }
 
-    /**
-     * Displays the fetched staged jobs in the table.
-     * @param {Object} jobs - Dictionary of staged jobs { staged_job_id: details }
-     */
-    function displayJobs(jobs) {
-        // Hide placeholder rows if they exist
-        const noJobsRow = document.getElementById('no-jobs-row');
-        const errorJobsRow = document.getElementById('error-jobs-row');
-        noJobsRow.style.display = 'none';
-        errorJobsRow.style.display = 'none';
+     /** Formats duration in seconds into H:MM:SS or M:SS */
+     function formatDuration(seconds) {
+        if (seconds === null || seconds === undefined || seconds < 0) return 'N/A';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        let str = "";
+        if (h > 0) str += `${h}:`;
+        str += `${m.toString().padStart(h > 0 ? 2 : 1, '0')}:`; // Pad minutes if hours present
+        str += s.toString().padStart(2, '0');
+        return str;
+    }
+
+    /** Calculates duration between two timestamps */
+    function calculateDuration(start, end) {
+        if (!start || !end || end < start) return null;
+        return end - start;
+    }
+
+    /** Shows a global status message */
+    function showGlobalStatus(message, type = 'info') {
+        globalStatusDiv.innerHTML = message;
+        globalStatusDiv.className = `alert alert-${type} mb-3`;
+        globalStatusDiv.style.display = 'block';
+    }
+
+    /** Clears the global status message */
+    function clearGlobalStatus() {
+         globalStatusDiv.textContent = '';
+         globalStatusDiv.style.display = 'none';
+         globalStatusDiv.className = '';
+    }
+
+    /** Safely get nested property */
+    function getNested(obj, path, defaultValue = null) {
+        try {
+            return path.split('.').reduce((o, k) => (o || {})[k], obj) || defaultValue;
+        } catch (e) {
+            return defaultValue;
+        }
+    }
 
 
-        // Check if only enqueued jobs are left + no new jobs came
-        const existingRows = jobsTableBody.querySelectorAll('tr:not(#loading-jobs-row):not(#no-jobs-row):not(#error-jobs-row)');
-        if (Object.keys(jobs).length === 0 && existingRows.length === 0) {
-            noJobsRow.style.display = ''; // Show no jobs row
-            return;
+    // --- Job Rendering and Updating ---
+
+    /** Creates a NEW job row and appends it */
+    function createAndAppendJobRow(job) {
+        const row = jobsTableBody.insertRow(-1); // Append at the end of tbody
+        row.dataset.jobId = job.id;
+
+        // --- Basic Info Cell (ID / Description) ---
+        let cellInfo = row.insertCell();
+        cellInfo.innerHTML = `
+            <strong title="${job.id}">${job.id.substring(0, 15)}...</strong>
+            <div class="text-muted" style="font-size: 0.9em;">${job.description || 'No Description'}</div>
+        `;
+
+        // --- Parameters Cell ---
+        let cellParams = row.insertCell();
+        const inputParams = getNested(job, 'meta.input_params', {});
+        let paramsHtml = '<div class="job-parameters">';
+        if (Object.keys(inputParams).length > 0) {
+            paramsHtml += Object.entries(inputParams)
+                .map(([key, value]) => value ? `<div><small>${key.replace(/_/g, ' ')}:</small> <kbd>${value || 'None'}</kbd></div>` : '') // Display 'None' if value is null/empty
+                .join('');
+        } else {
+             paramsHtml += '<span>N/A</span>';
+        }
+         paramsHtml += '</div>';
+        cellParams.innerHTML = paramsHtml;
+
+
+        // --- Time Info Cell ---
+        let cellTime = row.insertCell();
+        updateTimeCell(cellTime, job); // Use helper for time
+
+        // --- Status / Action Cell ---
+        let cellAction = row.insertCell();
+        cellAction.className = 'action-cell'; // Ensure class is set
+        updateActionCell(cellAction, job); // Use helper for actions
+
+        // --- Row Styling based on Status ---
+        row.className = `job-state-${job.status || 'unknown'}`; // Apply class for styling
+
+        // --- Manage Polling ---
+        // Decide whether to start polling based on the initial status
+        if (!TERMINAL_STATUSES.includes(job.status)) {
+            startPolling(job.id);
+        }
+    }
+
+     /** Updates the time cell content */
+    function updateTimeCell(cell, job) {
+        const durationSec = calculateDuration(job.started_at, job.ended_at);
+        cell.innerHTML = `
+            <div style="font-size: 0.85em;">
+                ${job.status === 'staged' ? 'Staged:' : 'Enqueued:'} ${formatTimestamp(job.enqueued_at || job.staged_at)}<br>
+                Started: ${formatTimestamp(job.started_at)}<br>
+                Ended: ${formatTimestamp(job.ended_at)}<br>
+                Duration: ${formatDuration(durationSec)}
+            </div>
+        `;
+    }
+
+
+    /** Updates the content of the Action Cell based on job status */
+    function updateActionCell(cell, job) {
+        let statusHtml = '';
+        let buttonsHtml = '';
+
+        // Determine status icon and text
+        switch (job.status) {
+            case 'staged':
+                statusHtml = `<span class="job-status-text text-secondary"><i class="bi bi-pause-circle"></i> Staged</span>`;
+                break;
+            case 'queued':
+                statusHtml = `<span class="job-status-text text-primary"><i class="bi bi-hourglass-split"></i> Queued</span>`;
+                break;
+            case 'started':
+                statusHtml = `<span class="job-status-text text-info"><i class="fas fa-sync-alt fa-spin"></i> Running</span>`;
+                const progress = getNested(job, 'meta.progress', null);
+                if (progress !== null) {
+                     statusHtml += `<div class="progress mt-1" style="height: 5px;"><div class="progress-bar" role="progressbar" style="width: ${progress}%;" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100"></div></div>`;
+                }
+                break;
+            case 'finished':
+                statusHtml = `<span class="job-status-text text-success"><i class="bi bi-check-circle-fill"></i> Finished</span>`;
+                break;
+            case 'failed':
+                statusHtml = `<span class="job-status-text text-danger"><i class="bi bi-x-octagon-fill"></i> Failed</span>`;
+                break;
+            case 'stopped':
+            case 'canceled':
+                 statusHtml = `<span class="job-status-text text-muted"><i class="bi bi-stop-circle"></i> ${job.status.charAt(0).toUpperCase() + job.status.slice(1)}</span>`;
+                 break;
+            default:
+                statusHtml = `<span class="job-status-text text-muted"><i class="bi bi-question-circle"></i> ${job.status || 'Unknown'}</span>`;
         }
 
-        // Sort jobs by staged time, newest first (optional)
-        const sortedJobEntries = Object.entries(jobs).sort(([, jobA], [, jobB]) => {
-            return (jobB.staged_at || 0) - (jobA.staged_at || 0);
-        });
-
-        sortedJobEntries.forEach(([stagedJobId, details]) => {
-            // Avoid adding duplicates if a refresh happens while a row exists
-             if (jobsTableBody.querySelector(`tr[data-staged-id="${stagedJobId}"]`)) {
-                 return;
+        // Determine buttons based on status
+         if (job.status === 'staged') {
+             buttonsHtml = `<button class="btn btn-success btn-sm ${BUTTON_CLASS_START}" data-staged-id="${job.id}">Start</button>`;
+         } else if (job.status === 'queued' || job.status === 'started') {
+             buttonsHtml = `<button class="btn btn-danger btn-sm ${BUTTON_CLASS_STOP}" data-job-id="${job.id}">Stop</button>`;
+         } else if (job.status === 'finished') {
+             const resultsPath = getNested(job, 'result.results_path', null);
+             if (resultsPath) {
+                  const dirName = resultsPath.split('/').pop();
+                  buttonsHtml = `<a href="/results?highlight=${encodeURIComponent(dirName)}" class="btn btn-info btn-sm ${BUTTON_CLASS_RESULTS}" title="View results folder">Results</a>`;
              }
+         } else if (job.status === 'failed') {
+             buttonsHtml = `<button class="btn btn-secondary btn-sm ${BUTTON_CLASS_ERROR_DETAILS}" data-error="${job.error || 'No details available.'}">Details</button>`;
+             if (Object.keys(getNested(job, 'meta.input_params', {})).length > 0) {
+                 buttonsHtml += ` <button class="btn btn-warning btn-sm ${BUTTON_CLASS_RERUN}" data-job-id="${job.id}">Rerun</button>`;
+             }
+         } else if (job.status === 'stopped' || job.status === 'canceled') {
+             // Optionally add Rerun button for stopped/canceled jobs
+             if (Object.keys(getNested(job, 'meta.input_params', {})).length > 0) {
+                 buttonsHtml += ` <button class="btn btn-warning btn-sm ${BUTTON_CLASS_RERUN}" data-job-id="${job.id}">Rerun</button>`;
+             }
+         }
 
-            const row = jobsTableBody.insertRow(0); // Insert at the top
-            row.dataset.stagedId = stagedJobId; // Add staged ID for potential reference
 
-            const idCell = row.insertCell();
-            idCell.textContent = stagedJobId.substring(0, 12) + "..."; // Shorten ID for display
+        cell.innerHTML = statusHtml + '<br>' + buttonsHtml;
+    }
 
-            const descCell = row.insertCell();
-            descCell.textContent = details.description || 'N/A'; // Display description
+    /** Updates an existing row with new job data */
+    function updateJobRow(row, job) {
+        // Update time cell
+        updateTimeCell(row.cells[2], job);
+        // Update action cell
+        updateActionCell(row.cells[3], job);
+        // Update row styling class
+        row.className = `job-state-${job.status || 'unknown'}`;
 
-            const timeCell = row.insertCell();
-            timeCell.textContent = details.staged_at
-                ? new Date(details.staged_at * 1000).toLocaleString()
-                : 'N/A';
-
-            const actionCell = row.insertCell();
-            actionCell.classList.add('action-cell');
-            const startButton = document.createElement('button');
-            startButton.textContent = 'Start';
-            startButton.classList.add('btn', 'btn-success', 'btn-sm', START_BUTTON_CLASS);
-            startButton.dataset.stagedId = stagedJobId; // Store the ID on the button
-            actionCell.appendChild(startButton);
-        });
-
-        // Check again if after adding, the table is effectively empty (only placeholder rows)
-         if (jobsTableBody.querySelectorAll('tr:not(#loading-jobs-row):not(#no-jobs-row):not(#error-jobs-row)').length === 0) {
-              noJobsRow.style.display = ''; // Show no jobs row
+         // --- Manage Polling ---
+         // Stop polling if the job has reached a terminal state
+         if (TERMINAL_STATUSES.includes(job.status)) {
+            // console.log(`Detected terminal state (${job.status}) for ${job.id}. Stopping polling.`); // Debug
+            stopPolling(job.id);
+         } else if (!jobPollingIntervals[job.id]) {
+             // This case should ideally not happen if polling was managed correctly
+             // but as a safeguard, start polling if it's active but not polling.
+             console.warn(`Job ${job.id} is active (${job.status}) but was not polling. Restarting polling.`);
+             startPolling(job.id);
          }
     }
 
-    /**
-     * Handles the click event for a "Start" button.
-     * @param {HTMLButtonElement} startButton - The button element that was clicked.
-     */
-    async function handleStartClick(startButton) {
-        const stagedJobId = startButton.dataset.stagedId;
-        const row = startButton.closest('tr');
-        const actionCell = startButton.parentNode;
 
-        if (!stagedJobId || !row || !actionCell) {
-            console.error('Could not find stagedJobId or table elements for starting job.');
-            showStatus('Internal error: Could not process start action.', 'danger');
-            return;
-        }
+    // --- API Calls ---
 
-        clearStatus();
-        startButton.disabled = true; // Prevent double-clicks
-        startButton.textContent = 'Starting...';
-        actionCell.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin"></i> Starting...</span>'; // Visual feedback
+    /** Fetches the combined list of jobs from the backend */
+    async function fetchJobsList() {
+        clearGlobalStatus();
+        loadingRow.style.display = '';
+        noJobsRow.style.display = 'none';
+        errorJobsRow.style.display = 'none';
+
+        // --- FIX FOR ORDERING & REFRESH ---
+        // 1. Store IDs of jobs currently being polled BEFORE clearing
+        const currentlyPollingIds = new Set(Object.keys(jobPollingIntervals));
+
+        // 2. Clear ALL existing job rows (excluding placeholders)
+        jobsTableBody.querySelectorAll('tr[data-job-id]').forEach(row => row.remove());
 
         try {
-            const response = await fetch(`/start_job/${stagedJobId}`, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json' // Indicate we expect JSON back
+            const response = await fetch('/jobs_list'); // Fetches sorted list (newest first)
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+                throw new Error(`Failed to fetch jobs list (${response.status}): ${errorData.detail}`);
+            }
+            const jobs = await response.json(); // jobs[0] is the newest
+            loadingRow.style.display = 'none';
+
+            if (!jobs || jobs.length === 0) {
+                noJobsRow.style.display = '';
+                // Stop polling for any jobs that might have been polling before clear
+                currentlyPollingIds.forEach(stopPolling);
+                return;
+            }
+
+            const activeJobIdsThisFetch = new Set();
+            // 3. Create and Append rows IN THE RECEIVED ORDER
+            jobs.forEach(job => {
+                createAndAppendJobRow(job); // This now appends, preserving backend sort order
+                 if (!TERMINAL_STATUSES.includes(job.status)) {
+                     activeJobIdsThisFetch.add(job.id);
+                 }
+            });
+
+            // 4. Stop polling for jobs that were polling but are now gone or terminal
+            currentlyPollingIds.forEach(jobId => {
+                if (!activeJobIdsThisFetch.has(jobId)) {
+                    stopPolling(jobId);
                 }
             });
 
-            const result = await response.json(); // Try to parse JSON regardless of status
+             // Check if table is empty after updates (shouldn't be if jobs.length > 0)
+             if (jobsTableBody.querySelectorAll('tr[data-job-id]').length === 0) {
+                  noJobsRow.style.display = '';
+             }
 
-            if (response.status === 202) { // 202 Accepted - Job enqueued successfully
-                const rqJobId = result.job_id;
-                showStatus(`Job ${rqJobId} successfully enqueued for processing.`, 'success');
-
-                // --- MODIFICATION START ---
-                // Mark row as enqueued/running
-                row.classList.add('job-enqueued');
-                row.dataset.rqJobId = rqJobId; // Store RQ job ID on the row
-
-                // Update Action Cell
-                actionCell.innerHTML = ''; // Clear previous content ("Starting...")
-
-                // Add status text
-                const statusSpan = document.createElement('span');
-                statusSpan.classList.add('text-info', 'mr-2', 'job-status-text');
-                statusSpan.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Enqueued'; // Add spinner
-                actionCell.appendChild(statusSpan);
-
-                // Add Stop Button
-                const stopButton = document.createElement('button');
-                stopButton.textContent = 'Stop';
-                stopButton.classList.add('btn', 'btn-danger', 'btn-sm', STOP_BUTTON_CLASS);
-                stopButton.dataset.rqJobId = rqJobId; // Store RQ Job ID for stopping
-                actionCell.appendChild(stopButton);
-                // --- MODIFICATION END ---
-
-            } else {
-                 // Handle errors (404, 500, 503 etc.)
-                 throw new Error(result.detail || `Failed to start job ${stagedJobId} (${response.status})`);
-            }
         } catch (error) {
-            console.error(`Error starting job ${stagedJobId}:`, error);
-            showStatus(`Error starting job ${stagedJobId}: ${error.message}`, 'danger');
-            // Restore the start button in the action cell on error
-            actionCell.innerHTML = ''; // Clear "Starting..."
-            startButton.disabled = false; // Re-enable button on error
-            startButton.textContent = 'Start';
-            actionCell.appendChild(startButton);
+            console.error('Error fetching jobs list:', error);
+            showGlobalStatus(`Error loading jobs: ${error.message}`, 'danger');
+            loadingRow.style.display = 'none';
+            errorJobsRow.style.display = '';
+            // Stop any previously active polling on error
+            Object.keys(jobPollingIntervals).forEach(stopPolling);
         }
     }
 
-    /**
-     * Handles the click event for a "Stop" button.
-     * @param {HTMLButtonElement} stopButton - The button element that was clicked.
-     */
-    async function handleStopClick(stopButton) {
-        const rqJobId = stopButton.dataset.rqJobId;
-        const row = stopButton.closest('tr');
-        const actionCell = stopButton.parentNode;
-        const statusSpan = actionCell.querySelector('.job-status-text');
+    /** Polls the status of a single job */
+    async function pollJobStatus(jobId) {
+         // console.log(`Polling job ${jobId}...`); // Debug logging
+        try {
+            const response = await fetch(`/job_status/${jobId}`);
+            const row = jobsTableBody.querySelector(`tr[data-job-id="${jobId}"]`);
 
+            if (!response.ok) {
+                 if (response.status === 404) {
+                     console.warn(`Job ${jobId} not found during polling. Stopping polling.`);
+                     stopPolling(jobId);
+                      if(row) { // Mark row as not found if it exists
+                          row.cells[3].innerHTML = `<span class="text-danger">Not Found</span>`;
+                          row.className = 'job-state-unknown';
+                      }
+                 } else {
+                     console.error(`Error polling job ${jobId}: ${response.statusText}`);
+                     // Consider stopping polling after multiple errors
+                 }
+                 return;
+            }
 
-        if (!rqJobId || !row || !actionCell) {
-            console.error('Could not find rqJobId or table elements for stopping job.');
-            showStatus('Internal error: Could not process stop action.', 'danger');
-            return;
+            const job = await response.json();
+
+            if (row) {
+                // console.log(`Updating row for ${jobId} with status: ${job.status}`); // Debug
+                updateJobRow(row, job); // Update existing row
+            } else {
+                 // Job appeared during polling but wasn't in initial list? Stop polling.
+                 console.warn(`Polled job ${jobId} but no row found. Stopping polling.`);
+                 stopPolling(jobId);
+             }
+
+        } catch (error) {
+            console.error(`Network error polling job ${jobId}:`, error);
+            // Consider stopping polling if network fails repeatedly
         }
+    }
 
-        clearStatus();
-        stopButton.disabled = true;
-        stopButton.textContent = 'Stopping...';
-        if(statusSpan) statusSpan.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Stopping';
+    /** Starts polling for a specific job ID if not already polling */
+    function startPolling(jobId) {
+        if (!jobPollingIntervals[jobId]) {
+            // console.log(`Starting polling for ${jobId}`); // Debug
+            // Poll immediately once to get initial running state faster
+            pollJobStatus(jobId);
+            jobPollingIntervals[jobId] = setInterval(() => pollJobStatus(jobId), POLLING_INTERVAL_MS);
+        }
+    }
+
+    /** Stops polling for a specific job ID */
+    function stopPolling(jobId) {
+        if (jobPollingIntervals[jobId]) {
+             // console.log(`Stopping polling for ${jobId}`); // Debug
+            clearInterval(jobPollingIntervals[jobId]);
+            delete jobPollingIntervals[jobId];
+        }
+    }
+
+
+    // --- Button Click Handlers --- (Keep handleStartClick, handleStopClick, handleRerunClick, handleErrorDetailsClick as they were)
+    /** Handle Start Button Click */
+    async function handleStartClick(button) {
+        const stagedJobId = button.dataset.stagedId;
+        if (!stagedJobId) return;
+
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
 
         try {
-            const response = await fetch(`/stop_job/${rqJobId}`, {
-                method: 'POST',
-                headers: { 'Accept': 'application/json' }
-            });
+            const response = await fetch(`/start_job/${stagedJobId}`, { method: 'POST', headers: { 'Accept': 'application/json' } });
+            const result = await response.json();
 
-            const result = await response.json(); // Expect JSON back
-
-            if (response.ok) { // 200 OK typically
-                showStatus(`Stop request sent for job ${rqJobId}. Status: ${result.message}`, 'info');
-                // Update UI to reflect stopped/cancelled state - e.g., change status text
-                 if(statusSpan) statusSpan.innerHTML = '<i class="fas fa-stop-circle text-danger"></i> Stopped';
-                 actionCell.removeChild(stopButton); // Remove the stop button
-                 row.classList.remove('job-enqueued'); // No longer actively enqueued from UI perspective
-                 row.classList.add('job-stopped'); // Add marker class
-            } else {
-                throw new Error(result.detail || `Failed to stop job ${rqJobId} (${response.status})`);
+            if (!response.ok) {
+                throw new Error(result.detail || `Failed to start job (${response.status})`);
             }
+
+            showGlobalStatus(`Job ${result.job_id} enqueued successfully. Refreshing...`, 'success');
+            // Trigger a refresh to show the newly enqueued job correctly
+             fetchJobsList();
+
         } catch (error) {
-             console.error(`Error stopping job ${rqJobId}:`, error);
-             showStatus(`Error stopping job ${rqJobId}: ${error.message}`, 'danger');
-             stopButton.disabled = false; // Re-enable button on error
-             stopButton.textContent = 'Stop';
-             if(statusSpan) statusSpan.innerHTML = '<i class="fas fa-exclamation-triangle text-warning"></i> Error Stopping'; // Indicate error state
+            console.error(`Error starting job ${stagedJobId}:`, error);
+            showGlobalStatus(`Error starting job ${stagedJobId}: ${error.message}`, 'danger');
+            // Re-enable button or let refresh handle it
+             button.disabled = false; // Safer to re-enable if refresh fails
+             button.textContent = 'Start';
+        }
+    }
+
+    /** Handle Stop Button Click */
+    async function handleStopClick(button) {
+        const jobId = button.dataset.jobId;
+        if (!jobId) return;
+
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Stopping...';
+
+        try {
+            const response = await fetch(`/stop_job/${jobId}`, { method: 'POST', headers: { 'Accept': 'application/json' } });
+            const result = await response.json();
+
+             if (!response.ok) {
+                 throw new Error(result.detail || `Failed to stop job (${response.status})`);
+             }
+
+            showGlobalStatus(`Stop request for ${jobId}: ${result.message}`, 'info');
+            // Poll will eventually update the status, or force an immediate poll:
+            pollJobStatus(jobId); // Request immediate update
+
+        } catch (error) {
+            console.error(`Error stopping job ${jobId}:`, error);
+            showGlobalStatus(`Error stopping job ${jobId}: ${error.message}`, 'danger');
+            button.disabled = false;
+            button.textContent = 'Stop';
+        }
+    }
+
+     /** Handle Rerun Button Click */
+     async function handleRerunClick(button) {
+        const jobId = button.dataset.jobId;
+        if (!jobId) return;
+
+         button.disabled = true;
+         button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparing...';
+
+        try {
+             const response = await fetch(`/job_status/${jobId}`); // Fetch details including meta
+             if (!response.ok) throw new Error(`Could not fetch job details for rerun (${response.status})`);
+             const jobDetails = await response.json();
+
+             const inputParams = getNested(jobDetails, 'meta.input_params');
+             if (!inputParams || Object.keys(inputParams).length === 0) {
+                 throw new Error("Input parameters not found for this job, cannot rerun automatically.");
+             }
+
+             const payload = {
+                 forward_reads_file: inputParams.forward_reads,
+                 reverse_reads_file: inputParams.reverse_reads,
+                 reference_genome_file: inputParams.reference_genome,
+                 target_regions_file: inputParams.target_regions,
+                 known_variants_file: inputParams.known_variants
+             };
+
+             const stageResponse = await fetch('/run_pipeline', {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                 body: JSON.stringify(payload)
+             });
+             const stageResult = await stageResponse.json();
+
+             if (!stageResponse.ok) {
+                 throw new Error(stageResult.detail || `Failed to re-stage job (${stageResponse.status})`);
+             }
+
+             showGlobalStatus(`Job successfully re-staged with ID: ${stageResult.staged_job_id}. Refreshing list...`, 'success');
+             fetchJobsList(); // Refresh to show the newly staged job
+
+         } catch (error) {
+             console.error(`Error rerunning job ${jobId}:`, error);
+             showGlobalStatus(`Error rerunning job ${jobId}: ${error.message}`, 'danger');
+             button.disabled = false;
+             button.innerHTML = 'Rerun';
+         }
+     }
+
+     /** Handle Error Details Button Click */
+     function handleErrorDetailsClick(button) {
+         const errorMsg = button.dataset.error || "No specific error message provided.";
+         errorModalText.textContent = errorMsg;
+         errorModal.style.display = "block";
+     }
+
+
+    // --- Event Listeners --- (Keep event delegation and modal closing logic as is)
+    jobsTableBody.addEventListener('click', function(event) {
+        const button = event.target.closest('button');
+        if (!button) return;
+
+        if (button.classList.contains(BUTTON_CLASS_START)) {
+            handleStartClick(button);
+        } else if (button.classList.contains(BUTTON_CLASS_STOP)) {
+            handleStopClick(button);
+        } else if (button.classList.contains(BUTTON_CLASS_RERUN)) {
+            handleRerunClick(button);
+        } else if (button.classList.contains(BUTTON_CLASS_ERROR_DETAILS)) {
+            handleErrorDetailsClick(button);
+        }
+    });
+
+    refreshButton.addEventListener('click', fetchJobsList);
+
+     window.onclick = function(event) {
+        if (event.target == errorModal) {
+            errorModal.style.display = "none";
+        }
+    }
+    // Add listener for modal close button
+     const closeModalButton = errorModal.querySelector('.close-modal');
+        if (closeModalButton) {
+            closeModalButton.onclick = function() {
+            errorModal.style.display = "none";
         }
     }
 
 
-    /**
-     * Shows a status message in the statusDiv.
-     * @param {string} message - The message to display.
-     * @param {string} type - Bootstrap alert type ('success', 'danger', 'warning', 'info')
-     */
-    function showStatus(message, type = 'info') {
-        statusDiv.innerHTML = message; // Use innerHTML to allow icons etc.
-        statusDiv.className = `alert alert-${type}`; // Use Bootstrap alert styles
-        statusDiv.style.display = 'block'; // Make sure it's visible
-    }
-
-    /** Clears the status message area */
-    function clearStatus() {
-         statusDiv.textContent = '';
-         statusDiv.style.display = 'none';
-         statusDiv.className = ''; // Reset classes
-    }
-
-    // --- Event Listeners ---
-    // Use event delegation for start AND stop buttons
-    jobsTableBody.addEventListener('click', function(event) {
-         if (event.target.classList.contains(START_BUTTON_CLASS)) {
-             handleStartClick(event.target);
-         } else if (event.target.classList.contains(STOP_BUTTON_CLASS)) {
-             handleStopClick(event.target);
-         }
-    });
-
-    // Refresh button listener
-    refreshButton.addEventListener('click', fetchStagedJobs);
-
     // --- Initial Load ---
-    fetchStagedJobs();
+    fetchJobsList();
+
+    // Optional: Refresh the whole list periodically less frequently than polling
+    // setInterval(fetchJobsList, 30000); // e.g., every 30 seconds
+
 });
