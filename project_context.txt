@@ -511,12 +511,13 @@ dependencies:
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
         #jobs-table .action-cell {
-            width: 150px; /* Adjust as needed */
+            width: 170px; /* Increased width slightly for remove button */
             text-align: center;
             vertical-align: middle;
         }
         #jobs-table .btn {
-             margin: 2px; /* Spacing between multiple buttons */
+             margin: 2px 3px; /* Spacing between multiple buttons */
+             min-width: 55px; /* Ensure buttons have minimum width */
         }
         .job-status-text {
             display: inline-block;
@@ -529,12 +530,14 @@ dependencies:
         .action-cell .bi { /* Include Bootstrap Icons if used */
              margin-right: 4px;
         }
-         .job-state-staged { background-color: #f8f9fa; }
-         .job-state-queued { background-color: #eef; }
-         .job-state-started { background-color: #e6ffed; }
-         .job-state-finished { background-color: #d4edda; } /* Bootstrap success light */
+         /* Job State Backgrounds */
+         .job-state-staged { background-color: #f8f9fa; } /* Light grey */
+         .job-state-queued { background-color: #e3f2fd; } /* Lighter blue */
+         .job-state-started { background-color: #e6ffed; } /* Light green */
+         .job-state-finished { background-color: #d1e7dd; } /* Bootstrap success light */
          .job-state-failed { background-color: #f8d7da; } /* Bootstrap danger light */
-         .job-state-stopped, .job-state-canceled { background-color: #eee; opacity: 0.7; }
+         .job-state-stopped, .job-state-canceled { background-color: #e9ecef; opacity: 0.8; } /* Slightly darker grey, more opaque */
+         .job-state-unknown { background-color: #fff; }
 
         /* Parameter display */
         .job-parameters {
@@ -543,23 +546,28 @@ dependencies:
             margin-top: 5px;
             padding-left: 10px;
             border-left: 2px solid #ccc;
+            max-width: 250px; /* Limit width */
+            overflow: hidden; /* Hide overflow */
+            text-overflow: ellipsis; /* Add ellipsis */
+            white-space: normal; /* Allow wrapping within limits */
         }
         .job-parameters kbd {
             background-color: #eee;
             padding: 1px 3px;
             border-radius: 3px;
             font-size: 0.75rem;
+            word-break: break-all; /* Break long filenames */
         }
-
-        /* Make table slightly less wide if needed */
-        /* .table-responsive { max-width: 95%; margin: auto; } */
+        .job-parameters div {
+            margin-bottom: 2px;
+        }
 
          /* Modal styles (simple) */
         .modal { display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
-        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; }
+        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 5px; }
         .close-modal { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
         .close-modal:hover, .close-modal:focus { color: black; text-decoration: none; cursor: pointer; }
-        .modal-body pre { background-color: #eee; padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; }
+        .modal-body pre { background-color: #eee; padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; }
 
     </style>
 {% endblock %}
@@ -568,7 +576,7 @@ dependencies:
     <h1 class="mb-4">Jobs Dashboard</h1>
     <p>Overview of staged, running, and recently completed pipeline jobs.</p>
 
-    <div id="jobs-status-global" class="mb-3"></div> <!-- For global loading/error messages -->
+    <div id="jobs-status-global" class="mb-3" style="display: none;"></div> <!-- For global loading/error messages -->
 
     <button class="btn btn-secondary btn-sm mb-3" id="refresh-jobs-btn">
         <i class="fas fa-sync-alt"></i> Refresh List
@@ -580,7 +588,7 @@ dependencies:
                 <tr>
                     <th scope="col">Job ID / Description</th>
                     <th scope="col">Parameters</th>
-                    <th scope="col">Time Info</th>
+                    <th scope="col">Time Info / Resources</th>
                     <th scope="col" class="action-cell">Status / Action</th>
                 </tr>
             </thead>
@@ -1699,6 +1707,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const BUTTON_CLASS_RERUN = 'btn-rerun-job';
     const BUTTON_CLASS_RESULTS = 'btn-view-results';
     const BUTTON_CLASS_ERROR_DETAILS = 'btn-error-details';
+    const BUTTON_CLASS_REMOVE_STAGED = 'btn-remove-staged-job'; // <-- New Class
 
     // --- Helper Functions ---
      /** Formats a timestamp (seconds since epoch) into a locale string, or returns 'N/A' */
@@ -1733,7 +1742,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /** Shows a global status message */
     function showGlobalStatus(message, type = 'info') {
-        globalStatusDiv.innerHTML = message;
+        globalStatusDiv.innerHTML = message; // Use innerHTML to allow basic tags like <code>
         globalStatusDiv.className = `alert alert-${type} mb-3`;
         globalStatusDiv.style.display = 'block';
     }
@@ -1761,13 +1770,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+     /** Checks if the jobs table body is empty (excluding placeholder rows) */
+     function isTableEmpty() {
+        return jobsTableBody.querySelectorAll('tr[data-job-id]').length === 0;
+    }
 
     // --- Job Rendering and Updating ---
 
     /** Creates a NEW job row and appends it */
     function createAndAppendJobRow(job) {
         const row = jobsTableBody.insertRow(-1); // Append at the end of tbody
-        row.dataset.jobId = job.id;
+        row.dataset.jobId = job.id; // Use job.id (from /jobs_list response) for the row identifier
 
         // --- Basic Info Cell (ID / Description) ---
         let cellInfo = row.insertCell();
@@ -1817,6 +1830,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Decide whether to start polling based on the initial status
         // Only poll if the job is NOT staged AND NOT terminal
         if (job.status !== 'staged' && !TERMINAL_STATUSES.includes(job.status)) {
+            // NOTE: Use job.id here because this is called with data from /jobs_list
+            // Polling function will fetch using /job_status which returns job_id, but we store interval by the original ID
             console.log(`[Polling Check] Job ${job.id} has status ${job.status}, starting polling.`); // Optional debug log
             startPolling(job.id);
         } else {
@@ -1824,39 +1839,35 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    /** Updates the time cell content, now including resource usage - CORRECTED */
+    /** Updates the time cell content, now including resource usage */
     function updateTimeCell(cell, job) {
-        // Try to get duration from meta first (more precise), fallback to calculated
-        // Ensure meta exists before accessing duration_seconds
-        const metaDuration = getNested(job, 'meta.duration_seconds', null); // Use getNested for safety
+        // IMPORTANT: Job object structure differs between /jobs_list (job.started_at etc)
+        // and /job_status (job.started_at etc ARE PRESENT).
+        // The previous fix was slightly incorrect, both endpoints *should* return these fields.
+        // Let's assume consistency for now, but double-check API responses if issues persist.
+
+        const metaDuration = getNested(job, 'meta.duration_seconds', null);
         const calculatedDuration = calculateDuration(job.started_at, job.ended_at);
-        // Use metaDuration if it's a valid number, otherwise use calculated if it's valid, else null
         let durationSec = (typeof metaDuration === 'number') ? metaDuration : ((typeof calculatedDuration === 'number') ? calculatedDuration : null);
 
-        // --- Get resource stats from the new 'resources' field or fallback to meta ---
-        // Use optional chaining and nullish coalescing for safer access
-        const resources = job?.resources ?? job?.meta ?? {};
-        const peakMem = resources.peak_memory_mb; // Access directly, check validity below
+        // --- Get resource stats from the new 'resources' field (from /job_status) or fallback to meta ---
+        const resources = job?.resources ?? job?.meta ?? {}; // Use 'resources' field if present
+        const peakMem = resources.peak_memory_mb;
         const avgCpu = resources.average_cpu_percent;
 
         let resourceHtml = '';
-        // Check if the job status indicates completion where stats should exist
         if (job.status === 'finished' || job.status === 'failed') {
-             // Display value if it's a number, otherwise show 'N/A'
-             resourceHtml += `Peak Mem: ${(typeof peakMem === 'number' ? peakMem + ' MB' : 'N/A')}<br>`;
-             resourceHtml += `Avg CPU: ${(typeof avgCpu === 'number' ? avgCpu + '%' : 'N/A')}<br>`;
+             resourceHtml += `Peak Mem: ${(typeof peakMem === 'number' ? peakMem.toFixed(1) + ' MB' : 'N/A')}<br>`; // Add rounding
+             resourceHtml += `Avg CPU: ${(typeof avgCpu === 'number' ? avgCpu.toFixed(1) + '%' : 'N/A')}<br>`;   // Add rounding
         }
-         // Show placeholder if running
          else if (job.status === 'started') {
              resourceHtml = `<i class="fas fa-cogs fa-spin fa-fw text-muted" title="Monitoring Resources..."></i> Monitoring...<br>`;
          }
-         // Default for other states (queued, staged, etc.)
          else {
              resourceHtml = '<span class="text-muted">-</span><br>';
          }
 
-        // --- CORRECTED INNERHTML CONSTRUCTION ---
-        // Build the final HTML string step-by-step
+        // --- INNERHTML CONSTRUCTION ---
         let finalHtml = `
             <div style="font-size: 0.85em;">
                 ${job.status === 'staged' ? 'Staged:' : 'Enqueued:'} ${formatTimestamp(job.enqueued_at || job.staged_at)}<br>
@@ -1864,29 +1875,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 Ended: ${formatTimestamp(job.ended_at)}<br>
         `;
 
-        // Only add the horizontal rule and duration/resources if the job has at least started
-        if (job.started_at || durationSec !== null) {
-             finalHtml += `<hr class="my-1">`; // Add the divider
-             finalHtml += `Duration: ${formatDuration(durationSec)}<br>`; // Add duration
-             finalHtml += resourceHtml; // Add the resource info string
-        } else {
-             // For staged jobs, maybe show nothing extra or just a placeholder
-             finalHtml += '<hr class="my-1"><span class="text-muted">-</span><br>';
+        if (job.started_at || durationSec !== null || job.status === 'finished' || job.status === 'failed') {
+             finalHtml += `<hr class="my-1">`;
+             finalHtml += `Duration: ${formatDuration(durationSec)}<br>`;
+             finalHtml += resourceHtml;
+        } else if (job.status === 'staged') {
+            // Add placeholder for staged jobs
+            finalHtml += '<hr class="my-1"><span class="text-muted">-</span><br>';
         }
 
-        finalHtml += `</div>`; // Close the main div
-
-        // Set the cell's content to the fully constructed HTML
+        finalHtml += `</div>`;
         cell.innerHTML = finalHtml;
     }
 
 
     /** Updates the content of the Action Cell based on job status */
     function updateActionCell(cell, job) {
+        // IMPORTANT: job object here can come from /jobs_list (has 'id') or /job_status (has 'job_id').
+        // We need the actual ID to put in data attributes.
+        const currentJobId = job.job_id || job.id; // Prioritize job_id if present (from /job_status)
+
         let statusHtml = '';
         let buttonsHtml = '';
 
-        // Determine status icon and text
+        // Determine status icon and text (using job.status)
         switch (job.status) {
             case 'staged':
                 statusHtml = `<span class="job-status-text text-secondary"><i class="bi bi-pause-circle"></i> Staged</span>`;
@@ -1896,7 +1908,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             case 'started':
                 statusHtml = `<span class="job-status-text text-info"><i class="fas fa-sync-alt fa-spin"></i> Running</span>`;
-                // Use progress from meta if available
                 const progress = getNested(job, 'meta.progress', null);
                 if (progress !== null) {
                      statusHtml += `<div class="progress mt-1" style="height: 5px;"><div class="progress-bar" role="progressbar" style="width: ${progress}%;" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100"></div></div>`;
@@ -1907,8 +1918,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             case 'failed':
                 statusHtml = `<span class="job-status-text text-danger"><i class="bi bi-x-octagon-fill"></i> Failed</span>`;
-                // Display error summary directly if available
-                // The 'error' field in the response should now contain the summary
                 if (job.error) {
                      statusHtml += `<br><small class="text-danger" title="${job.error}">Error: ${job.error.substring(0, 50)}${job.error.length > 50 ? '...' : ''}</small>`;
                  }
@@ -1921,33 +1930,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusHtml = `<span class="job-status-text text-muted"><i class="bi bi-question-circle"></i> ${job.status || 'Unknown'}</span>`;
         }
 
-        // Determine buttons based on status
+        // Determine buttons based on status (using job.status and currentJobId)
          if (job.status === 'staged') {
-             buttonsHtml = `<button class="btn btn-success btn-sm ${BUTTON_CLASS_START}" data-staged-id="${job.id}">Start</button>`;
+             // Add Start and Remove buttons for staged jobs
+             buttonsHtml = `<button class="btn btn-success btn-sm ${BUTTON_CLASS_START}" data-staged-id="${currentJobId}">Start</button>`;
+             buttonsHtml += ` <button class="btn btn-danger btn-sm ${BUTTON_CLASS_REMOVE_STAGED}" data-staged-id="${currentJobId}" title="Remove Staged Job">Remove</button>`; // <-- New Remove Button
          } else if (job.status === 'queued' || job.status === 'started') {
-             buttonsHtml = `<button class="btn btn-danger btn-sm ${BUTTON_CLASS_STOP}" data-job-id="${job.id}">Stop</button>`;
+             buttonsHtml = `<button class="btn btn-danger btn-sm ${BUTTON_CLASS_STOP}" data-job-id="${currentJobId}">Stop</button>`;
          } else if (job.status === 'finished') {
-             // Use optional chaining for safer access
              const resultsPath = getNested(job, 'result.results_path', null);
              if (resultsPath) {
                   const dirName = resultsPath.split('/').pop();
                   buttonsHtml = `<a href="/results?highlight=${encodeURIComponent(dirName)}" class="btn btn-info btn-sm ${BUTTON_CLASS_RESULTS}" title="View results folder">Results</a>`;
              } else {
-                  buttonsHtml = `<span class="text-muted small">No results link</span>`; // Handle case where path isn't returned
+                  buttonsHtml = `<span class="text-muted small">No results link</span>`;
              }
-         } else if (job.status === 'failed') {
-             // Use the summarized error from the job data for the button dataset
-             buttonsHtml = `<button class="btn btn-secondary btn-sm ${BUTTON_CLASS_ERROR_DETAILS}" data-error="${job.error || 'No details available.'}" title="Show Error Details">Details</button>`;
-             // Check if we have the necessary params to enable rerun (using meta)
-             const rerunParams = getNested(job, 'meta.input_params.input_filenames', getNested(job, 'meta.input_params', {}));
-             if (rerunParams && Object.keys(rerunParams).length > 0 && rerunParams.forward_reads) { // Basic check
-                 buttonsHtml += ` <button class="btn btn-warning btn-sm ${BUTTON_CLASS_RERUN}" data-job-id="${job.id}" title="Re-stage job with same inputs">Rerun</button>`;
-             }
-         } else if (job.status === 'stopped' || job.status === 'canceled') {
-             // Optionally add Rerun button for stopped/canceled jobs (using meta)
+             // Check for rerun capability based on meta params
              const rerunParams = getNested(job, 'meta.input_params.input_filenames', getNested(job, 'meta.input_params', {}));
              if (rerunParams && Object.keys(rerunParams).length > 0 && rerunParams.forward_reads) {
-                 buttonsHtml += ` <button class="btn btn-warning btn-sm ${BUTTON_CLASS_RERUN}" data-job-id="${job.id}" title="Re-stage job with same inputs">Rerun</button>`;
+                 buttonsHtml += ` <button class="btn btn-warning btn-sm ${BUTTON_CLASS_RERUN}" data-job-id="${currentJobId}" title="Re-stage job with same inputs">Rerun</button>`;
+             }
+
+         } else if (job.status === 'failed') {
+             buttonsHtml = `<button class="btn btn-secondary btn-sm ${BUTTON_CLASS_ERROR_DETAILS}" data-error="${job.error || 'No details available.'}" title="Show Error Details">Details</button>`;
+             const rerunParams = getNested(job, 'meta.input_params.input_filenames', getNested(job, 'meta.input_params', {}));
+             if (rerunParams && Object.keys(rerunParams).length > 0 && rerunParams.forward_reads) {
+                 buttonsHtml += ` <button class="btn btn-warning btn-sm ${BUTTON_CLASS_RERUN}" data-job-id="${currentJobId}" title="Re-stage job with same inputs">Rerun</button>`;
+             }
+         } else if (job.status === 'stopped' || job.status === 'canceled') {
+             const rerunParams = getNested(job, 'meta.input_params.input_filenames', getNested(job, 'meta.input_params', {}));
+             if (rerunParams && Object.keys(rerunParams).length > 0 && rerunParams.forward_reads) {
+                 buttonsHtml += ` <button class="btn btn-warning btn-sm ${BUTTON_CLASS_RERUN}" data-job-id="${currentJobId}" title="Re-stage job with same inputs">Rerun</button>`;
              }
          }
 
@@ -1955,8 +1968,10 @@ document.addEventListener('DOMContentLoaded', function() {
         cell.innerHTML = statusHtml + '<br>' + buttonsHtml;
     }
 
-    /** Updates an existing row with new job data */
-    function updateJobRow(row, job) {
+    /** Updates an existing row with new job data from /job_status endpoint */
+    function updateJobRow(row, job) { // job here is from /job_status, has 'job_id'
+        const jobId = job.job_id; // Use job_id from the response
+
         // Update time cell (includes resources now)
         updateTimeCell(row.cells[2], job);
         // Update action cell (includes error summary now)
@@ -1967,14 +1982,14 @@ document.addEventListener('DOMContentLoaded', function() {
          // --- Manage Polling ---
          // Stop polling if the job has reached a terminal state
          if (TERMINAL_STATUSES.includes(job.status)) {
-            stopPolling(job.id);
-         } else if (!jobPollingIntervals[job.id]) {
+            stopPolling(jobId); // Stop polling using the correct ID
+         } else if (!jobPollingIntervals[jobId]) { // Check if polling is running for this ID
              // This case should ideally not happen if polling was managed correctly
              // but as a safeguard, start polling if it's active but not polling.
              // Only start if it's actually in a pollable state
              if (job.status !== 'staged' && !TERMINAL_STATUSES.includes(job.status)) {
-                console.warn(`Job ${job.id} is active (${job.status}) but was not polling. Restarting polling.`);
-                startPolling(job.id);
+                console.warn(`Job ${jobId} is active (${job.status}) but was not polling. Restarting polling.`);
+                startPolling(jobId); // Start polling using the correct ID
              }
          }
     }
@@ -2006,17 +2021,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (!jobs || jobs.length === 0) {
                 noJobsRow.style.display = '';
-                // Stop polling for any jobs that might have been polling before clear
-                currentlyPollingIds.forEach(stopPolling);
+                currentlyPollingIds.forEach(stopPolling); // Stop polling for any previously listed jobs
                 return;
             }
 
             const activeJobIdsThisFetch = new Set();
             // 3. Create and Append rows IN THE RECEIVED ORDER
             jobs.forEach(job => {
-                createAndAppendJobRow(job); // This now appends, preserving backend sort order
-                 if (job.status !== 'staged' && !TERMINAL_STATUSES.includes(job.status)) { // Use updated polling logic here too
-                     activeJobIdsThisFetch.add(job.id);
+                // NOTE: job object from /jobs_list has 'id' field
+                createAndAppendJobRow(job); // Creates row with data-job-id="job.id"
+                 if (job.status !== 'staged' && !TERMINAL_STATUSES.includes(job.status)) {
+                     activeJobIdsThisFetch.add(job.id); // Keep track of active jobs by their ID
                  }
             });
 
@@ -2032,8 +2047,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
 
-             // Check if table is empty after updates (shouldn't be if jobs.length > 0)
-             if (jobsTableBody.querySelectorAll('tr[data-job-id]').length === 0) {
+             // Check if table is empty after updates (re-check after potential polling stops)
+             if (isTableEmpty()) {
                   noJobsRow.style.display = '';
              }
 
@@ -2048,7 +2063,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     /** Polls the status of a single job */
-    async function pollJobStatus(jobId) {
+    async function pollJobStatus(jobId) { // jobId here is the one used to start polling (from job.id initially)
         // Check if still polling before making the request
         if (!jobPollingIntervals[jobId]) {
             // console.log(`Polling interval for ${jobId} already cleared, skipping fetch.`);
@@ -2056,8 +2071,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         try {
-            const response = await fetch(`/job_status/${jobId}`);
-            const row = jobsTableBody.querySelector(`tr[data-job-id="${jobId}"]`);
+            const response = await fetch(`/job_status/${jobId}`); // Use the ID to fetch status
+            const row = jobsTableBody.querySelector(`tr[data-job-id="${jobId}"]`); // Find row using the same ID
 
             // If row disappeared before fetch completed, stop polling
             if (!row) {
@@ -2068,47 +2083,57 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (!response.ok) {
                  if (response.status === 404) {
-                     console.warn(`Job ${jobId} not found during polling (404). Stopping polling and removing row.`);
+                     console.warn(`Job ${jobId} not found during polling (404). Assuming completed/deleted. Stopping polling and possibly removing row.`);
+                     // Don't remove row immediately, let refresh handle it unless it persists
                      stopPolling(jobId);
-                     row.remove(); // Remove the row as job is gone
                  } else {
                      const errorData = await response.json().catch(() => ({ detail: response.statusText }));
                      console.error(`Error polling job ${jobId} (${response.status}): ${errorData.detail}`);
-                     // Optionally stop polling after multiple consecutive errors -> Maybe add a counter?
-                     // For now, let it continue trying unless it's a 404
+                     // Optional: Stop polling after multiple errors?
                  }
                  return;
             }
 
-            const job = await response.json();
+            const job = await response.json(); // job object here has 'job_id' field
 
-            // Row still exists, update it
-            updateJobRow(row, job); // Update existing row with new data (including resources)
+            // Row still exists, update it with the data from /job_status
+            // updateJobRow expects an object with 'job_id' for correct polling logic inside it
+            updateJobRow(row, job); // Pass the fetched job object
 
 
         } catch (error) {
             console.error(`Network error polling job ${jobId}:`, error);
-            // Optionally stop polling if network fails repeatedly
-            // stopPolling(jobId); // Uncomment to stop on network errors
+            // Optional: Stop polling on network error?
+            // stopPolling(jobId);
         }
     }
 
     /** Starts polling for a specific job ID if not already polling */
     function startPolling(jobId) {
+        if (!jobId) {
+             console.warn("Attempted to start polling with invalid jobId:", jobId);
+             return;
+        }
         if (!jobPollingIntervals[jobId]) {
-            // Poll immediately once to get initial running state faster
-            pollJobStatus(jobId); // Fire off the first poll
+            // Poll immediately once
+            pollJobStatus(jobId);
             // Then set the interval
             jobPollingIntervals[jobId] = setInterval(() => pollJobStatus(jobId), POLLING_INTERVAL_MS);
+            console.log(`Started polling for job ${jobId}`);
         }
     }
 
     /** Stops polling for a specific job ID */
     function stopPolling(jobId) {
+        if (!jobId) {
+            console.warn("Attempted to stop polling with invalid jobId:", jobId);
+            return;
+        }
         if (jobPollingIntervals[jobId]) {
             // console.log(`Stopping polling for ${jobId}`); // Debug
             clearInterval(jobPollingIntervals[jobId]);
             delete jobPollingIntervals[jobId];
+            console.log(`Stopped polling for job ${jobId}`);
         }
     }
 
@@ -2121,29 +2146,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
         button.disabled = true;
         button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+        // Also disable the corresponding remove button
+        const removeButton = button.closest('td').querySelector(`.${BUTTON_CLASS_REMOVE_STAGED}`);
+        if (removeButton) removeButton.disabled = true;
+
 
         try {
             const response = await fetch(`/start_job/${stagedJobId}`, { method: 'POST', headers: { 'Accept': 'application/json' } });
             const result = await response.json();
 
-            // Expecting 202 Accepted on success
             if (!response.ok || response.status !== 202) {
                 throw new Error(result.detail || `Failed to start job (${response.status})`);
             }
 
-            showGlobalStatus(`Job ${result.job_id} enqueued successfully. Refreshing list...`, 'success');
-            // Trigger a refresh to show the newly enqueued job correctly
-             await fetchJobsList(); // Make sure refresh completes
+            showGlobalStatus(`Job <code>${result.job_id}</code> enqueued successfully. Refreshing list...`, 'success');
+            await fetchJobsList(); // Refresh to show the newly enqueued job
 
         } catch (error) {
             console.error(`Error starting job ${stagedJobId}:`, error);
-            showGlobalStatus(`Error starting job ${stagedJobId}: ${error.message}`, 'danger');
-            // Re-enable button only if the row still exists and shows the start button
-            // (Could have been removed by a concurrent refresh)
-            const existingButton = jobsTableBody.querySelector(`button[data-staged-id="${stagedJobId}"]`);
-            if (existingButton) {
-                existingButton.disabled = false;
-                existingButton.innerHTML = 'Start';
+            showGlobalStatus(`Error starting job <code>${stagedJobId}</code>: ${error.message}`, 'danger');
+            // Re-enable buttons if the row still exists
+            const actionCell = jobsTableBody.querySelector(`tr[data-job-id="${stagedJobId}"] .action-cell`);
+            if (actionCell) {
+                const startBtn = actionCell.querySelector(`.${BUTTON_CLASS_START}`);
+                const removeBtn = actionCell.querySelector(`.${BUTTON_CLASS_REMOVE_STAGED}`);
+                 if (startBtn) {
+                    startBtn.disabled = false;
+                    startBtn.innerHTML = 'Start';
+                 }
+                 if (removeBtn) {
+                     removeBtn.disabled = false;
+                 }
             }
         }
     }
@@ -2160,18 +2193,18 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch(`/stop_job/${jobId}`, { method: 'POST', headers: { 'Accept': 'application/json' } });
             const result = await response.json();
 
-             if (!response.ok) { // Check status code (e.g., 200 OK is expected)
+             if (!response.ok) {
                  throw new Error(result.detail || `Failed to stop job (${response.status})`);
              }
 
-            showGlobalStatus(`Stop request for ${jobId}: ${result.message}`, 'info');
+            showGlobalStatus(`Stop request for job <code>${jobId}</code>: ${result.message}. Status will update shortly.`, 'info');
             // Force an immediate poll to update status quicker
             await pollJobStatus(jobId);
 
         } catch (error) {
             console.error(`Error stopping job ${jobId}:`, error);
-            showGlobalStatus(`Error stopping job ${jobId}: ${error.message}`, 'danger');
-             // Re-enable button only if the row still exists and shows the stop button
+            showGlobalStatus(`Error stopping job <code>${jobId}</code>: ${error.message}`, 'danger');
+            // Re-enable button only if the row still exists and shows the stop button
             const existingButton = jobsTableBody.querySelector(`button[data-job-id="${jobId}"].${BUTTON_CLASS_STOP}`);
             if(existingButton){
                 existingButton.disabled = false;
@@ -2182,22 +2215,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
      /** Handle Rerun Button Click */
      async function handleRerunClick(button) {
-        const jobId = button.dataset.jobId;
-        if (!jobId) return;
+        const jobId = button.dataset.jobId; // This ID comes from the button attribute set by updateActionCell
+        if (!jobId) {
+            console.error("Rerun button clicked but data-job-id is missing or invalid:", button);
+            showGlobalStatus("Cannot rerun: Job ID is missing.", "danger");
+            return;
+        }
 
          button.disabled = true;
          button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Re-staging...';
 
         try {
              // Fetch the specific job details again to ensure we have the latest meta
+             // Use the jobId obtained from the button's data attribute
              const response = await fetch(`/job_status/${jobId}`);
-             if (!response.ok) throw new Error(`Could not fetch job details for rerun (${response.status})`);
-             const jobDetails = await response.json();
+             if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Error rerunning job ${jobId}: Could not fetch job details for rerun (${response.status} - ${errorText})`);
+             }
+             const jobDetails = await response.json(); // jobDetails has 'job_id' field
 
              // Look for the original input filenames stored during staging/enqueueing
              const inputParams = getNested(jobDetails, 'meta.input_params.input_filenames', getNested(jobDetails, 'meta.input_params', {}));
 
-             if (!inputParams || !inputParams.forward_reads) { // Check for at least one essential parameter
+             if (!inputParams || !inputParams.forward_reads) { // Basic check
                  throw new Error("Original input parameters not found for this job, cannot rerun automatically.");
              }
 
@@ -2207,10 +2248,10 @@ document.addEventListener('DOMContentLoaded', function() {
                  reverse_reads_file: inputParams.reverse_reads,
                  reference_genome_file: inputParams.reference_genome,
                  target_regions_file: inputParams.target_regions,
-                 known_variants_file: inputParams.known_variants || null // Send null if undefined/null/empty
+                 known_variants_file: inputParams.known_variants || null
              };
 
-             // Call the staging endpoint (which now returns 200 OK on success)
+             // Call the staging endpoint
              const stageResponse = await fetch('/run_pipeline', {
                  method: 'POST',
                  headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -2218,16 +2259,16 @@ document.addEventListener('DOMContentLoaded', function() {
              });
              const stageResult = await stageResponse.json();
 
-             if (!stageResponse.ok) { // Check for non-2xx status
+             if (!stageResponse.ok) {
                  throw new Error(stageResult.detail || `Failed to re-stage job (${stageResponse.status})`);
              }
 
-             showGlobalStatus(`Job successfully re-staged with ID: ${stageResult.staged_job_id}. Refreshing list...`, 'success');
+             showGlobalStatus(`Job successfully re-staged with ID: <code>${stageResult.staged_job_id}</code>. Refreshing list...`, 'success');
              await fetchJobsList(); // Refresh to show the newly staged job
 
          } catch (error) {
              console.error(`Error rerunning job ${jobId}:`, error);
-             showGlobalStatus(`Error rerunning job ${jobId}: ${error.message}`, 'danger');
+             showGlobalStatus(`Error rerunning job <code>${jobId}</code>: ${error.message}`, 'danger');
              // Re-enable button only if the row still exists and shows the rerun button
              const existingButton = jobsTableBody.querySelector(`button[data-job-id="${jobId}"].${BUTTON_CLASS_RERUN}`);
              if(existingButton){
@@ -2239,21 +2280,75 @@ document.addEventListener('DOMContentLoaded', function() {
 
      /** Handle Error Details Button Click */
      function handleErrorDetailsClick(button) {
-         // Get the error from the button's data attribute
-         // Use the full error message from job.error (passed via updateActionCell)
          const errorMsg = button.dataset.error || "No specific error message provided.";
+         let extraDetails = ""; // Placeholder for future stderr etc.
 
-         // Get additional details from meta if available (example: stderr snippet)
-         // This part is simplified as getting full meta client-side is tricky without extra storage
-         // We rely on the summary provided in job.error from the backend status response.
-         let extraDetails = "";
-         // Potential future enhancement: If backend included stderr_snippet directly in job.error or a separate field...
-         // const stderrSnippet = button.dataset.stderr; // If we added data-stderr="..."
-         // if (stderrSnippet) extraDetails = `\n\nStderr Snippet:\n${stderrSnippet}`;
-
-         errorModalText.textContent = errorMsg + extraDetails; // Display error summary
+         errorModalText.textContent = errorMsg + extraDetails;
          errorModal.style.display = "block";
      }
+
+    /** Handle Remove Staged Job Button Click */
+    async function handleRemoveStagedClick(button) {
+        const stagedJobId = button.dataset.stagedId;
+        if (!stagedJobId) return;
+
+        // --- Confirmation ---
+        const confirmation = confirm(`Are you sure you want to permanently remove the staged job '${stagedJobId.substring(0, 15)}...'? This cannot be undone.`);
+        if (!confirmation) {
+            return; // User canceled
+        }
+
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Removing...';
+        // Also disable the corresponding start button
+        const startButton = button.closest('td').querySelector(`.${BUTTON_CLASS_START}`);
+        if (startButton) startButton.disabled = true;
+
+        try {
+            const response = await fetch(`/remove_staged_job/${stagedJobId}`, {
+                 method: 'DELETE',
+                 headers: { 'Accept': 'application/json' }
+            });
+            const result = await response.json(); // Expect success message or error detail
+
+            if (!response.ok) {
+                // Handle 404 (Not Found) or other errors
+                throw new Error(result.detail || `Failed to remove job (${response.status})`);
+            }
+
+            showGlobalStatus(result.message || `Staged job <code>${stagedJobId}</code> removed successfully.`, 'success');
+
+            // Remove the row from the table
+            const rowToRemove = button.closest('tr');
+            if (rowToRemove) {
+                rowToRemove.remove();
+            }
+
+            // Check if table is now empty
+            if (isTableEmpty()) {
+                noJobsRow.style.display = '';
+                loadingRow.style.display = 'none'; // Ensure loading is hidden
+                errorJobsRow.style.display = 'none'; // Ensure error is hidden
+            }
+
+        } catch (error) {
+            console.error(`Error removing staged job ${stagedJobId}:`, error);
+            showGlobalStatus(`Error removing staged job <code>${stagedJobId}</code>: ${error.message}`, 'danger');
+            // Re-enable buttons if the row still exists
+             const actionCell = jobsTableBody.querySelector(`tr[data-job-id="${stagedJobId}"] .action-cell`);
+             if (actionCell) {
+                 const startBtn = actionCell.querySelector(`.${BUTTON_CLASS_START}`);
+                 const removeBtn = actionCell.querySelector(`.${BUTTON_CLASS_REMOVE_STAGED}`);
+                  if (startBtn) {
+                     startBtn.disabled = false;
+                  }
+                  if (removeBtn) {
+                      removeBtn.disabled = false;
+                      removeBtn.innerHTML = 'Remove'; // Reset text
+                  }
+             }
+        }
+    }
 
 
     // --- Event Listeners ---
@@ -2269,6 +2364,8 @@ document.addEventListener('DOMContentLoaded', function() {
             handleRerunClick(button);
         } else if (button.classList.contains(BUTTON_CLASS_ERROR_DETAILS)) {
             handleErrorDetailsClick(button);
+        } else if (button.classList.contains(BUTTON_CLASS_REMOVE_STAGED)) { // <-- New Handler
+            handleRemoveStagedClick(button);
         }
         // Note: View Results is an anchor tag <a>, not handled here
     });
@@ -2970,7 +3067,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], # Be more specific in production
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE"], # Added DELETE if needed later
+    allow_methods=["GET", "POST", "DELETE"], # Added DELETE
     allow_headers=["*"],
 )
 
@@ -2985,7 +3082,7 @@ redis_conn = None
 pipeline_queue = None
 
 try:
-    redis_conn = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=False)
+    redis_conn = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=False) # Keep decode_responses=False for RQ compatibility
     redis_conn.ping()
     logger.info(f"Successfully connected to Redis at {REDIS_HOST}:{REDIS_PORT}")
     pipeline_queue = Queue(PIPELINE_QUEUE_NAME, connection=redis_conn)
@@ -3009,7 +3106,6 @@ def get_filebrowser_config() -> Dict[str, Any]:
             with open(settings_path, 'r') as f:
                 fb_settings = json.load(f)
                 config["baseURL"] = fb_settings.get("baseURL", "/filebrowser").strip('/')
-                # Add other settings if needed
             logger.info(f"Loaded File Browser config: baseURL=/{config['baseURL']}")
         else:
             logger.warning(f"File Browser settings not found at {settings_path}, using default baseURL.")
@@ -3032,21 +3128,17 @@ def dt_to_timestamp(dt: Optional[datetime.datetime]) -> Optional[float]:
 
 def get_safe_path(base_dir: Path, requested_path: str) -> Path:
     """Safely join a base directory and a requested path, preventing path traversal."""
-    # Decode URL component
     decoded_path_str = urllib.parse.unquote(requested_path)
-    # Create Path object
     requested = Path(decoded_path_str)
 
-    # Ensure the requested path is relative and does not contain '..'
     if requested.is_absolute() or '..' in requested.parts:
         logger.warning(f"Attempted path traversal: {requested_path}")
         raise HTTPException(status_code=400, detail="Invalid path requested.")
 
-    # Join with base directory
     full_path = (base_dir / requested).resolve()
 
-    # Check if the resolved path is still within the base directory
-    if base_dir.resolve() not in full_path.parents and full_path != base_dir.resolve():
+    # Check if the resolved path is still within the base directory OR is the base directory itself
+    if base_dir.resolve() != full_path and base_dir.resolve() not in full_path.parents:
          logger.warning(f"Attempted path traversal resolved outside base: {full_path} (Base: {base_dir.resolve()})")
          raise HTTPException(status_code=400, detail="Invalid path requested.")
 
@@ -3060,7 +3152,6 @@ def get_directory_contents(directory: Path, list_dirs: bool = False, list_files:
         logger.warning(f"Directory not found or is not a directory: {directory}")
         return items
     try:
-        # Sort directories first, then files, alphabetically
         sorted_paths = sorted(
             list(directory.iterdir()),
             key=lambda p: (not p.is_dir(), p.name.lower())
@@ -3073,35 +3164,36 @@ def get_directory_contents(directory: Path, list_dirs: bool = False, list_files:
             if (is_dir and list_dirs) or (not is_dir and list_files):
                 try:
                     stat_result = item_path.stat()
+                    # Generate File Browser link ONLY if listing directories (for runs list)
+                    # Make sure the link generation is safe (URL encode the directory name part)
+                    fb_link = None
+                    if is_dir and list_dirs:
+                        # Construct relative path from RESULTS_DIR for FB link if needed, or just use name
+                        # For simplicity, just use the name here assuming FB root is DATA_DIR parent or similar
+                        fb_link = f"/{fb_base_url}/files/{urllib.parse.quote(item_path.name)}"
+
                     item_info = {
                         "name": item_path.name,
                         "is_dir": is_dir,
                         "modified_time": stat_result.st_mtime,
                         "size": stat_result.st_size if not is_dir else None,
                         "extension": item_path.suffix.lower() if not is_dir else None,
-                        # Generate File Browser link ONLY if listing directories (for runs list)
-                        "filebrowser_link": f"/{fb_base_url}/files/{urllib.parse.quote(item_path.name)}" if is_dir and list_dirs else None
+                        "filebrowser_link": fb_link
                     }
                     items.append(item_info)
                 except OSError as stat_e:
                     logger.error(f"Could not get stat for item {item_path}: {stat_e}")
-                    # Optionally add a placeholder for inaccessible items
                     items.append({
-                        "name": item_path.name,
-                        "is_dir": is_dir,
+                        "name": item_path.name, "is_dir": is_dir,
                         "error": "Could not access item metadata."
                     })
-
     except OSError as list_e:
         logger.error(f"Error reading directory {directory}: {list_e}")
-        # Consider raising an exception or returning an error indicator
         raise HTTPException(status_code=500, detail=f"Error reading directory: {directory.name}") from list_e
-
     return items
 
 
 # --- Validation Helper ---
-# (No changes needed in validate_pipeline_input)
 def validate_pipeline_input(input_data: PipelineInput) -> tuple[Dict[str, Path], str | None, List[str]]:
     """Validates input files exist and returns paths and errors."""
     validation_errors = []
@@ -3109,10 +3201,14 @@ def validate_pipeline_input(input_data: PipelineInput) -> tuple[Dict[str, Path],
     known_variants_path_str = None
 
     try:
-        paths_map["forward_reads"] = DATA_DIR / input_data.forward_reads_file
-        paths_map["reverse_reads"] = DATA_DIR / input_data.reverse_reads_file
-        paths_map["reference_genome"] = DATA_DIR / input_data.reference_genome_file
-        paths_map["target_regions"] = DATA_DIR / input_data.target_regions_file
+        # Ensure DATA_DIR exists before proceeding
+        if not DATA_DIR.is_dir():
+             raise FileNotFoundError(f"Data directory not found: {DATA_DIR}")
+
+        paths_map["forward_reads"] = get_safe_path(DATA_DIR, input_data.forward_reads_file)
+        paths_map["reverse_reads"] = get_safe_path(DATA_DIR, input_data.reverse_reads_file)
+        paths_map["reference_genome"] = get_safe_path(DATA_DIR, input_data.reference_genome_file)
+        paths_map["target_regions"] = get_safe_path(DATA_DIR, input_data.target_regions_file)
 
         required_files_display_map = {
             "Forward Reads": paths_map["forward_reads"],
@@ -3122,25 +3218,33 @@ def validate_pipeline_input(input_data: PipelineInput) -> tuple[Dict[str, Path],
         }
         for name, file_path in required_files_display_map.items():
             if not file_path.is_file():
-                validation_errors.append(f"{name} file not found: {file_path.name}")
+                # Use the original filename from input_data for user-friendly error
+                original_filename = getattr(input_data, f"{name.lower().replace(' ', '_')}_file", file_path.name)
+                validation_errors.append(f"{name} file not found: {original_filename}")
 
         if input_data.known_variants_file and input_data.known_variants_file.lower() != "none":
-            known_variants_path = DATA_DIR / input_data.known_variants_file
+            known_variants_path = get_safe_path(DATA_DIR, input_data.known_variants_file)
             if not known_variants_path.is_file():
-                 validation_errors.append(f"Known Variants file not found: {known_variants_path.name}")
+                 validation_errors.append(f"Known Variants file not found: {input_data.known_variants_file}")
             else:
                  known_variants_path_str = str(known_variants_path)
                  paths_map["known_variants"] = known_variants_path
 
+    except FileNotFoundError as e: # Catch specific data dir error
+         logger.error(str(e))
+         # Return a user-friendly error without exposing full path
+         raise HTTPException(status_code=500, detail="Server configuration error: Cannot access data directory.")
+    except HTTPException: # Re-raise exceptions from get_safe_path
+        raise
     except Exception as e:
          logger.error(f"Error constructing file paths during validation: {e}")
-         raise HTTPException(status_code=400, detail="Invalid file name format provided.")
+         # Use a generic error for unexpected issues
+         raise HTTPException(status_code=400, detail="Invalid file name or path provided.")
 
     return paths_map, known_variants_path_str, validation_errors
 
 
 # --- HTML Routes ---
-# (No changes needed for HTML routes serving templates, including /results)
 @app.get("/", response_class=HTMLResponse, summary="Serve Main Home Page")
 async def main_page(request: Request):
     return templates.TemplateResponse("pages/index/index.html", {"request": request})
@@ -3151,16 +3255,12 @@ async def run_pipeline_page(request: Request):
 
 @app.get("/results", response_class=HTMLResponse, summary="Serve Results Page")
 async def results_page(request: Request):
-    # Ensure RESULTS_DIR exists (or log error)
     try:
         RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     except OSError as e:
          logger.error(f"Could not create or access results directory {RESULTS_DIR}: {e}")
-         # Render template anyway, JS will show error
-    # Extract highlight parameter if present
     highlight = request.query_params.get("highlight")
     return templates.TemplateResponse("pages/results/results.html", {"request": request, "highlight": highlight})
-
 
 @app.get("/jobs", response_class=HTMLResponse, summary="Serve Jobs Page")
 async def jobs_page(request: Request):
@@ -3173,166 +3273,175 @@ async def get_data():
     if not DATA_DIR.exists():
          logger.error(f"Data directory does not exist: {DATA_DIR}")
          raise HTTPException(status_code=500, detail="Server configuration error: Data directory not found.")
-
-    fb_config = get_filebrowser_config() # Keep getting config in case helper uses it internally
-
+    fb_config = get_filebrowser_config()
     try:
-        # Get the detailed contents first using the helper
-        # We want only files listed for this endpoint's purpose
         full_contents = get_directory_contents(
-            DATA_DIR,
-            list_dirs=False, # Don't list directories
-            list_files=True,  # DO list files
-            fb_base_url=fb_config["baseURL"]
+            DATA_DIR, list_dirs=False, list_files=True, fb_base_url=fb_config["baseURL"]
         )
-
-        # --- NEW: Simplify the response to match the response_model ---
-        # The model List[Dict[str, str]] expects {'name': 'some_name', 'type': 'file'/'directory'}
-        simplified_response = []
-        for item in full_contents:
-            # Ensure we only process files returned by the helper
-            if not item.get("is_dir", True): # Check 'is_dir' is explicitly False
-                simplified_response.append({
-                    "name": item.get("name", "Unknown"), # Get the name
-                    "type": "file" # Hardcode type as 'file' since we only asked for files
-                })
-        # --- End Simplification ---
-
-        return simplified_response # Return the simplified list
-
+        # Simplify to match List[Dict[str, str]] model {'name': ..., 'type': 'file'}
+        simplified_response = [
+            {"name": item.get("name", "Unknown"), "type": "file"}
+            for item in full_contents if not item.get("is_dir", True)
+        ]
+        return simplified_response
     except HTTPException as e:
-        # Propagate specific exceptions raised by get_directory_contents or get_safe_path
         logger.error(f"HTTPException in /get_data processing: {e.detail}")
         raise e
     except Exception as e:
-        # Catch any other unexpected errors during processing
         logger.exception(f"Unexpected error processing data directory contents for /get_data: {e}")
         raise HTTPException(status_code=500, detail="Internal server error processing data list.")
-    
-# --- MODIFIED: /get_results API Route ---
+
 @app.get("/get_results", response_model=List[Dict[str, Any]], summary="List Result Run Directories")
 async def get_results_runs(fb_config: Dict = Depends(get_filebrowser_config)):
     """Lists the subdirectories (pipeline runs) within the main results directory."""
     if not RESULTS_DIR.exists():
         logger.warning(f"Results directory not found: {RESULTS_DIR}. Returning empty list.")
         return []
-    # Use helper to list ONLY directories and include File Browser link
     return get_directory_contents(RESULTS_DIR, list_dirs=True, list_files=False, fb_base_url=fb_config["baseURL"])
 
-
-# --- NEW: API Route to Get Files WITHIN a Result Directory ---
 @app.get("/get_results/{run_dir_name:path}", response_model=List[Dict[str, Any]], summary="List Files in a Specific Run Directory")
 async def get_results_run_files(run_dir_name: str):
-    """
-    Lists the files and subdirectories within a specific pipeline run directory.
-    The run_dir_name is URL-decoded automatically by FastAPI.
-    """
+    """Lists the files and subdirectories within a specific pipeline run directory."""
     logger.info(f"Request to list files for run directory: {run_dir_name}")
-
-    # Validate the path is within RESULTS_DIR
     try:
         target_run_dir = get_safe_path(RESULTS_DIR, run_dir_name)
     except HTTPException as e:
-        # Propagate the HTTPException from get_safe_path
         raise e
     except Exception as e:
         logger.error(f"Unexpected error validating path for {run_dir_name}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error during path validation.")
 
-
     if not target_run_dir.exists() or not target_run_dir.is_dir():
          logger.warning(f"Requested run directory not found or not a directory: {target_run_dir}")
          raise HTTPException(status_code=404, detail=f"Run directory '{run_dir_name}' not found.")
 
-    # Use helper to list ONLY files (and potentially subdirs if needed later)
-    # File Browser links aren't needed for inner files
     fb_config = get_filebrowser_config()
     return get_directory_contents(target_run_dir, list_dirs=True, list_files=True, fb_base_url=fb_config["baseURL"])
 
 
 # --- Jobs List Route ---
-# (No changes needed for /jobs_list)
 @app.get("/jobs_list", response_model=List[Dict[str, Any]], summary="List All Relevant Jobs")
 async def get_jobs_list():
     if not redis_conn or not pipeline_queue:
         raise HTTPException(status_code=503, detail="Service unavailable: Cannot connect to job storage.")
     all_jobs_dict = {}
+
+    # 1. Get Staged Jobs
     try:
+        # Use redis_conn with decode_responses=False for keys/values
         staged_jobs_raw = redis_conn.hgetall(STAGED_JOBS_KEY)
         for job_id_bytes, job_details_bytes in staged_jobs_raw.items():
             try:
                 job_id = job_id_bytes.decode('utf-8')
                 details = json.loads(job_details_bytes.decode('utf-8'))
                 all_jobs_dict[job_id] = {
-                    "id": job_id,
+                    "id": job_id, # Use 'id' consistently for this endpoint
                     "status": "staged",
                     "description": details.get("description", "N/A"),
                     "enqueued_at": None, "started_at": None, "ended_at": None,
                     "result": None, "error": None,
-                    "meta": {"input_params": details.get("input_filenames", details)}, # Prioritize input_filenames
+                    "meta": {"input_params": details.get("input_filenames", details)},
                     "staged_at": details.get("staged_at")
                 }
             except (UnicodeDecodeError, json.JSONDecodeError, TypeError) as e:
                 logger.error(f"Error decoding/parsing staged job data for key {job_id_bytes}: {e}")
     except redis.exceptions.RedisError as e:
         logger.error(f"Redis error fetching staged jobs: {e}")
+        # Continue to fetch RQ jobs even if staged jobs fail
 
-    MAX_REGISTRY_JOBS = 50
-    registries = {
+    # 2. Get RQ Jobs from Registries
+    MAX_REGISTRY_JOBS = 50 # Limit history fetched
+    registries_to_check = {
+        "queued": pipeline_queue, # Use queue directly for queued jobs
         "started": StartedJobRegistry(queue=pipeline_queue),
         "finished": FinishedJobRegistry(queue=pipeline_queue),
         "failed": FailedJobRegistry(queue=pipeline_queue),
     }
-    for status_name, registry in registries.items():
+    # Add other registries if needed (deferred, scheduled)
+
+    for status_name, registry_or_queue in registries_to_check.items():
         try:
-            limit = -1 if status_name == "started" else MAX_REGISTRY_JOBS
-            job_ids = registry.get_job_ids(0, limit)
+            job_ids = []
+            if isinstance(registry_or_queue, Queue):
+                # Queue.get_job_ids() gets currently queued jobs
+                job_ids = registry_or_queue.get_job_ids()
+            elif isinstance(registry_or_queue, (StartedJobRegistry, FinishedJobRegistry, FailedJobRegistry)):
+                # Registries have different methods, limit finished/failed
+                limit = -1 if status_name == "started" else MAX_REGISTRY_JOBS
+                job_ids = registry_or_queue.get_job_ids(0, limit)
+            else:
+                 logger.warning(f"Unsupported type for job fetching: {type(registry_or_queue)}")
+                 continue
+
             if job_ids:
+                # Fetch jobs in batch
                 jobs = Job.fetch_many(job_ids, connection=redis_conn, serializer=pipeline_queue.serializer)
                 for job in jobs:
+                    # Ensure job exists and hasn't been replaced by a newer status from another registry
+                    # (e.g., avoid showing finished if we already have failed)
+                    # Prioritize Failed > Finished > Started > Queued > Staged
                     if job and (job.id not in all_jobs_dict or all_jobs_dict[job.id]['status'] == 'staged'):
                         job.refresh() # Ensure meta is loaded
+                        current_status = job.get_status()
                         error_summary = None
-                        if job.get_status() == JobStatus.FAILED:
+                        if current_status == JobStatus.FAILED:
                             error_summary = job.meta.get('error_message', "Job failed processing.")
+                            stderr = job.meta.get('stderr_snippet')
                             if error_summary == "Job failed processing." and job.exc_info:
                                 try:
                                     lines = job.exc_info.strip().split('\n')
                                     if lines: error_summary = lines[-1]
                                 except Exception: pass
+                            if stderr: error_summary += f" (stderr: {stderr}...)" # Append snippet
 
+                        # Store with 'id' key
                         all_jobs_dict[job.id] = {
-                            "id": job.id, "status": job.get_status(),
+                            "id": job.id, # Use 'id' consistently
+                            "status": current_status,
                             "description": job.description or "N/A",
                             "enqueued_at": dt_to_timestamp(job.enqueued_at),
                             "started_at": dt_to_timestamp(job.started_at),
                             "ended_at": dt_to_timestamp(job.ended_at),
-                            "result": job.result, "error": error_summary,
-                            "meta": job.meta or {}, "staged_at": None
+                            "result": job.result,
+                            "error": error_summary,
+                            "meta": job.meta or {},
+                            "staged_at": None, # Not applicable to RQ jobs
+                             # Add resource stats directly if available in meta (for consistency)
+                            "resources": {
+                                "peak_memory_mb": job.meta.get("peak_memory_mb"),
+                                "average_cpu_percent": job.meta.get("average_cpu_percent"),
+                                "duration_seconds": job.meta.get("duration_seconds")
+                            }
                         }
         except redis.exceptions.RedisError as e:
             logger.error(f"Redis error fetching {status_name} jobs: {e}")
         except Exception as e:
             logger.exception(f"Unexpected error fetching {status_name} jobs.")
 
+
+    # 3. Sort and Return
     all_jobs_list = sorted(
         all_jobs_dict.values(),
-        key=lambda j: j.get('enqueued_at') or j.get('staged_at') or time.time(),
+        # Sort by enqueue/stage time descending (newest first)
+        key=lambda j: j.get('enqueued_at') or j.get('staged_at') or 0, # Use 0 as fallback time
         reverse=True
     )
     return all_jobs_list
 
 
 # --- Staging and Job Control Routes ---
-# (No changes needed for /run_pipeline, /start_job, /job_status, /stop_job)
+
 @app.post("/run_pipeline", status_code=200, summary="Stage Pipeline Job")
 async def stage_pipeline_job(input_data: PipelineInput):
+    """Validates inputs, generates a unique ID, and stores job details in Redis hash."""
     if not redis_conn:
         raise HTTPException(status_code=503, detail="Service unavailable (Redis).")
     pipeline_script_path = BACKEND_APP_DIR / "pipeline.sh"
     if not pipeline_script_path.is_file():
-        raise HTTPException(status_code=500, detail="Server config error: Pipeline script missing.")
+        logger.error(f"Pipeline script not found at: {pipeline_script_path}")
+        raise HTTPException(status_code=500, detail="Server configuration error: Pipeline script missing.")
 
+    # Validate inputs and get absolute paths
     paths_map, known_variants_path_str, validation_errors = validate_pipeline_input(input_data)
     if validation_errors:
         raise HTTPException(status_code=400, detail=f"Input file error(s): {'; '.join(validation_errors)}")
@@ -3345,18 +3454,19 @@ async def stage_pipeline_job(input_data: PipelineInput):
             "reverse_reads_path": str(paths_map["reverse_reads"]),
             "reference_genome_path": str(paths_map["reference_genome"]),
             "target_regions_path": str(paths_map["target_regions"]),
-            "known_variants_path": known_variants_path_str,
+            "known_variants_path": known_variants_path_str, # Can be None
             "description": f"Pipeline for {input_data.forward_reads_file}",
             "staged_at": time.time(),
-            "input_filenames": { # Store original inputs
+            "input_filenames": { # Store original relative filenames for potential rerun
                  "forward_reads": input_data.forward_reads_file,
                  "reverse_reads": input_data.reverse_reads_file,
                  "reference_genome": input_data.reference_genome_file,
                  "target_regions": input_data.target_regions_file,
-                 "known_variants": input_data.known_variants_file
+                 "known_variants": input_data.known_variants_file # Can be None
             }
         }
-        redis_conn.hset(STAGED_JOBS_KEY, staged_job_id, json.dumps(job_details))
+        # Store as bytes in Redis hash
+        redis_conn.hset(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'), json.dumps(job_details).encode('utf-8'))
         logger.info(f"Staged job {staged_job_id}")
         return JSONResponse(status_code=200, content={"message": "Job staged.", "staged_job_id": staged_job_id})
     except redis.exceptions.RedisError as e:
@@ -3366,111 +3476,128 @@ async def stage_pipeline_job(input_data: PipelineInput):
         logger.exception("Failed to stage pipeline job.")
         raise HTTPException(status_code=500, detail="Server error: Could not stage job.")
 
-
 @app.post("/start_job/{staged_job_id}", status_code=202, summary="Enqueue Staged Job")
 async def start_job(staged_job_id: str):
+    """Retrieves staged job details, enqueues it to RQ, and removes staged entry."""
     if not redis_conn or not pipeline_queue:
         raise HTTPException(status_code=503, detail="Background job service unavailable.")
     try:
-        job_details_json_bytes = redis_conn.hget(STAGED_JOBS_KEY, staged_job_id)
+        # Fetch bytes from Redis
+        job_details_json_bytes = redis_conn.hget(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
         if not job_details_json_bytes:
             raise HTTPException(status_code=404, detail=f"Staged job {staged_job_id} not found.")
 
+        # Decode and parse JSON
         job_details = json.loads(job_details_json_bytes.decode('utf-8'))
         required_keys = ["pipeline_script_path", "forward_reads_path", "reverse_reads_path", "reference_genome_path", "target_regions_path"]
         if not all(key in job_details for key in required_keys):
+             logger.error(f"Corrupted staged job data for {staged_job_id}: Missing keys.")
              raise HTTPException(status_code=500, detail="Corrupted staged job data.")
 
         job_args = (
             job_details["pipeline_script_path"], job_details["forward_reads_path"],
             job_details["reverse_reads_path"], job_details["reference_genome_path"],
-            job_details["target_regions_path"], job_details.get("known_variants_path", ""),
+            job_details["target_regions_path"], job_details.get("known_variants_path"), # Pass None if missing
         )
         job_meta = {
-            "input_params": job_details.get("input_filenames", {}),
+            "input_params": job_details.get("input_filenames", {}), # Keep original filenames
             "staged_job_id_origin": staged_job_id
         }
+
+        # Enqueue the job
         job = pipeline_queue.enqueue(
             f=run_pipeline_task, args=job_args, meta=job_meta,
-            job_id_prefix="bio_pipeline_", job_timeout='2h',
-            result_ttl=86400, failure_ttl=604800,
+            job_id_prefix="bio_pipeline_", job_timeout='2h', # Example timeout
+            result_ttl=86400, # Keep result 1 day
+            failure_ttl=604800, # Keep failed 1 week
             description=job_details.get("description", f"Run from {staged_job_id}")
         )
+
         logger.info(f"Enqueued RQ job {job.id} from staged {staged_job_id}")
-        redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id)
+
+        # Remove the staged job entry AFTER successful enqueue
+        redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
         logger.info(f"Removed staged job {staged_job_id}.")
+
         return JSONResponse(status_code=202, content={"message": "Job enqueued.", "job_id": job.id})
+
     except redis.exceptions.RedisError as e:
          logger.error(f"Redis error starting job {staged_job_id}: {e}")
          raise HTTPException(status_code=503, detail="Service unavailable starting job.")
     except json.JSONDecodeError as e:
         logger.error(f"Error decoding JSON for staged job {staged_job_id}: {e}")
+        # Consider removing the corrupted entry?
+        # redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
         raise HTTPException(status_code=500, detail="Corrupted staged job data.")
     except Exception as e:
         logger.exception(f"Failed to start/enqueue staged job {staged_job_id}.")
         raise HTTPException(status_code=500, detail="Server error: Could not start job.")
 
-@app.get("/job_status/{job_id}", summary="Get RQ Job Status")
+
+@app.get("/job_status/{job_id}", summary="Get RQ Job Status and Details")
 async def get_job_status(job_id: str):
+    """Fetches RQ job status, result/error, metadata, and resource usage."""
     if not redis_conn:
         raise HTTPException(status_code=503, detail="Status check unavailable (Redis).")
     try:
-        # Fetch with the correct serializer if needed (often default is fine)
-        job = Job.fetch(job_id, connection=redis_conn) # Removed specific serializer arg for simplicity
-        job.refresh() # Ensure meta is loaded, especially after task completion
+        # Fetch with the correct serializer if needed
+        job = Job.fetch(job_id, connection=redis_conn, serializer=pipeline_queue.serializer)
+        job.refresh() # Load meta, status etc.
     except NoSuchJobError:
+        # Before raising 404, check if it was a staged job that never started
+        # This check is less critical now that staging is separate, but can be useful
+        if job_id.startswith("staged_"):
+             staged_exists = redis_conn.hexists(STAGED_JOBS_KEY, job_id.encode('utf-8'))
+             if staged_exists:
+                  # It's a staged job, return specific status? Or let 404 stand?
+                  # For now, let 404 stand, as it's not an *RQ* job.
+                  pass # Or potentially return a custom "staged" status here if needed
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found.")
     except redis.exceptions.RedisError as e:
          logger.error(f"Redis error fetching RQ job {job_id}: {e}")
          raise HTTPException(status_code=503, detail="Service unavailable: Could not connect to status backend.")
     except Exception as e:
-        # Catch potential deserialization errors or other issues
         logger.exception(f"Unexpected error fetching or refreshing job {job_id}.")
         raise HTTPException(status_code=500, detail=f"Server error fetching job status.")
 
     status = job.get_status()
     result = None
-    # --- Get metadata safely ---
     meta_data = job.meta or {}
     error_info_summary = None
 
     try:
         if status == JobStatus.FINISHED:
-            # Result might contain resource info if task returns it, but meta is canonical
-            result = job.result
+            result = job.result # Contains {'status': 'success', 'results_path': ...}
         elif status == JobStatus.FAILED:
-            # Prioritize specific error message from meta if task set it
             error_info_summary = meta_data.get('error_message', "Job failed processing.")
-            # Add stderr snippet if available
             stderr_snippet = meta_data.get('stderr_snippet')
-            if stderr_snippet:
-                error_info_summary += f" (stderr: {stderr_snippet}...)"
-            # Fallback to exc_info if specific message not set
             if error_info_summary == "Job failed processing." and job.exc_info:
                  try:
                      lines = job.exc_info.strip().split('\n')
                      if lines: error_info_summary = lines[-1] # Get last line of traceback
-                 except Exception: pass
+                 except Exception: pass # Ignore parsing errors
+            if stderr_snippet:
+                 error_info_summary += f" (stderr: {stderr_snippet}...)"
     except Exception as e:
         logger.exception(f"Error accessing result/error info for job {job_id} (status: {status}).")
-        # Don't overwrite error_info_summary if already set
         if not error_info_summary:
              error_info_summary = "Could not retrieve job result/error details."
 
-    # --- Explicitly include resource stats from meta if they exist ---
+    # --- Explicitly include resource stats from meta ---
     resource_stats = {
         "peak_memory_mb": meta_data.get("peak_memory_mb"),
         "average_cpu_percent": meta_data.get("average_cpu_percent"),
         "duration_seconds": meta_data.get("duration_seconds")
     }
 
+    # Return structure consistent for JS side (use job_id key)
     return JSONResponse(content={
-        "job_id": job_id,
+        "job_id": job.id, # Key is 'job_id' for the response
         "status": status,
-        "result": result, # This might be redundant if info is in meta
+        "result": result, # Result from task return
         "error": error_info_summary,
-        "meta": meta_data, # Include the full meta for potential future use
-        "resources": resource_stats, # <-- Add the specific resource stats
+        "meta": meta_data, # Full meta
+        "resources": resource_stats, # Extracted resources
         "enqueued_at": dt_to_timestamp(job.enqueued_at),
         "started_at": dt_to_timestamp(job.started_at),
         "ended_at": dt_to_timestamp(job.ended_at)
@@ -3478,28 +3605,37 @@ async def get_job_status(job_id: str):
 
 @app.post("/stop_job/{job_id}", status_code=200, summary="Cancel Running/Queued Job")
 async def stop_job(job_id: str):
+    """Sends a stop signal to an RQ job."""
     if not redis_conn:
         raise HTTPException(status_code=503, detail="Service unavailable (Redis).")
     logger.info(f"Request to stop job: {job_id}")
     try:
         job = Job.fetch(job_id, connection=redis_conn)
         status = job.get_status()
-        if job.is_finished or job.is_failed or job.is_canceled or job.is_stopped:
+        if job.is_finished or job.is_failed or job.is_stopped: # No need to check canceled separately
+             logger.warning(f"Attempted to stop job {job_id} which is already in state: {status}")
              return JSONResponse(status_code=200, content={"message": f"Job already {status}.", "job_id": job_id})
+        if job.is_canceled: # RQ terminology might differ slightly, cover explicit cancel
+            logger.warning(f"Attempted to stop job {job_id} which was already canceled.")
+            return JSONResponse(status_code=200, content={"message": f"Job already canceled.", "job_id": job_id})
 
+        # Use RQ's preferred method
         from rq.command import send_stop_job_command
         message = "Stop signal sent."
         try:
             send_stop_job_command(redis_conn, job.id)
             logger.info(f"Sent stop signal command for job {job_id}.")
+            # Optionally update meta immediately?
+            # job.meta['status_override'] = 'stopping'
+            # job.save_meta()
         except Exception as sig_err:
-            logger.warning(f"Could not send stop signal for job {job_id}. Error: {sig_err}")
-            # Fallback? Maybe not necessary if signal sent anyway.
-            # job.cancel() # Avoid generic cancel if signal is preferred
+            # Fallback or just log error? Sending the signal is best-effort.
+            logger.warning(f"Could not send stop signal command via RQ for job {job_id}. Error: {sig_err}. Job might continue.")
             message = "Stop signal attempted (check worker logs)."
 
         logger.info(f"Stop request processed for job {job_id}.")
         return JSONResponse(status_code=200, content={"message": message, "job_id": job_id})
+
     except NoSuchJobError:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found.")
     except redis.exceptions.RedisError as e:
@@ -3509,6 +3645,40 @@ async def stop_job(job_id: str):
         logger.exception(f"Unexpected error stopping job {job_id}.")
         raise HTTPException(status_code=500, detail=f"Server error stopping job.")
 
+
+# --- NEW: DELETE Endpoint for Staged Jobs ---
+@app.delete("/remove_staged_job/{staged_job_id}", status_code=200, summary="Remove a Staged Job")
+async def remove_staged_job(staged_job_id: str):
+    """Removes a job from the staged jobs Redis hash."""
+    if not redis_conn:
+        raise HTTPException(status_code=503, detail="Service unavailable (Redis).")
+    logger.info(f"Request to remove staged job: {staged_job_id}")
+
+    try:
+        # Attempt to delete the key from the hash
+        # hdel returns the number of fields that were removed
+        num_deleted = redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
+
+        if num_deleted == 1:
+            logger.info(f"Successfully removed staged job: {staged_job_id}")
+            return JSONResponse(status_code=200, content={"message": f"Staged job '{staged_job_id}' removed successfully.", "staged_job_id": staged_job_id})
+        elif num_deleted == 0:
+            logger.warning(f"Attempted to remove non-existent staged job: {staged_job_id}")
+            raise HTTPException(status_code=404, detail=f"Staged job '{staged_job_id}' not found.")
+        else:
+            # Should not happen with hdel on a single key
+            logger.error(f"Unexpected result from hdel for {staged_job_id}: {num_deleted}")
+            raise HTTPException(status_code=500, detail="Internal server error during job removal.")
+
+    except redis.exceptions.RedisError as e:
+        logger.error(f"Redis error removing staged job {staged_job_id}: {e}")
+        raise HTTPException(status_code=503, detail="Service unavailable: Could not remove job.")
+    except HTTPException as e:
+        # Re-raise HTTPExceptions (like the 404)
+        raise e
+    except Exception as e:
+        logger.exception(f"Unexpected error removing staged job {staged_job_id}.")
+        raise HTTPException(status_code=500, detail="Server error removing job.")
 --- END FILE: ./backend/app/app.py ---
 
 --- START FILE: ./backend/app/tasks.py ---
