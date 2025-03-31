@@ -1,28 +1,124 @@
-/* Remove bullet points */
-ul {
-    list-style-type: none;
-    padding-left: 0;
+/* frontend/static/results.css */
+
+#results-controls {
+    margin-bottom: 1.5rem;
+    padding: 0.75rem 1rem;
+    background-color: #e9ecef; /* Lighter grey */
+    border-radius: 0.25rem;
+    border: 1px solid #dee2e6;
 }
 
-/* Style the blue output files bar */
-.output-files-header {
+#results-controls label,
+#results-controls span {
+    font-size: 0.9em;
+    margin-right: 0.5rem;
+}
+
+#results-controls .btn-group .btn.active {
     background-color: #007bff;
     color: white;
-    padding: 10px 15px;
-    display: flex;
-    align-items: center;
 }
 
-.output-files-header i {
-    margin-right: 10px;
+.run-item {
+    border: 1px solid #dee2e6;
+    transition: box-shadow 0.2s ease-in-out;
 }
 
-/* Style the file name */
-.output-file-name {
-    padding: 10px 15px;
+.run-item:hover {
+     box-shadow: 0 .125rem .25rem rgba(0,0,0,.075);
+}
+
+.run-item .card-header {
     background-color: #f8f9fa;
+    font-size: 1rem;
+    padding: 0.5rem 1rem; /* Reduced padding */
 }
 
-.container .list-group {
-    padding: 0.75rem 1.5rem;
+.run-item .run-name {
+    font-weight: 600;
+}
+
+.run-item .run-date {
+    font-size: 0.8em;
+}
+
+.run-item .expand-btn i {
+    transition: transform 0.3s ease;
+}
+
+.run-item .expand-btn[aria-expanded="true"] i {
+    transform: rotate(90deg);
+}
+
+
+.run-item .filebrowser-link i {
+    margin-right: 4px;
+    vertical-align: middle; /* Align icon better */
+}
+
+/* Style for the collapsible area */
+.run-item .collapse {
+    overflow: hidden;
+    transition: max-height 0.3s ease-out; /* Smooth transition */
+    max-height: 0; /* Start collapsed */
+    background-color: #fff; /* Ensure background */
+}
+.run-item .collapse.show {
+     /* max-height will be set by JS */
+     border-top: 1px solid #dee2e6;
+}
+
+
+.run-item .file-list {
+    /* Optional: Limit max height and add scroll */
+    /* max-height: 400px; */
+    /* overflow-y: auto; */
+}
+
+.run-item .file-list-item {
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem; /* Reduced padding */
+    border-bottom: 1px solid #eee; /* Lighter separator */
+}
+.run-item .file-list-item:last-child {
+    border-bottom: none;
+}
+
+.run-item .file-list-item .file-icon {
+    width: 20px;
+    text-align: center;
+    margin-right: 10px;
+    color: #6c757d; /* Default icon color */
+}
+
+/* Specific icon colors (example) */
+.run-item .file-list-item .fa-dna { color: #17a2b8; } /* Info Blue */
+.run-item .file-list-item .fa-file-medical-alt { color: #fd7e14; } /* Orange */
+.run-item .file-list-item .fa-table { color: #343a40; } /* Dark */
+.run-item .file-list-item .fa-file-alt { color: #adb5bd; } /* Grey */
+
+
+.run-item .file-list-item .file-meta {
+    font-size: 0.8em;
+    color: #6c757d;
+    white-space: nowrap; /* Prevent wrapping */
+    margin-left: 1rem;
+}
+
+
+/* Highlight style */
+.run-item.highlighted {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+.run-item.highlighted .card-header {
+    background-color: #cfe2ff; /* Bootstrap primary light */
+    border-bottom: 1px solid #b6d4fe;
+}
+
+/* Status messages */
+#loading-runs,
+#no-runs,
+#error-runs {
+    padding: 2rem;
 }
