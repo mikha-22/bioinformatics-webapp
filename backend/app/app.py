@@ -354,6 +354,52 @@ async def start_job(staged_job_id: str):
         logger.exception(f"Failed to start/enqueue staged job {staged_job_id}.")
         raise HTTPException(status_code=500, detail="Server error: Could not start job.")
 
+@app.post("/stop_job/{job_id}", status_code=200, summary="Cancel Running/Queued Job")
+async def stop_job(job_id: str):
+    """
+    Attempts to cancel an RQ job (queued or running) using its RQ Job ID.
+    """
+    if not redis_conn:
+        logger.error(f"Attempted to stop job {job_id}, but Redis connection is not available.")
+        raise HTTPException(status_code=503, detail="Service unavailable (Redis connection failed).")
+
+    logger.info(f"Received request to stop job: {job_id}")
+    try:
+        job = Job.fetch(job_id, connection=redis_conn)
+
+        # Check current status
+        status = job.get_status()
+        logger.info(f"Job {job_id} current status: {status}")
+
+        if job.is_finished or job.is_failed or job.is_canceled or job.is_stopped:
+             logger.warning(f"Job {job_id} is already in a terminal state ({status}). Cannot stop.")
+             return JSONResponse(
+                 status_code=200, # Still OK, just inform the user
+                 content={"message": f"Job already {status}.", "job_id": job_id}
+             )
+
+        # Attempt to cancel the job
+        # RQ's job.cancel() internally uses the appropriate mechanism (like send_stop_signal).
+        logger.info(f"Attempting to cancel job {job_id}...")
+        job.cancel()
+
+        # Note: Cancellation is asynchronous. The job might take time to actually stop.
+        # We just confirm the request was sent.
+        logger.info(f"Cancellation request sent for job {job_id}.")
+        return JSONResponse(
+            status_code=200,
+            content={"message": "Cancellation request sent.", "job_id": job_id}
+        )
+
+    except NoSuchJobError:
+        logger.warning(f"Attempted to stop non-existent RQ job ID: {job_id}")
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found.")
+    except redis.exceptions.RedisError as e:
+         logger.error(f"Redis error interacting with job {job_id}: {e}")
+         raise HTTPException(status_code=503, detail="Service unavailable: Could not connect to job backend.")
+    except Exception as e:
+        logger.exception(f"Unexpected error stopping job {job_id}.")
+        raise HTTPException(status_code=500, detail=f"Server error stopping job.")
 
 @app.get("/job_status/{job_id}", summary="Get RQ Job Status")
 async def get_job_status(job_id: str):
