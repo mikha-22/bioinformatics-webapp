@@ -1,4 +1,5 @@
-name: Docker Build and Push to GHCR
+# ./.github/workflows/docker-publish.yml
+name: Docker Build and Push Components to GHCR
 
 # Controls when the action will run.
 on:
@@ -9,6 +10,8 @@ on:
       - 'README.md'
       - 'CHANGELOG.md'
       - '.gitignore'
+      # Optionally ignore changes only affecting one component if builds are slow
+      # - 'frontend/**' # Example: ignore frontend changes for worker build
   pull_request:
     branches:
       - main # Trigger on Pull Requests targeting the main branch
@@ -18,7 +21,7 @@ on:
       - '.gitignore'
 
 jobs:
-  build-and-push:
+  build-and-push-components: # Renamed job for clarity
     runs-on: ubuntu-latest
 
     permissions:
@@ -39,23 +42,62 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }} # Using PAT as configured
 
-      - name: Build and push Docker image
+      # --- Build Webapp Image ---
+      - name: Build and push webapp image
         uses: docker/build-push-action@v5
         with:
           context: .
-          # Ensure this path points to your actual Dockerfile
-          file: ./docker/Dockerfile
+          # Specify the webapp Dockerfile
+          file: ./docker/Dockerfile.webapp
           # Push ONLY when the trigger is a push event to the 'main' branch
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          # Define tags: latest and commit-<full-sha>
+          # Define unique tags for the webapp image
           tags: |
-            ghcr.io/mikha-22/bioinformatics-webapp:latest
-            ghcr.io/mikha-22/bioinformatics-webapp:commit-${{ github.sha }}
-          # Pass the current branch name (e.g., 'main') as a build argument
-          # This overrides the default in your Dockerfile's ARG BRANCH
-          build-args: |
-            BRANCH=${{ github.ref_name }}
-          # Cache settings
+            ghcr.io/mikha-22/bioinformatics-webapp/webapp:latest
+            ghcr.io/mikha-22/bioinformatics-webapp/webapp:commit-${{ github.sha }}
+          # Pass build args if needed by Dockerfile.webapp
+          # build-args: |
+          #   SOME_ARG=value
+          # Enable caching
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          no-cache: true
+
+      # --- Build Worker Image ---
+      - name: Build and push worker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          # Specify the worker Dockerfile
+          file: ./docker/Dockerfile.worker
+          # Push ONLY when the trigger is a push event to the 'main' branch
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          # Define unique tags for the worker image
+          tags: |
+            ghcr.io/mikha-22/bioinformatics-webapp/worker:latest
+            ghcr.io/mikha-22/bioinformatics-webapp/worker:commit-${{ github.sha }}
+          # Pass build args if needed by Dockerfile.worker
+          # build-args: |
+          #   SOME_ARG=value
+          # Enable caching
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # --- Build File Browser Image ---
+      - name: Build and push filebrowser image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          # Specify the filebrowser Dockerfile
+          file: ./docker/Dockerfile.filebrowser
+          # Push ONLY when the trigger is a push event to the 'main' branch
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          # Define unique tags for the filebrowser image
+          tags: |
+            ghcr.io/mikha-22/bioinformatics-webapp/filebrowser:latest
+            ghcr.io/mikha-22/bioinformatics-webapp/filebrowser:commit-${{ github.sha }}
+          # Pass build args if needed by Dockerfile.filebrowser
+          # build-args: |
+          #   SOME_ARG=value
+          # Enable caching
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,0 +1,5 @@
+# ./requirements_worker.txt
+rq
+redis
+psutil
+# Add any other specific Python libraries ONLY needed by tasks.py

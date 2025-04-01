@@ -1,0 +1,74 @@
+# ./docker/Dockerfile.filebrowser
+#-------------------------------------------------------------------
+# Stage 1: Builder Stage - Fetch File Browser binary & configs
+#-------------------------------------------------------------------
+FROM debian:bookworm-slim AS builder
+
+WORKDIR /build
+
+# Install dependencies needed to download File Browser
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    bash \
+    ca-certificates \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# --- Install File Browser binary ---
+RUN echo "Installing File Browser..." && \
+    curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash
+    # Installs to /usr/local/bin/filebrowser
+
+# --- Copy configuration files from build context ---
+COPY ./docker/filebrowser.db /build/config/filebrowser.db
+COPY ./docker/settings.json /build/config/settings.json
+COPY ./tls/server.crt /build/config/server.crt # Needed if settings.json points to it
+COPY ./tls/server.key /build/config/server.key # Needed if settings.json points to it
+
+#-------------------------------------------------------------------
+# Stage 2: Final Stage - File Browser Runtime
+#-------------------------------------------------------------------
+# Use a minimal image like debian-slim again or scratch if possible (though unlikely)
+FROM debian:bookworm-slim
+
+# Install runtime dependencies (minimal needed, ca-certificates maybe for updates/plugins)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app # Set a working directory
+
+# --- Create directories expected by File Browser command/config ---
+# Ensure these paths match volume mounts and CMD flags
+RUN mkdir -p /config /srv
+
+# --- Copy artifacts from builder ---
+COPY --from=builder /usr/local/bin/filebrowser /usr/local/bin/filebrowser
+COPY --from=builder /build/config /config
+
+# --- Create non-root user ---
+ARG UID=1000
+ARG GID=1000
+RUN groupadd --gid ${GID} appuser && \
+    useradd --uid ${UID} --gid ${GID} --shell /bin/bash --create-home appuser
+
+# --- Set Permissions ---
+# Ensure the user owns the app dir and config files
+# The /srv directory will be mounted, so its permissions come from the host/volume driver
+RUN chown appuser:appuser /app /home/appuser && \
+    chown -R appuser:appuser /config && \
+    chmod 664 /config/filebrowser.db /config/settings.json # Adjust cert perms if needed
+
+# Switch to the non-root user
+USER appuser
+
+# Expose the internal port File Browser will listen on
+EXPOSE 8081
+
+# --- Define the command ---
+# Use flags matching the paths where config files are copied/mounted
+CMD ["/usr/local/bin/filebrowser", \
+     "--port=8081", \
+     "--root=/srv", \
+     "--database=/config/filebrowser.db", \
+     "--config=/config/settings.json"]
+     # Add TLS flags if needed: --cert=/config/server.crt --key=/config/server.key

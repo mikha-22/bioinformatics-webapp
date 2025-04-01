@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+rq
+redis
+Jinja2
+python-multipart # For form data if needed by FastAPI endpoints
+# psutil # Add only if webapp logic *directly* uses psutil, not just the worker
