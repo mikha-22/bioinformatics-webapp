@@ -9,6 +9,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const sortButtons = document.querySelectorAll('#results-controls [data-sort]');
     const sortDirectionButton = document.getElementById('sort-direction-btn');
 
+    // --- Constants ---
+    // Define the base URL for the File Browser iframe, matching base.html
+    // Use protocol-relative //localhost:8081 or explicit https://localhost:8081
+    // Using explicit https is usually safer if your main app uses https.
+    const FILE_BROWSER_BASE_URL = 'https://localhost:8081'; // <-- Correct Port
+
     // --- State ---
     let allRunsData = []; // Store the fetched run data
     let currentSort = { field: 'date', direction: 'desc' }; // Default sort: newest first
@@ -131,8 +137,9 @@ document.addEventListener('DOMContentLoaded', function() {
             runItem.className = 'run-item card mb-2';
             runItem.dataset.runName = run.name; // Store name for filtering/fetching files
 
-            // Construct File Browser link safely
-            const fbLink = run.filebrowser_link || '#'; // Fallback link
+            // Construct File Browser PATH ONLY. The full URL is built onClick.
+            // Ensure the backend link only contains the path part (e.g., /filebrowser/files/results/...)
+            const fbPath = run.filebrowser_link || '#'; // Expecting PATH, not full URL
 
             runItem.innerHTML = `
                 <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
@@ -145,7 +152,7 @@ document.addEventListener('DOMContentLoaded', function() {
                            <small class="run-date text-muted">Modified: ${formatTimestamp(run.modified_time)}</small>
                         </div>
                     </div>
-                    <a href="${fbLink}" class="btn btn-sm btn-outline-primary filebrowser-link ml-auto mt-1 mt-md-0" target="_blank" title="Open in File Browser">
+                    <a href="${fbPath}" class="btn btn-sm btn-outline-primary filebrowser-link ml-auto mt-1 mt-md-0" title="Open in File Browser">
                         <i class="bi bi-folder-symlink"></i> <span class="d-none d-md-inline">File Browser</span>
                     </a>
                 </div>
@@ -182,11 +189,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (targetElement) {
                 targetElement.classList.add('highlighted');
                 targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                // Optionally auto-expand
-                // const expandButton = targetElement.querySelector('.expand-btn');
-                // if (expandButton && expandButton.getAttribute('aria-expanded') === 'false') {
-                //    handleExpandCollapse(expandButton, window.highlightRun);
-                // }
             } else {
                 console.warn(`Highlight run "${window.highlightRun}" not found in the list.`);
             }
@@ -199,7 +201,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showStatus(loadingLi, true);
         showStatus(errorLi, false);
 
-        // Clear previous file list items (excluding loading/error messages)
+        // Clear previous file list items
         Array.from(fileListUl.children).forEach(child => {
             if (!child.classList.contains('file-list-loading') && !child.classList.contains('file-list-error')) {
                 child.remove();
@@ -266,22 +268,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (isExpanded) {
             // Collapse
-            targetCollapse.style.maxHeight = null; // Or use Bootstrap's JS if integrated
-            targetCollapse.classList.remove('show'); // For Bootstrap 4/5 JS integration
+            targetCollapse.style.maxHeight = null;
+            targetCollapse.classList.remove('show');
              button.setAttribute('aria-expanded', 'false');
              icon.classList.remove('fa-minus');
              icon.classList.add('fa-plus');
         } else {
             // Expand
-             // Basic animation (can enhance with CSS transitions)
-            targetCollapse.classList.add('show'); // For Bootstrap 4/5 JS integration
-            targetCollapse.style.maxHeight = targetCollapse.scrollHeight + "px"; // Basic height animation
+            targetCollapse.classList.add('show');
+            targetCollapse.style.maxHeight = targetCollapse.scrollHeight + "px";
              button.setAttribute('aria-expanded', 'true');
              icon.classList.remove('fa-plus');
              icon.classList.add('fa-minus');
 
             // Fetch files only if the list hasn't been loaded yet
-             // Check if files (excluding loading/error placeholders) are already present
             const hasFiles = Array.from(fileListUl.children).some(child =>
                  !child.classList.contains('file-list-loading') && !child.classList.contains('file-list-error')
             );
@@ -289,12 +289,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 fetchAndRenderFiles(runName, fileListUl, loadingLi, errorLi);
             }
         }
-         // Adjust maxHeight after content is potentially loaded (or use CSS transitions)
+         // Adjust maxHeight after content is potentially loaded
         setTimeout(() => {
              if(button.getAttribute('aria-expanded') === 'true') {
                  targetCollapse.style.maxHeight = targetCollapse.scrollHeight + "px";
              }
-         }, 300); // Delay slightly for content loading/rendering
+         }, 300);
     }
 
 
@@ -302,20 +302,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Filter input
     filterInput.addEventListener('input', () => {
-        renderRuns(); // Re-render applies the filter
-        applyHighlight(); // Re-apply highlight if filter changes
+        renderRuns();
+        applyHighlight();
     });
 
     // Sort buttons
     sortButtons.forEach(button => {
         button.addEventListener('click', () => {
             const newSortField = button.dataset.sort;
-            // If clicking the same field, toggle direction, else set to default desc
             if (currentSort.field === newSortField) {
                 currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
             } else {
                 currentSort.field = newSortField;
-                currentSort.direction = 'desc'; // Default to descending for new field
+                currentSort.direction = 'desc';
             }
              updateSortUI();
              sortAndRenderRuns();
@@ -332,13 +331,50 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
 
-    // Expand/Collapse (using event delegation)
+    // Expand/Collapse AND File Browser Link Handling (using event delegation)
     runsListContainer.addEventListener('click', function(event) {
-        const button = event.target.closest('.expand-btn');
-        if (button) {
-            const runItem = button.closest('.run-item');
+        const expandButton = event.target.closest('.expand-btn');
+        const fileBrowserLink = event.target.closest('.filebrowser-link');
+
+        if (expandButton) {
+            // --- Handle Expand/Collapse ---
+            const runItem = expandButton.closest('.run-item');
             const runName = runItem.dataset.runName;
-            handleExpandCollapse(button, runName);
+            handleExpandCollapse(expandButton, runName);
+
+        } else if (fileBrowserLink) {
+            // --- Handle File Browser Link Click ---
+            event.preventDefault(); // Prevent opening new tab
+
+            const targetPath = fileBrowserLink.getAttribute('href'); // Get the PATH from href (e.g., /filebrowser/files/results/...)
+            if (!targetPath || targetPath === '#') {
+                console.error("File Browser link has invalid href:", targetPath);
+                return; // Don't proceed if the path is missing
+            }
+
+            // Construct the FULL URL for the iframe using the defined base URL and the path
+            const targetUrl = FILE_BROWSER_BASE_URL + targetPath; // <-- Combine Base URL + Path
+
+            console.log("Opening File Browser iframe to:", targetUrl);
+
+            // Get references to the iframe elements from base.html
+            const iframe = document.getElementById('fileBrowserFrame');
+            const iframeContainer = document.getElementById('fileBrowserContainer');
+            const overlay = document.getElementById('overlay');
+
+            if (iframe && iframeContainer && overlay) {
+                // Set the iframe source to the correctly constructed URL
+                iframe.src = targetUrl; // <-- Use the full URL with correct port
+
+                // Show the iframe container and overlay
+                iframeContainer.classList.add('active');
+                overlay.classList.add('active');
+            } else {
+                console.error("Could not find File Browser iframe elements in base.html");
+                // Fallback: open the constructed full URL in new tab if iframe elements are missing
+                console.warn("Falling back to opening link in new tab.");
+                window.open(targetUrl, '_blank');
+            }
         }
     });
 
