@@ -8,15 +8,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const addToStagingBtn = document.getElementById('addToStagingBtn');
     const pipelineStatusDiv = document.getElementById('pipeline-status');
     const mandatorySelects = [forwardReadsSelect, reverseReadsSelect, referenceGenomeSelect, targetRegionsSelect];
-    // --- MODIFIED: Include knownVariantsSelect for easier reset ---
     const allSelects = [forwardReadsSelect, reverseReadsSelect, referenceGenomeSelect, targetRegionsSelect, knownVariantsSelect];
 
     // --- Helper Functions ---
 
+    /**
+     * Populates a select dropdown with files matching given extensions,
+     * preserving the first (placeholder) option.
+     * @param {HTMLSelectElement} selectElement - The dropdown element.
+     * @param {Array<Object>} files - Array of file objects (e.g., { name: "file.txt" }).
+     * @param {Array<string>} extensions - Array of valid file extensions (e.g., ['.txt', '.csv']).
+     */
     function populateDropdown(selectElement, files, extensions) {
-        // --- Keep the first option (the placeholder) ---
-        // selectElement.length = 1; // <-- REMOVE THIS LINE or adjust if you want to rebuild placeholders too
+        // Keep the first option (placeholder)
+        // selectElement.length = 1; // Use this if you need to clear previous dynamic options first
         if (!files || files.length === 0) return;
+
         const sortedFiles = files.sort((a, b) => a.name.localeCompare(b.name));
         sortedFiles.forEach(file => {
             if (extensions.some(ext => file.name.toLowerCase().endsWith(ext.toLowerCase()))) {
@@ -28,152 +35,166 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    /**
+     * Checks if all mandatory select elements have a value selected.
+     * @returns {boolean} True if all mandatory files are selected, false otherwise.
+     */
     function checkMandatoryFiles() {
         return mandatorySelects.every(select => select.value !== "");
     }
 
     /**
-     * Resets all form select elements to their initial ("None"/placeholder) state.
-     * Sets the value to "" which selects the first <option> with value=""
-     * (either the disabled placeholder or the added "None" option).
-     * Also disables the staging button.
+     * Resets all form select elements to their initial state (value="").
+     * Disables the staging button.
+     * NOTE: Does NOT clear the pipeline status message, allowing success/error messages to persist.
      */
     function resetForm() {
         allSelects.forEach(select => {
-            select.value = ""; // Reset to the option with value=""
+            select.value = ""; // Reset to the option with value="" (placeholder or "None")
         });
         // Explicitly disable the button after resetting
         addToStagingBtn.disabled = true;
-        // Optionally clear status message immediately after reset
-        pipelineStatusDiv.innerHTML = '';
-        pipelineStatusDiv.className = 'mt-3 d-none';
+        // The status message is intentionally NOT cleared here.
+        // It will be cleared by user interaction via the 'change' listeners.
     }
 
-
+    /**
+     * Updates the UI elements: status message, button text, and button disabled state.
+     * @param {boolean} isSubmitting - Whether the form is currently being submitted.
+     * @param {string} statusMessage - The message to display (HTML allowed).
+     * @param {string} [messageType='info'] - The Bootstrap alert type ('info', 'success', 'warning', 'danger').
+     */
     function updateUI(isSubmitting, statusMessage, messageType = 'info') {
         pipelineStatusDiv.innerHTML = statusMessage;
-        // Make sure message is visible if there is content
+        // Show/hide the status div based on whether there's a message
         pipelineStatusDiv.className = `mt-3 alert alert-${messageType} ${statusMessage ? '' : 'd-none'}`;
 
-        // Update button state
         // Button should be disabled if submitting OR if mandatory files aren't selected
         addToStagingBtn.disabled = isSubmitting || !checkMandatoryFiles();
-
-        // Update button text
         addToStagingBtn.textContent = isSubmitting ? 'Staging...' : 'Add to Staging';
     }
 
 
-    // --- Initial Setup ---
+    // --- Initial Setup: Fetch file list and populate dropdowns ---
     fetch('/get_data')
         .then(response => {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             return response.json();
         })
         .then(data => {
-            // Populate mandatory dropdowns (keeping placeholder)
+            // Populate mandatory dropdowns
             populateDropdown(forwardReadsSelect, data, ['.fastq', '.fastq.gz', '.fq', '.fq.gz']);
             populateDropdown(reverseReadsSelect, data, ['.fastq', '.fastq.gz', '.fq', '.fq.gz']);
             populateDropdown(referenceGenomeSelect, data, ['.fasta', '.fasta.gz', '.fa', '.fa.gz']);
             populateDropdown(targetRegionsSelect, data, ['.bed']);
 
-            // Handle optional dropdown: Clear existing options except placeholder, add "None", then files
-            knownVariantsSelect.length = 1; // Keep only the placeholder initially
+            // Setup optional dropdown (Known Variants)
+            knownVariantsSelect.length = 1; // Keep only the placeholder
             const noneOption = document.createElement('option');
-            // --- Ensure value is "" to match resetForm logic ---
-            noneOption.value = "";
+            noneOption.value = ""; // Value matches resetForm logic and placeholder
             noneOption.textContent = "None (Optional)";
-            // --- Make this "None" option selected by default after population ---
-            noneOption.selected = true; // Make this the default *selectable* option
+            noneOption.selected = true; // Make this the default selectable option
             knownVariantsSelect.appendChild(noneOption);
-            // Now populate the actual VCF files
-            populateDropdown(knownVariantsSelect, data, ['.vcf', '.vcf.gz']);
-            // --- Set value to "" to ensure the added "None" or placeholder is selected ---
-            knownVariantsSelect.value = ""; // Selects the <option value="">
+            populateDropdown(knownVariantsSelect, data, ['.vcf', '.vcf.gz']); // Add actual VCF files
 
-            // --- Ensure initial state selects the placeholder/None option for ALL selects ---
+            // Ensure all selects start at their placeholder/None state
             allSelects.forEach(select => {
-                 select.value = ""; // This ensures the <option value=""> is selected initially
+                 select.value = "";
             });
 
-            addToStagingBtn.disabled = !checkMandatoryFiles(); // Initial check based on mandatory fields
+            // Set initial button state based on mandatory fields
+            addToStagingBtn.disabled = !checkMandatoryFiles();
         })
         .catch(error => {
             console.error('Error fetching file list:', error);
             updateUI(false, `Error fetching file list: ${error.message}. Cannot stage job.`, 'danger');
             addToStagingBtn.disabled = true;
-            allSelects.forEach(s => s.disabled = true); // Disable selects on error
+            allSelects.forEach(s => s.disabled = true); // Disable selects if file list fails
         });
 
-    // Event listeners to enable/disable the stage button
+    // --- Event Listeners for Select Changes ---
+
+    // Update button state and clear status message when mandatory fields change
     mandatorySelects.forEach(select => {
         select.addEventListener('change', () => {
             const isSubmitting = addToStagingBtn.textContent === 'Staging...';
             addToStagingBtn.disabled = isSubmitting || !checkMandatoryFiles();
-            // Clear status message when user interacts (unless submitting)
+            // Clear status message on user interaction (unless already submitting)
             if (!isSubmitting) {
-                 updateUI(false, '', 'info');
+                 updateUI(false, '', 'info'); // Reset message but maintain button state logic
             }
         });
     });
-    // Also listen to optional select change for UI consistency if needed (optional)
+
+    // Clear status message when optional field changes (button state doesn't depend on it)
     knownVariantsSelect.addEventListener('change', () => {
         const isSubmitting = addToStagingBtn.textContent === 'Staging...';
         if (!isSubmitting) {
-             updateUI(false, '', 'info');
+             updateUI(false, '', 'info'); // Reset message
         }
-        // Button state depends only on mandatory fields, so no need to update disable state here
     });
 
     // --- Add to Staging Button Event Listener ---
     addToStagingBtn.addEventListener('click', function() {
         if (!checkMandatoryFiles()) {
             updateUI(false, 'Please select all mandatory input files.', 'warning');
-            return;
+            return; // Stop if validation fails
         }
 
-        updateUI(true, 'Staging job...', 'info'); // Show submitting state
+        // Update UI to indicate submission is in progress
+        updateUI(true, 'Staging job...', 'info');
 
         const payload = {
             forward_reads_file: forwardReadsSelect.value,
             reverse_reads_file: reverseReadsSelect.value,
             reference_genome_file: referenceGenomeSelect.value,
             target_regions_file: targetRegionsSelect.value,
-            // Send null if value is "", otherwise send the selected file
+            // Send null if "None" or placeholder is selected, otherwise send the file name
             known_variants_file: knownVariantsSelect.value === "" ? null : knownVariantsSelect.value
         };
 
+        // Send the request to the backend
         fetch('/run_pipeline', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json' // Indicate we expect JSON back
+            },
             body: JSON.stringify(payload)
         })
-        .then(async response => {
-            if (response.ok) return response.json(); // Expect 200 OK for staging success now
-            // Handle potential errors (like validation errors from backend)
+        .then(async response => { // Use async to easily await potential error JSON
+            if (response.ok) {
+                return response.json(); // Success case (e.g., 200 OK)
+            }
+            // Handle HTTP errors (e.g., 400, 422, 500)
             let errorDetail = `HTTP ${response.status}: ${response.statusText}`;
             try {
+                // Try to parse JSON error detail from backend
                 const errData = await response.json();
                 errorDetail = `Failed to stage job (${response.status}): ${errData.detail || response.statusText}`;
-            } catch (e) { /* Ignore if response body isn't JSON */ }
-            throw new Error(errorDetail);
+            } catch (e) {
+                // Ignore if response body isn't JSON or parsing fails
+            }
+            throw new Error(errorDetail); // Throw an error to be caught by .catch()
         })
         .then(data => {
+            // Handle successful staging response
             if (data.staged_job_id) {
                 const successMessage = `Success! Job staged with ID: <code>${data.staged_job_id}</code>. <br>Go to the <a href="/jobs" class="alert-link">Jobs Dashboard</a> to monitor and start the job.`;
-                // Update UI FIRST to show success message (keeps button disabled for a moment)
+                // Show success message (button will be re-enabled by updateUI)
                 updateUI(false, successMessage, 'success');
-                // --- THEN Reset the form ---
-                resetForm(); // This will set selects to "" and disable the button
+                // Reset the form selections and disable the button again
+                resetForm();
             } else {
-                // Handle cases where staging might succeed but not return expected ID (unlikely with current backend)
+                // Handle unexpected success response (e.g., missing job ID)
                 updateUI(false, data.message || 'Job staged, but no ID received. Check Jobs Dashboard.', 'warning');
-                // Don't reset form if ID wasn't received, user might want to retry
+                // Don't reset form in this case, user might need to see selections or retry
             }
         })
         .catch(error => {
+            // Handle fetch errors or errors thrown from .then(response => ...)
             console.error('Error submitting pipeline job for staging:', error);
-            // Show error, keep button enabled (updateUI handles this)
+            // Show error message (button will be re-enabled by updateUI if mandatory files are still selected)
             updateUI(false, `Error staging job: ${error.message}`, 'danger');
         });
     });
