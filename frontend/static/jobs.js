@@ -68,7 +68,6 @@ document.addEventListener('DOMContentLoaded', function() {
          globalStatusDiv.className = '';
     }
 
-    // +++ ADDED MISSING HELPER FUNCTION +++
     /** Safely get nested property */
     function getNested(obj, path, defaultValue = null) {
         try {
@@ -85,7 +84,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return defaultValue;
         }
     }
-    // +++++++++++++++++++++++++++++++++++++++
 
      /** Checks if the jobs table body is empty (excluding placeholder rows) */
      function isTableEmpty() {
@@ -370,9 +368,14 @@ document.addEventListener('DOMContentLoaded', function() {
                  if (response.status === 404) {
                      console.warn(`Job ${jobId} not found during polling (404). Assuming completed/deleted. Stopping polling.`);
                      stopPolling(jobId);
+                     // Update the row to reflect the error/disappearance?
+                     // This is tricky, as the row *might* have been intentionally removed by a delete action.
+                     // Let's assume stopPolling is enough for now.
                  } else {
                      const errorData = await response.json().catch(() => ({ detail: response.statusText }));
                      console.error(`Error polling job ${jobId} (${response.status}): ${errorData.detail}`);
+                     // Maybe update the row status to 'Error Polling'?
+                     // updateActionCell(row.cells[3], { job_id: jobId, status: 'error_polling', error: `Poll Error ${response.status}` });
                  }
                  return;
             }
@@ -382,6 +385,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         } catch (error) {
             console.error(`Network error polling job ${jobId}:`, error);
+            // Maybe update row status on network error too?
+            // const row = jobsTableBody.querySelector(`tr[data-job-id="${jobId}"]`);
+            // if (row && row.cells[3]) {
+            //    updateActionCell(row.cells[3], { job_id: jobId, status: 'error_polling', error: 'Network Error' });
+            // }
         }
     }
 
@@ -424,16 +432,23 @@ document.addEventListener('DOMContentLoaded', function() {
         const removeButton = button.closest('td').querySelector(`.${BUTTON_CLASS_REMOVE}`);
         if (removeButton) removeButton.disabled = true;
 
-        try {
-            const response = await fetch(`/start_job/${stagedJobId}`, { method: 'POST', headers: { 'Accept': 'application/json' } });
-            const result = await response.json();
+    try {
+        const response = await fetch(`/start_job/${stagedJobId}`, { method: 'POST', headers: { 'Accept': 'application/json' }});
+        const result = await response.json();
 
-            if (!response.ok || response.status !== 202) {
-                throw new Error(result.detail || `Failed to start job (${response.status})`);
-            }
+        if (!response.ok || response.status !== 202) {
+            throw new Error(result.detail || `Failed to start job (${response.status})`);
+        }
 
-            showGlobalStatus(`Job <code>${result.job_id}</code> enqueued successfully. Refreshing list...`, 'success');
-            setTimeout(fetchJobsList, 1500);
+        showGlobalStatus(`Job <code>${result.job_id}</code> enqueued successfully. Refreshing list...`, 'success');
+
+        // --- ADD THIS LINE ---
+        // Immediately start polling the status of the newly created RQ job
+        startPolling(result.job_id);
+        // --- END ADDED LINE ---
+
+        // Keep the scheduled full refresh as well
+        setTimeout(fetchJobsList, 1500);
 
         } catch (error) {
             console.error(`Error starting job ${stagedJobId}:`, error);
@@ -453,35 +468,74 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    /** Handle Stop Button Click */
-    async function handleStopClick(button) {
-        const jobId = button.dataset.jobId;
-        if (!jobId) return;
+    async function handleStartClick(button) {
+    const stagedJobId = button.dataset.stagedId;
+    if (!stagedJobId) {
+         console.error("Start button clicked but data-staged-id missing.");
+         return;
+     }
+    try {
+        const response = await fetch(`/start_job/${stagedJobId}`, ...);
+        const result = await response.json();
 
-        button.disabled = true;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Stopping...';
+        if (!response.ok) {
+            throw new Error(result.detail || `Failed to start job (${response.status})`);
+        }
 
-        try {
-            const response = await fetch(`/stop_job/${jobId}`, { method: 'POST', headers: { 'Accept': 'application/json' } });
-            const result = await response.json();
+        // 1. Remove the staged job row
+        const stagedRow = button.closest('tr');
+        if (stagedRow) stagedRow.remove();
 
-             if (!response.ok) {
-                 throw new Error(result.detail || `Failed to stop job (${response.status})`);
-             }
+        // 2. Immediately create a new row for the RQ job
+        const newJobRow = jobsTableBody.insertRow(-1);
+        newJobRow.dataset.jobId = result.new_job_id;
+        newJobRow.innerHTML = `
+            <td><strong>${result.new_job_id.substring(0, 15)}...</strong></td>
+            <td><div class="job-parameters">Loading...</div></td>
+            <td>Starting...</td>
+            <td class="action-cell">
+                <span class="job-status-text text-info">
+                    <i class="fas fa-sync-alt fa-spin"></i> Starting
+                </span>
+                <br>
+                <button class="btn btn-danger btn-sm ${BUTTON_CLASS_STOP}" 
+                        data-job-id="${result.new_job_id}">
+                    Stop
+                </button>
+                <button class="btn btn-outline-danger btn-sm ${BUTTON_CLASS_REMOVE}" 
+                        data-job-id="${result.new_job_id}"
+                        title="Remove Job Data">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
 
-            showGlobalStatus(`Stop request for job <code>${jobId}</code>: ${result.message}. Status will update shortly.`, 'info');
-            await pollJobStatus(jobId);
+        // 3. Start polling immediately  
+        startPolling(result.new_job_id);
+        showGlobalStatus(`Job <code>${result.new_job_id}</code> enqueued successfully`, 'success');
+
+    const row = button.closest('tr'); // Get the row to remove later
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+    const removeButton = button.closest('td').querySelector(`.${BUTTON_CLASS_REMOVE}`);
+    if (removeButton) removeButton.disabled = true;
 
         } catch (error) {
-            console.error(`Error stopping job ${jobId}:`, error);
-            showGlobalStatus(`Error stopping job <code>${jobId}</code>: ${error.message}`, 'danger');
-            const existingButton = jobsTableBody.querySelector(`button[data-job-id="${jobId}"].${BUTTON_CLASS_STOP}`);
-            if(existingButton){
-                existingButton.disabled = false;
-                existingButton.innerHTML = 'Stop';
-            }
-        }
+        console.error(`Error starting job ${stagedJobId}:`, error);
+        showGlobalStatus(`Error starting job <code>${stagedJobId}</code>: ${error.message}`, 'danger');
+        // Ensure buttons are re-enabled on error in the catch block as well
+        const existingButton = jobsTableBody.querySelector(`button[data-staged-id="${stagedJobId}"].${BUTTON_CLASS_START}`);
+         if(existingButton){
+             existingButton.disabled = false;
+             existingButton.innerHTML = 'Start';
+         }
+         const existingRemoveButton = jobsTableBody.querySelector(`tr[data-job-id="${stagedJobId}"] .${BUTTON_CLASS_REMOVE}`);
+         if(existingRemoveButton) {
+             existingRemoveButton.disabled = false;
+         }
     }
+}
+
 
      /** Handle Rerun Button Click */
      async function handleRerunClick(button) {
@@ -546,7 +600,10 @@ document.addEventListener('DOMContentLoaded', function() {
      /** Handle Error Details Button Click */
      function handleErrorDetailsClick(button) {
          const errorMsg = button.dataset.error || "No specific error message provided.";
-         let extraDetails = "";
+         // If you stored more details (e.g., job.exc_info) in meta and fetched it, you could display it here
+         // const jobId = button.closest('tr').dataset.jobId;
+         // fetch(`/job_status/${jobId}`).then(...).then(job => { /* extract details */ });
+         let extraDetails = ""; // Placeholder for more details if fetched
 
          errorModalText.textContent = errorMsg + extraDetails;
          errorModal.style.display = "block";
@@ -560,9 +617,11 @@ document.addEventListener('DOMContentLoaded', function() {
              return;
         }
 
-        const jobDesc = jobId.startsWith("staged_") ? `staged job '${jobId.substring(0, 15)}...'` : `job '${jobId}'`;
-        const confirmation = confirm(`Are you sure you want to permanently remove ${jobDesc} and its data? This cannot be undone.`);
-        if (!confirmation) return;
+        // --- CONFIRMATION REMOVED ---
+        // const jobDesc = jobId.startsWith("staged_") ? `staged job '${jobId.substring(0, 15)}...'` : `job '${jobId}'`;
+        // const confirmation = confirm(`Are you sure you want to permanently remove ${jobDesc} and its data? This cannot be undone.`);
+        // if (!confirmation) return;
+        // --- END REMOVED CONFIRMATION ---
 
         stopPolling(jobId); // Stop polling if active
 
@@ -577,6 +636,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
 
             if (!response.ok) {
+                // Keep button disabled but show error state visually?
+                // Maybe revert icon but keep disabled?
+                //button.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i>';
                 throw new Error(result.detail || `Failed to remove job (${response.status})`);
             }
 
@@ -584,6 +646,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const rowToRemove = button.closest('tr');
             if (rowToRemove) rowToRemove.remove();
 
+            // Check if table is empty AFTER removing the row
             if (isTableEmpty()) {
                 noJobsRow.style.display = '';
                 loadingRow.style.display = 'none';
@@ -593,11 +656,12 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error(`Error removing job ${jobId}:`, error);
             showGlobalStatus(`Error removing job <code>${jobId}</code>: ${error.message}`, 'danger');
-             const existingButton = jobsTableBody.querySelector(`button[data-job-id="${jobId}"].${BUTTON_CLASS_REMOVE}`);
-             if(existingButton){
+            // Re-enable the button on error so the user can retry
+            const existingButton = jobsTableBody.querySelector(`button[data-job-id="${jobId}"].${BUTTON_CLASS_REMOVE}`);
+            if(existingButton){
                  existingButton.disabled = false;
                  existingButton.innerHTML = '<i class="fas fa-trash"></i>';
-             }
+            }
         }
     }
 
@@ -616,8 +680,9 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (button.classList.contains(BUTTON_CLASS_ERROR_DETAILS)) {
             handleErrorDetailsClick(button);
         } else if (button.classList.contains(BUTTON_CLASS_REMOVE)) {
-            handleRemoveClick(button);
+            handleRemoveClick(button); // Will now run without confirmation
         }
+        // Note: No action needed for BUTTON_CLASS_RESULTS as it's an <a> tag
     });
 
     refreshButton.addEventListener('click', fetchJobsList);
@@ -639,3 +704,4 @@ document.addEventListener('DOMContentLoaded', function() {
     fetchJobsList();
 
 });
+

@@ -514,7 +514,7 @@ async def remove_job(
 
             # Delete the job data (main hash and from registries)
             # remove_from_registries=True is more thorough
-            job.delete(remove_from_registries=True)
+            job.delete()
 
             logger.info(f"Successfully deleted RQ job '{job_id}' and associated data.")
             # Stop any active polling for this job ID if necessary (though frontend usually handles row removal)
