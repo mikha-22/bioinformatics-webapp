@@ -55,15 +55,15 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Only copy what tasks.py needs (or mount via compose)
 # Make sure the path structure allows `from backend.app.tasks import ...`
 COPY ./backend/app/tasks.py /app/backend/app/tasks.py
-COPY ./backend/app/utils /app/backend/app/utils # If utils are needed by tasks
-COPY ./backend/app/core/config.py /app/backend/app/core/config.py # If config needed by tasks
+COPY ./backend/app/utils /app/backend/app/utils
+COPY ./backend/app/core/config.py /app/backend/app/core/config.py
 # Ensure parent directories and __init__.py files exist
 RUN mkdir -p /app/backend/app && \
     touch /app/backend/__init__.py /app/backend/app/__init__.py
 
 # --- Environment Setup ---
-ENV PYTHONPATH=/app # Allows finding backend.app.tasks
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 # Helps Nextflow find Java
+ENV PYTHONPATH=/app
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 
 # Change ownership
 RUN chown -R appuser:appuser /app /home/appuser
