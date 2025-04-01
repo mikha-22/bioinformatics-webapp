@@ -210,7 +210,7 @@ async def get_jobs_list(
                     "ended_at": None,
                     "result": None,
                     "error": None,
-                    "meta": {"input_params": details.get("input_filenames", {})}, # Extract original filenames
+                    "meta": {"input_params": details.get("input_filenames", {}),"staged_job_id_origin": job_id},
                     "staged_at": details.get("staged_at"), # Timestamp when staged
                     "resources": None # No resources for staged jobs
                 }
