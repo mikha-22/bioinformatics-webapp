@@ -340,8 +340,8 @@ volumes:
     "baseURL": "/filebrowser",
     "root": "/srv",
     "noauth": true,
-    "cert": "/app/tls/server.crt",
-    "key": "/app/tls/server.key"
+    "cert": "/config/server.crt",
+    "key": "/config/server.key"
 }
 --- END FILE: ./docker/settings.json ---
 
@@ -574,13 +574,13 @@ USER appuser
 
 # Expose the internal port File Browser will listen on
 # Make sure this matches the --port flag in CMD and the internal port in docker-compose
-EXPOSE 8081
+EXPOSE 8080
 
 # --- Define the command ---
 # Use flags matching the paths where config files are copied/mounted
 # Ensure the --port matches the EXPOSE instruction above
 CMD ["/usr/local/bin/filebrowser", \
-     "--port=8081", \
+     "--port=8080", \
      "--root=/srv", \
      "--database=/config/filebrowser.db", \
      "--config=/config/settings.json"]
@@ -3177,112 +3177,155 @@ This is the recommended method for deployment, as it packages the application an
 
 --- START FILE: ./docker-compose.yml ---
 # ./docker-compose.yml
+# Main compose file for running the full application stack,
+# building images locally.
+
 version: '3.8'
 
 services:
+  ##################
+  # Web Application
+  ##################
   webapp:
-    # Replace build: with image:
-    image: ghcr.io/mikha-22/bioinformatics-webapp/webapp:latest
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.webapp
     container_name: bio_webapp
     ports:
-      - "${WEBAPP_PORT:-8000}:8000"
+      - "${WEBAPP_PORT:-8000}:8000" # Webapp listens on 8000 (via main.py/uvicorn)
     volumes:
-      # You MAY still want to mount code/TLS/results for runtime access/updates
-      # If code/TLS is BAKED into the image and doesn't need host access, remove mounts
-      - ./backend:/app/backend:ro
-      - ./frontend:/app/frontend:ro
-      - ./main.py:/app/main.py:ro
-      - ./tls:/app/tls:ro # Needed by main.py if it reads local TLS files
-      - results_vol:/app/bioinformatics/results:ro
+      # Mount local code for development convenience (overrides image code)
+      # Remove these if you want to run *only* the code baked into the image
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+      - ./main.py:/app/main.py
+      # Mount TLS certificates needed by uvicorn in main.py
+      - ./tls:/app/tls
+      # Mount results for potential read access by webapp (optional)
+      - results_vol:/app/bioinformatics/results
+      - data_vol:/app/bioinformatics/data
+      - ./docker/settings.json:/app/docker/settings.json
     environment:
+      # Must point to the 'redis' service name below
       - REDIS_HOST=redis
       - PYTHONUNBUFFERED=1
-    # User directive might still be needed if the image expects it or for volume permissions
     user: "${UID:-1000}:${GID:-1000}"
     depends_on:
-      - redis
+      - redis # Webapp needs Redis to initialize RQ connection/queue
     restart: unless-stopped
     networks:
       - app-network
 
+  ##################
+  # RQ Worker
+  ##################
   worker:
-    # Replace build: with image:
-    image: ghcr.io/mikha-22/bioinformatics-webapp/worker:latest
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker
     container_name: bio_worker
     depends_on:
-      - redis
+      - redis # Worker needs Redis to connect to the queue
     volumes:
-      # --- Critical: Mount Docker socket ---
+      # Critical: Mount Docker socket if tasks use Docker (e.g., Nextflow)
       - /var/run/docker.sock:/var/run/docker.sock
-      # --- Mount backend code ONLY if worker image doesn't have it baked in ---
-      # - ./backend:/app/backend:ro # Remove if code is in the image
-      # --- Mount shared data volumes ---
-      - data_vol:/data
-      - results_vol:/results
-      - references_vol:/references
-      - nextflow_work_vol:/nf_work
+      # Optional: Mount backend code if NOT fully baked into the image AND needed at runtime
+      # - ./backend:/app/backend:ro # Commented out as Dockerfile.worker copies necessary code
+      # Mount shared data volumes needed by the pipeline tasks
+      - data_vol:/data # Assuming tasks might need input from /data
+      - results_vol:/results # Tasks likely write results here
+      - references_vol:/references # If tasks need reference data
+      - nextflow_work_vol:/nf_work # If using Nextflow
     environment:
+      # Must match the service name below (already does)
       - REDIS_HOST=redis
       - PYTHONUNBUFFERED=1
-      - PYTHONPATH=/app # Still needed if backend code structure is expected
-      - NXF_WORK=/nf_work
-    # User directive might still be needed for socket/volume permissions
+      - PYTHONPATH=/app # Set in Dockerfile.worker, reiterated for clarity
+      - NXF_WORK=/nf_work # For Nextflow, if used
     user: "${UID:-1000}:${GID:-1000}"
     restart: unless-stopped
     networks:
       - app-network
 
-  redis:
-    image: redis:7-alpine # Stays the same
+  ##################
+  # Redis
+  ##################
+  redis: # Service name MUST be 'redis' for hardcoded worker CMD
+    image: redis:7-alpine
     container_name: bio_redis
     volumes:
+      # Persist Redis data
       - redis_data_vol:/data
     restart: unless-stopped
     networks:
       - app-network
+    # No ports exposed to host by default, only accessible within app-network
 
+  ##################
+  # File Browser
+  ##################
   filebrowser:
-    # Replace build: with image:
-    image: ghcr.io/mikha-22/bioinformatics-webapp/filebrowser:latest
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.filebrowser
     container_name: bio_filebrowser
     ports:
-      - "${FILEBROWSER_PORT:-8081}:8080" # Internal port is 8080 as per your last Dockerfile
+      # Host port : Container port (matches Dockerfile EXPOSE and CMD --port)
+      - "${FILEBROWSER_PORT:-8081}:8080"
     volumes:
-      # Mount data/results volumes
-      - data_vol:/srv/data
-      - results_vol:/srv/results
-      # Mount runtime config/TLS files - image needs CMD flags matching these paths
-      - ./docker/filebrowser.db:/config/filebrowser.db
-      - ./docker/settings.json:/config/settings.json:ro
-      - ./tls/server.crt:/config/server.crt:ro
-      - ./tls/server.key:/config/server.key:ro
-    # User directive might still be needed for volume access
+      # Mount data/results for browsing (results needs write access for deletion)
+      - data_vol:/srv/data # Data likely read-only
+      - results_vol:/srv/results # Needs write access
+      # Mount runtime config/TLS files needed by CMD flags
+      - ./docker/filebrowser.db:/config/filebrowser.db # Needs write access
+      - ./docker/settings.json:/config/settings.json
+      - ./tls/server.crt:/config/server.crt
+      - ./tls/server.key:/config/server.key
+      # Ensure settings.json inside ./docker/ now points to /config/server.crt and /config/server.key
     user: "${UID:-1000}:${GID:-1000}"
     restart: unless-stopped
-    # Ensure the CMD baked into the image uses the correct paths (/config, /srv)
     networks:
       - app-network
 
-# Define the network
+##################
+# Networks
+##################
 networks:
   app-network:
     driver: bridge
 
-# Define named volumes
+##################
+# Volumes
+##################
 volumes:
   data_vol:
-    # driver_opts:
-    #   device: '/absolute/path/on/your/host/bioinformatics/data'
+    # Define how the volume is managed (default is Docker managed)
+    # Or use driver_opts for local path mapping if needed:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/home/mikha/labs/bioinformatics-webapp/bioinformatics/data'
   results_vol:
-    # driver_opts:
-    #   device: '/absolute/path/on/your/host/bioinformatics/results'
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/home/mikha/labs/bioinformatics-webapp/bioinformatics/results'
   references_vol:
-    # driver_opts:
-    #   device: '/absolute/path/on/your/host/bioinformatics/references'
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/home/mikha/labs/bioinformatics-webapp/bioinformatics/references'
   nextflow_work_vol:
-    # driver_opts:
-    #   device: '/absolute/path/on/your/host/bioinformatics/nf_work'
+    #  driver: local
+    #  driver_opts:
+    #    type: 'none'
+    #    o: 'bind'
+    #    device: '/home/mikha/labs/bioinformatics-webapp/bioinformatics/nf_work'
   redis_data_vol:
+    # Docker managed volume for Redis persistence
 --- END FILE: ./docker-compose.yml ---
 
 --- START FILE: ./contextualize.sh ---
@@ -4826,6 +4869,7 @@ def get_pipeline_queue():
 # backend/app/core/config.py
 import logging
 from pathlib import Path
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -4857,11 +4901,13 @@ except Exception as e:
 
 
 # --- Redis/RQ Configuration ---
-REDIS_HOST = "localhost"
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = 6379
 REDIS_DB = 0
 PIPELINE_QUEUE_NAME = "pipeline_tasks"
 STAGED_JOBS_KEY = "staged_pipeline_jobs" # Key for Redis Hash storing staged jobs
+
+logger.info(f"Using REDIS_HOST: {REDIS_HOST}")
 
 # --- Job Settings ---
 DEFAULT_JOB_TIMEOUT = '2h'

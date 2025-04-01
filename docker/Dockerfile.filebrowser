@@ -67,7 +67,7 @@ EXPOSE 8080
 # Use flags matching the paths where config files are copied/mounted
 # Ensure the --port matches the EXPOSE instruction above
 CMD ["/usr/local/bin/filebrowser", \
-     "--port=8081", \
+     "--port=8080", \
      "--root=/srv", \
      "--database=/config/filebrowser.db", \
      "--config=/config/settings.json"]
