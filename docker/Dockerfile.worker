@@ -31,7 +31,8 @@ RUN mkdir -p /etc/apt/keyrings && \
     rm -rf /var/lib/apt/lists/*
 
 # --- Install Nextflow ---
-ENV NXF_VER=24.04.3 # Use desired Nextflow version
+# Specify desired Nextflow version
+ENV NXF_VER=24.04.3
 RUN echo "Installing Nextflow..." && \
     cd /usr/local/bin && \
     curl -fsSL https://get.nextflow.io | bash && \
