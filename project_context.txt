@@ -118,7 +118,8 @@ You can place this within your README.md under a new section or link to it from 
 --- END FILE: ./docs/queue.txt ---
 
 --- START FILE: ./.github/workflows/docker-publish.yml ---
-name: Docker Build and Push to GHCR
+# ./.github/workflows/docker-publish.yml
+name: Docker Build and Push Components to GHCR
 
 # Controls when the action will run.
 on:
@@ -129,6 +130,8 @@ on:
       - 'README.md'
       - 'CHANGELOG.md'
       - '.gitignore'
+      # Optionally ignore changes only affecting one component if builds are slow
+      # - 'frontend/**' # Example: ignore frontend changes for worker build
   pull_request:
     branches:
       - main # Trigger on Pull Requests targeting the main branch
@@ -138,7 +141,7 @@ on:
       - '.gitignore'
 
 jobs:
-  build-and-push:
+  build-and-push-components: # Renamed job for clarity
     runs-on: ubuntu-latest
 
     permissions:
@@ -159,29 +162,268 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }} # Using PAT as configured
 
-      - name: Build and push Docker image
+      # --- Build Webapp Image ---
+      - name: Build and push webapp image
         uses: docker/build-push-action@v5
         with:
           context: .
-          # Ensure this path points to your actual Dockerfile
-          file: ./docker/Dockerfile
+          # Specify the webapp Dockerfile
+          file: ./docker/Dockerfile.webapp
           # Push ONLY when the trigger is a push event to the 'main' branch
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          # Define tags: latest and commit-<full-sha>
+          # Define unique tags for the webapp image
           tags: |
-            ghcr.io/mikha-22/bioinformatics-webapp:latest
-            ghcr.io/mikha-22/bioinformatics-webapp:commit-${{ github.sha }}
-          # Pass the current branch name (e.g., 'main') as a build argument
-          # This overrides the default in your Dockerfile's ARG BRANCH
-          build-args: |
-            BRANCH=${{ github.ref_name }}
-          # Cache settings
+            ghcr.io/mikha-22/bioinformatics-webapp/webapp:latest
+            ghcr.io/mikha-22/bioinformatics-webapp/webapp:commit-${{ github.sha }}
+          # Pass build args if needed by Dockerfile.webapp
+          # build-args: |
+          #   SOME_ARG=value
+          # Enable caching
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          no-cache: true
+
+      # --- Build Worker Image ---
+      - name: Build and push worker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          # Specify the worker Dockerfile
+          file: ./docker/Dockerfile.worker
+          # Push ONLY when the trigger is a push event to the 'main' branch
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          # Define unique tags for the worker image
+          tags: |
+            ghcr.io/mikha-22/bioinformatics-webapp/worker:latest
+            ghcr.io/mikha-22/bioinformatics-webapp/worker:commit-${{ github.sha }}
+          # Pass build args if needed by Dockerfile.worker
+          # build-args: |
+          #   SOME_ARG=value
+          # Enable caching
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # --- Build File Browser Image ---
+      - name: Build and push filebrowser image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          # Specify the filebrowser Dockerfile
+          file: ./docker/Dockerfile.filebrowser
+          # Push ONLY when the trigger is a push event to the 'main' branch
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          # Define unique tags for the filebrowser image
+          tags: |
+            ghcr.io/mikha-22/bioinformatics-webapp/filebrowser:latest
+            ghcr.io/mikha-22/bioinformatics-webapp/filebrowser:commit-${{ github.sha }}
+          # Pass build args if needed by Dockerfile.filebrowser
+          # build-args: |
+          #   SOME_ARG=value
+          # Enable caching
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 --- END FILE: ./.github/workflows/docker-publish.yml ---
 
---- START FILE: ./docker/Dockerfile ---
+--- START FILE: ./docker/docker-compose.yml ---
+# ./docker-compose.yml
+version: '3.8'
+
+services:
+  webapp:
+    # Replace build: with image:
+    image: ghcr.io/mikha-22/bioinformatics-webapp/webapp:latest
+    container_name: bio_webapp
+    ports:
+      - "${WEBAPP_PORT:-8000}:8000"
+    volumes:
+      # You MAY still want to mount code/TLS/results for runtime access/updates
+      # If code/TLS is BAKED into the image and doesn't need host access, remove mounts
+      - ./backend:/app/backend:ro
+      - ./frontend:/app/frontend:ro
+      - ./main.py:/app/main.py:ro
+      - ./tls:/app/tls:ro # Needed by main.py if it reads local TLS files
+      - results_vol:/app/bioinformatics/results:ro
+    environment:
+      - REDIS_HOST=redis
+      - PYTHONUNBUFFERED=1
+    # User directive might still be needed if the image expects it or for volume permissions
+    user: "${UID:-1000}:${GID:-1000}"
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  worker:
+    # Replace build: with image:
+    image: ghcr.io/mikha-22/bioinformatics-webapp/worker:latest
+    container_name: bio_worker
+    depends_on:
+      - redis
+    volumes:
+      # --- Critical: Mount Docker socket ---
+      - /var/run/docker.sock:/var/run/docker.sock
+      # --- Mount backend code ONLY if worker image doesn't have it baked in ---
+      # - ./backend:/app/backend:ro # Remove if code is in the image
+      # --- Mount shared data volumes ---
+      - data_vol:/data
+      - results_vol:/results
+      - references_vol:/references
+      - nextflow_work_vol:/nf_work
+    environment:
+      - REDIS_HOST=redis
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app # Still needed if backend code structure is expected
+      - NXF_WORK=/nf_work
+    # User directive might still be needed for socket/volume permissions
+    user: "${UID:-1000}:${GID:-1000}"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine # Stays the same
+    container_name: bio_redis
+    volumes:
+      - redis_data_vol:/data
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  filebrowser:
+    # Replace build: with image:
+    image: ghcr.io/mikha-22/bioinformatics-webapp/filebrowser:latest
+    container_name: bio_filebrowser
+    ports:
+      - "${FILEBROWSER_PORT:-8081}:8080" # Internal port is 8080 as per your last Dockerfile
+    volumes:
+      # Mount data/results volumes
+      - data_vol:/srv/data
+      - results_vol:/srv/results
+      # Mount runtime config/TLS files - image needs CMD flags matching these paths
+      - ./docker/filebrowser.db:/config/filebrowser.db
+      - ./docker/settings.json:/config/settings.json:ro
+      - ./tls/server.crt:/config/server.crt:ro
+      - ./tls/server.key:/config/server.key:ro
+    # User directive might still be needed for volume access
+    user: "${UID:-1000}:${GID:-1000}"
+    restart: unless-stopped
+    # Ensure the CMD baked into the image uses the correct paths (/config, /srv)
+    networks:
+      - app-network
+
+# Define the network
+networks:
+  app-network:
+    driver: bridge
+
+# Define named volumes
+volumes:
+  data_vol:
+    # driver_opts:
+    #   device: '/absolute/path/on/your/host/bioinformatics/data'
+  results_vol:
+    # driver_opts:
+    #   device: '/absolute/path/on/your/host/bioinformatics/results'
+  references_vol:
+    # driver_opts:
+    #   device: '/absolute/path/on/your/host/bioinformatics/references'
+  nextflow_work_vol:
+    # driver_opts:
+    #   device: '/absolute/path/on/your/host/bioinformatics/nf_work'
+  redis_data_vol:
+--- END FILE: ./docker/docker-compose.yml ---
+
+--- START FILE: ./docker/settings.json ---
+{
+    "port": 8080,
+    "address": "0.0.0.0",
+    "baseURL": "/filebrowser",
+    "root": "/srv",
+    "noauth": true,
+    "cert": "/app/tls/server.crt",
+    "key": "/app/tls/server.key"
+}
+--- END FILE: ./docker/settings.json ---
+
+--- START FILE: ./docker/Dockerfile.worker ---
+# ./docker/Dockerfile.worker
+ARG PYTHON_VERSION=3.11
+FROM python:${PYTHON_VERSION}-slim-bookworm AS python-base
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# --- Install OS Dependencies ---
+# Install Java (for Nextflow), Docker CLI tools, and basic utilities
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    coreutils \
+    curl \
+    openjdk-17-jre-headless \
+    ca-certificates \
+    gnupg \
+    lsb-release \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Install Docker CLI ---
+# Based on official Docker install instructions for Debian
+RUN mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+      $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends docker-ce-cli && \
+    rm -rf /var/lib/apt/lists/*
+
+# --- Install Nextflow ---
+# Specify desired Nextflow version
+ENV NXF_VER=24.04.3
+RUN echo "Installing Nextflow..." && \
+    cd /usr/local/bin && \
+    curl -fsSL https://get.nextflow.io | bash && \
+    chmod +x nextflow && \
+    nextflow -v # Verify installation
+
+# --- Create a non-root user ---
+# Use the same UID/GID as webapp or define separately if needed
+ARG UID=1000
+ARG GID=1000
+RUN groupadd --gid ${GID} appuser && \
+    useradd --uid ${UID} --gid ${GID} --shell /bin/bash --create-home appuser
+
+# --- Install Python Dependencies ---
+COPY requirements_worker.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements_worker.txt
+
+# --- Copy necessary application code for the worker ---
+# Only copy what tasks.py needs (or mount via compose)
+# Make sure the path structure allows `from backend.app.tasks import ...`
+COPY ./backend/app/tasks.py /app/backend/app/tasks.py
+COPY ./backend/app/utils /app/backend/app/utils
+COPY ./backend/app/core/config.py /app/backend/app/core/config.py
+# Ensure parent directories and __init__.py files exist
+RUN mkdir -p /app/backend/app && \
+    touch /app/backend/__init__.py /app/backend/app/__init__.py
+
+# --- Environment Setup ---
+ENV PYTHONPATH=/app
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+
+# Change ownership
+RUN chown -R appuser:appuser /app /home/appuser
+
+# Switch to the non-root user
+USER appuser
+
+# Define the command to run the RQ worker, connecting to 'redis' host
+CMD ["rq", "worker", "pipeline_tasks", "--url", "redis://redis:6379/0"]
+--- END FILE: ./docker/Dockerfile.worker ---
+
+--- START FILE: ./docker/Dockerfile_backup_inactive ---
 #-------------------------------------------------------------------
 # Stage 1: Builder Stage
 #-------------------------------------------------------------------
@@ -266,106 +508,144 @@ EXPOSE 8000 8080
 # Run both applications using the shell script
 # Using absolute paths for robustness
 CMD ["sh", "-c", "/opt/conda/envs/bio-webapp/bin/python /app/main.py & /usr/local/bin/filebrowser --database /config/filebrowser.db --config /config/settings.json --port 8080 --root /data"]
---- END FILE: ./docker/Dockerfile ---
+--- END FILE: ./docker/Dockerfile_backup_inactive ---
 
---- START FILE: ./docker/settings.json ---
-{
-    "port": 8080,
-    "address": "0.0.0.0",
-    "baseURL": "/filebrowser",
-    "root": "/srv",
-    "noauth": true,
-    "cert": "/app/tls/server.crt",
-    "key": "/app/tls/server.key"
-}
---- END FILE: ./docker/settings.json ---
-
---- START FILE: ./docker/Dockerfile.backup_stable ---
+--- START FILE: ./docker/Dockerfile.filebrowser ---
+# ./docker/Dockerfile.filebrowser
 #-------------------------------------------------------------------
-# Stage 1: Builder Stage
+# Stage 1: Builder Stage - Fetch File Browser binary & configs
 #-------------------------------------------------------------------
-# Use Miniforge as the base image for building
-FROM condaforge/mambaforge AS builder
+FROM debian:bookworm-slim AS builder
 
-# Set working directory
 WORKDIR /build
 
-# Install build-time dependencies (Git, Curl, Bash, Coreutils)
-# Tar is no longer strictly needed for env creation, but kept for general utility
-# Clean up apt cache in the same layer
+# Install dependencies needed to download File Browser
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    tar \
     curl \
     bash \
-    coreutils \
+    ca-certificates \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# --- Clone the application repository ---
-# Use ARGs for repo and branch, default branch set to 'main' as per workflow
-ARG REPO_URL=https://github.com/mikha-22/bioinformatics-webapp.git
-ARG BRANCH=main
-RUN git clone --branch ${BRANCH} --depth 1 ${REPO_URL} /build/app \
-    && rm -rf /build/app/.git # Remove .git folder immediately
-
-# --- Create and Clean Conda Environment from YAML ---
-# Uses mamba for faster environment creation from the YML file in the cloned repo
-# Cleans the Conda cache afterwards to reduce layer size
-# Assumes your conda_env.yml specifies 'name: bio-webapp'
-RUN echo "Creating Conda environment 'bio-webapp' from YAML..." && \
-    /opt/conda/bin/mamba env create -f /build/app/conda_env.yml && \
-    echo "Cleaning Conda cache..." && \
-    /opt/conda/bin/conda clean --all -y
-    # No source tarball to remove
-
-# --- Install File Browser ---
-# Install File Browser using bash - it usually installs to /usr/local/bin
+# --- Install File Browser binary ---
 RUN echo "Installing File Browser..." && \
     curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash
+# Installs to /usr/local/bin/filebrowser
 
-# --- Prepare File Browser Config ---
-# Create a temporary config directory and copy files from the repo
-RUN mkdir -p /build/config_staging && \
-    cp /build/app/docker/filebrowser.db /build/config_staging/filebrowser.db && \
-    cp /build/app/docker/settings.json /build/config_staging/settings.json
+# --- Copy configuration files from build context ---
+COPY ./docker/filebrowser.db /build/config/filebrowser.db
+COPY ./docker/settings.json /build/config/settings.json
+COPY ./tls/server.crt /build/config/server.crt
+COPY ./tls/server.key /build/config/server.key
 
 #-------------------------------------------------------------------
-# Stage 2: Final Stage
+# Stage 2: Final Stage - File Browser Runtime
 #-------------------------------------------------------------------
-# Use the same base image for consistency
-FROM condaforge/mambaforge
+FROM debian:bookworm-slim
 
-# Set required Conda environment variables
-# Ensure the name here matches the 'name:' field in your conda_env.yml
-ENV PATH="/opt/conda/envs/bio-webapp/bin:$PATH"
-ENV CONDA_DEFAULT_ENV=bio-webapp
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Create necessary runtime directories (/app, /data, /config)
-RUN mkdir -p /app /data /config
+WORKDIR /app # Working directory still set to /app
 
-# Copy essential artifacts from the builder stage:
-# 1. The created/cleaned Conda environment
-# 2. The application code
-# 3. The File Browser binary
-# 4. The File Browser configuration
-COPY --from=builder /opt/conda/envs/bio-webapp /opt/conda/envs/bio-webapp
-COPY --from=builder /build/app /app
+# --- Create necessary directories ---
+# Only create /config and /srv. /app is just the WORKDIR.
+RUN mkdir -p /config /srv
+
+# --- Copy artifacts from builder ---
 COPY --from=builder /usr/local/bin/filebrowser /usr/local/bin/filebrowser
-COPY --from=builder /build/config_staging /config
+COPY --from=builder /build/config /config
 
-# Ensure correct permissions for File Browser config
-RUN chmod 664 /config/filebrowser.db /config/settings.json
+# --- Create non-root user ---
+ARG UID=1000
+ARG GID=1000
+RUN groupadd --gid ${GID} appuser && \
+    useradd --uid ${UID} --gid ${GID} --shell /bin/bash --create-home appuser
 
-# Set working directory for the application
+# --- Set Permissions ---
+# Change ownership ONLY for the user's home directory and the /config directory.
+# /app doesn't need explicit ownership change here. /srv permissions are handled by the mount.
+# Also adjust permissions for config files AND potentially copied TLS keys.
+RUN chown -R appuser:appuser /home/appuser /config && \
+    chmod 664 /config/filebrowser.db /config/settings.json /config/server.crt /config/server.key
+
+# Switch to the non-root user
+USER appuser
+
+# Expose the internal port File Browser will listen on
+# Make sure this matches the --port flag in CMD and the internal port in docker-compose
+EXPOSE 8081
+
+# --- Define the command ---
+# Use flags matching the paths where config files are copied/mounted
+# Ensure the --port matches the EXPOSE instruction above
+CMD ["/usr/local/bin/filebrowser", \
+     "--port=8081", \
+     "--root=/srv", \
+     "--database=/config/filebrowser.db", \
+     "--config=/config/settings.json"]
+     # Add TLS flags if needed: --cert=/config/server.crt --key=/config/server.key
+--- END FILE: ./docker/Dockerfile.filebrowser ---
+
+--- START FILE: ./docker/Dockerfile.webapp ---
+# ./docker/Dockerfile.webapp
+# Use a specific Python version slim image
+ARG PYTHON_VERSION=3.11
+FROM python:${PYTHON_VERSION}-slim-bookworm AS python-base
+
+# Set environment variables for Python
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
-# Expose both application ports
-EXPOSE 8000 8080
+# --- OS Dependencies (Install only if necessary for webapp runtime) ---
+# RUN apt-get update && apt-get install -y --no-install-recommends some-package && rm -rf /var/lib/apt/lists/*
 
-# Run both applications using the shell script
-# Using absolute paths for robustness
-CMD ["sh", "-c", "/opt/conda/envs/bio-webapp/bin/python /app/main.py & /usr/local/bin/filebrowser --database /config/filebrowser.db --config /config/settings.json --port 8080 --root /data"]
---- END FILE: ./docker/Dockerfile.backup_stable ---
+# --- Create a non-root user for security ---
+ARG UID=1000
+ARG GID=1000
+RUN groupadd --gid ${GID} appuser && \
+    useradd --uid ${UID} --gid ${GID} --shell /bin/bash --create-home appuser
+
+# --- Install Python Dependencies ---
+# Copy requirements file first for layer caching
+COPY requirements_webapp.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements_webapp.txt
+
+# --- Copy Application Code ---
+# Copy backend structure needed by the webapp (routers, models, core, app.py etc)
+COPY ./backend /app/backend
+# Copy frontend files
+COPY ./frontend /app/frontend
+# Copy the main entrypoint script
+COPY ./main.py /app/main.py
+# Ensure necessary __init__.py files exist if copying selectively
+
+# Change ownership to the non-root user
+RUN chown -R appuser:appuser /app
+
+# Switch to the non-root user
+USER appuser
+
+# Expose the port FastAPI will run on
+EXPOSE 8000
+
+# Define the command to start the FastAPI application
+# Adjust if your main.py or uvicorn command needs specific args or paths
+# Assumes main.py handles Uvicorn startup and TLS paths (if needed) correctly,
+# especially considering TLS certs are mounted via compose.
+CMD ["python", "main.py"]
+--- END FILE: ./docker/Dockerfile.webapp ---
+
+--- START FILE: ./requirements_worker.txt ---
+# ./requirements_worker.txt
+rq
+redis
+psutil
+# Add any other specific Python libraries ONLY needed by tasks.py
+--- END FILE: ./requirements_worker.txt ---
 
 --- START FILE: ./conda_env.yml ---
 name: bio-webapp
@@ -879,6 +1159,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const sortButtons = document.querySelectorAll('#results-controls [data-sort]');
     const sortDirectionButton = document.getElementById('sort-direction-btn');
 
+    // --- Constants ---
+    // Define the base URL for the File Browser iframe, matching base.html
+    // Use protocol-relative //localhost:8081 or explicit https://localhost:8081
+    // Using explicit https is usually safer if your main app uses https.
+    const FILE_BROWSER_BASE_URL = 'https://localhost:8081'; // <-- Correct Port
+
     // --- State ---
     let allRunsData = []; // Store the fetched run data
     let currentSort = { field: 'date', direction: 'desc' }; // Default sort: newest first
@@ -1001,8 +1287,9 @@ document.addEventListener('DOMContentLoaded', function() {
             runItem.className = 'run-item card mb-2';
             runItem.dataset.runName = run.name; // Store name for filtering/fetching files
 
-            // Construct File Browser link safely
-            const fbLink = run.filebrowser_link || '#'; // Fallback link
+            // Construct File Browser PATH ONLY. The full URL is built onClick.
+            // Ensure the backend link only contains the path part (e.g., /filebrowser/files/results/...)
+            const fbPath = run.filebrowser_link || '#'; // Expecting PATH, not full URL
 
             runItem.innerHTML = `
                 <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
@@ -1015,7 +1302,7 @@ document.addEventListener('DOMContentLoaded', function() {
                            <small class="run-date text-muted">Modified: ${formatTimestamp(run.modified_time)}</small>
                         </div>
                     </div>
-                    <a href="${fbLink}" class="btn btn-sm btn-outline-primary filebrowser-link ml-auto mt-1 mt-md-0" target="_blank" title="Open in File Browser">
+                    <a href="${fbPath}" class="btn btn-sm btn-outline-primary filebrowser-link ml-auto mt-1 mt-md-0" title="Open in File Browser">
                         <i class="bi bi-folder-symlink"></i> <span class="d-none d-md-inline">File Browser</span>
                     </a>
                 </div>
@@ -1052,11 +1339,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (targetElement) {
                 targetElement.classList.add('highlighted');
                 targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                // Optionally auto-expand
-                // const expandButton = targetElement.querySelector('.expand-btn');
-                // if (expandButton && expandButton.getAttribute('aria-expanded') === 'false') {
-                //    handleExpandCollapse(expandButton, window.highlightRun);
-                // }
             } else {
                 console.warn(`Highlight run "${window.highlightRun}" not found in the list.`);
             }
@@ -1069,7 +1351,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showStatus(loadingLi, true);
         showStatus(errorLi, false);
 
-        // Clear previous file list items (excluding loading/error messages)
+        // Clear previous file list items
         Array.from(fileListUl.children).forEach(child => {
             if (!child.classList.contains('file-list-loading') && !child.classList.contains('file-list-error')) {
                 child.remove();
@@ -1136,22 +1418,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (isExpanded) {
             // Collapse
-            targetCollapse.style.maxHeight = null; // Or use Bootstrap's JS if integrated
-            targetCollapse.classList.remove('show'); // For Bootstrap 4/5 JS integration
+            targetCollapse.style.maxHeight = null;
+            targetCollapse.classList.remove('show');
              button.setAttribute('aria-expanded', 'false');
              icon.classList.remove('fa-minus');
              icon.classList.add('fa-plus');
         } else {
             // Expand
-             // Basic animation (can enhance with CSS transitions)
-            targetCollapse.classList.add('show'); // For Bootstrap 4/5 JS integration
-            targetCollapse.style.maxHeight = targetCollapse.scrollHeight + "px"; // Basic height animation
+            targetCollapse.classList.add('show');
+            targetCollapse.style.maxHeight = targetCollapse.scrollHeight + "px";
              button.setAttribute('aria-expanded', 'true');
              icon.classList.remove('fa-plus');
              icon.classList.add('fa-minus');
 
             // Fetch files only if the list hasn't been loaded yet
-             // Check if files (excluding loading/error placeholders) are already present
             const hasFiles = Array.from(fileListUl.children).some(child =>
                  !child.classList.contains('file-list-loading') && !child.classList.contains('file-list-error')
             );
@@ -1159,12 +1439,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 fetchAndRenderFiles(runName, fileListUl, loadingLi, errorLi);
             }
         }
-         // Adjust maxHeight after content is potentially loaded (or use CSS transitions)
+         // Adjust maxHeight after content is potentially loaded
         setTimeout(() => {
              if(button.getAttribute('aria-expanded') === 'true') {
                  targetCollapse.style.maxHeight = targetCollapse.scrollHeight + "px";
              }
-         }, 300); // Delay slightly for content loading/rendering
+         }, 300);
     }
 
 
@@ -1172,20 +1452,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Filter input
     filterInput.addEventListener('input', () => {
-        renderRuns(); // Re-render applies the filter
-        applyHighlight(); // Re-apply highlight if filter changes
+        renderRuns();
+        applyHighlight();
     });
 
     // Sort buttons
     sortButtons.forEach(button => {
         button.addEventListener('click', () => {
             const newSortField = button.dataset.sort;
-            // If clicking the same field, toggle direction, else set to default desc
             if (currentSort.field === newSortField) {
                 currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
             } else {
                 currentSort.field = newSortField;
-                currentSort.direction = 'desc'; // Default to descending for new field
+                currentSort.direction = 'desc';
             }
              updateSortUI();
              sortAndRenderRuns();
@@ -1202,13 +1481,50 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
 
-    // Expand/Collapse (using event delegation)
+    // Expand/Collapse AND File Browser Link Handling (using event delegation)
     runsListContainer.addEventListener('click', function(event) {
-        const button = event.target.closest('.expand-btn');
-        if (button) {
-            const runItem = button.closest('.run-item');
+        const expandButton = event.target.closest('.expand-btn');
+        const fileBrowserLink = event.target.closest('.filebrowser-link');
+
+        if (expandButton) {
+            // --- Handle Expand/Collapse ---
+            const runItem = expandButton.closest('.run-item');
             const runName = runItem.dataset.runName;
-            handleExpandCollapse(button, runName);
+            handleExpandCollapse(expandButton, runName);
+
+        } else if (fileBrowserLink) {
+            // --- Handle File Browser Link Click ---
+            event.preventDefault(); // Prevent opening new tab
+
+            const targetPath = fileBrowserLink.getAttribute('href'); // Get the PATH from href (e.g., /filebrowser/files/results/...)
+            if (!targetPath || targetPath === '#') {
+                console.error("File Browser link has invalid href:", targetPath);
+                return; // Don't proceed if the path is missing
+            }
+
+            // Construct the FULL URL for the iframe using the defined base URL and the path
+            const targetUrl = FILE_BROWSER_BASE_URL + targetPath; // <-- Combine Base URL + Path
+
+            console.log("Opening File Browser iframe to:", targetUrl);
+
+            // Get references to the iframe elements from base.html
+            const iframe = document.getElementById('fileBrowserFrame');
+            const iframeContainer = document.getElementById('fileBrowserContainer');
+            const overlay = document.getElementById('overlay');
+
+            if (iframe && iframeContainer && overlay) {
+                // Set the iframe source to the correctly constructed URL
+                iframe.src = targetUrl; // <-- Use the full URL with correct port
+
+                // Show the iframe container and overlay
+                iframeContainer.classList.add('active');
+                overlay.classList.add('active');
+            } else {
+                console.error("Could not find File Browser iframe elements in base.html");
+                // Fallback: open the constructed full URL in new tab if iframe elements are missing
+                console.warn("Falling back to opening link in new tab.");
+                window.open(targetUrl, '_blank');
+            }
         }
     });
 
@@ -2997,6 +3313,16 @@ if __name__ == "__main__":
         ssl_certfile="./tls/server.crt", # Path to the cert file
     )
 --- END FILE: ./main.py ---
+
+--- START FILE: ./requirements_webapp.txt ---
+fastapi
+uvicorn[standard]
+rq
+redis
+Jinja2
+python-multipart # For form data if needed by FastAPI endpoints
+# psutil # Add only if webapp logic *directly* uses psutil, not just the worker
+--- END FILE: ./requirements_webapp.txt ---
 
 --- START FILE: ./backend/app/pipeline.sh ---
 #!/bin/bash
