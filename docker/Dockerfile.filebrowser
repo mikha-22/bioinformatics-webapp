@@ -61,7 +61,7 @@ USER appuser
 
 # Expose the internal port File Browser will listen on
 # Make sure this matches the --port flag in CMD and the internal port in docker-compose
-EXPOSE 8081
+EXPOSE 8080
 
 # --- Define the command ---
 # Use flags matching the paths where config files are copied/mounted
