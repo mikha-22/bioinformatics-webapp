@@ -512,7 +512,7 @@ dependencies:
     <style>
         #jobs-table .action-cell {
             /* Adjusted width to better accommodate potential multiple buttons including remove */
-            width: 190px; 
+            width: 190px;
             text-align: center;
             vertical-align: middle;
         }
@@ -1701,7 +1701,14 @@ document.addEventListener('DOMContentLoaded', function() {
 --- START FILE: ./frontend/static/jobs.js ---
 // frontend/static/jobs.js
 document.addEventListener('DOMContentLoaded', function() {
-    // ... (keep existing elements references: jobsTableBody, globalStatusDiv, etc.) ...
+    const jobsTableBody = document.querySelector('#jobs-table tbody');
+    const globalStatusDiv = document.getElementById('jobs-status-global');
+    const refreshButton = document.getElementById('refresh-jobs-btn');
+    const loadingRow = document.getElementById('loading-jobs-row');
+    const noJobsRow = document.getElementById('no-jobs-row');
+    const errorJobsRow = document.getElementById('error-jobs-row');
+    const errorModal = document.getElementById('error-modal');
+    const errorModalText = document.getElementById('error-modal-text');
 
     // --- State ---
     let jobPollingIntervals = {}; // Store polling intervals {jobId: intervalId}
@@ -1714,14 +1721,38 @@ document.addEventListener('DOMContentLoaded', function() {
     const BUTTON_CLASS_RERUN = 'btn-rerun-job';
     const BUTTON_CLASS_RESULTS = 'btn-view-results';
     const BUTTON_CLASS_ERROR_DETAILS = 'btn-error-details';
-    // const BUTTON_CLASS_REMOVE_STAGED = 'btn-remove-staged-job'; // <-- REMOVE THIS
-    const BUTTON_CLASS_REMOVE = 'btn-remove-job'; // <-- NEW UNIFIED CLASS
+    const BUTTON_CLASS_REMOVE = 'btn-remove-job'; // Unified remove class
 
-    // ... (keep existing helper functions: formatTimestamp, formatDuration, etc.) ...
+    // --- Helper Functions ---
 
-    /** Checks if the jobs table body is empty (excluding placeholder rows) */
-     function isTableEmpty() {
-        return jobsTableBody.querySelectorAll('tr[data-job-id]').length === 0;
+     /** Formats a timestamp (seconds since epoch) into a locale string, or returns 'N/A' */
+     function formatTimestamp(timestamp) {
+        if (!timestamp) return 'N/A';
+        try {
+            return new Date(timestamp * 1000).toLocaleString();
+        } catch (e) {
+            return 'Invalid Date';
+        }
+    }
+
+    /** Formats duration in seconds into Hh Mm Ss or Mm Ss */
+    function formatDuration(seconds) {
+        if (seconds === null || seconds === undefined || seconds < 0) return 'N/A';
+        if (seconds < 1) return "< 1s"; // Handle very short durations
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        let str = "";
+        if (h > 0) str += `${h}h `;
+        if (m > 0 || h > 0) str += `${m.toString().padStart(h > 0 ? 2 : 1, '0')}m `; // Pad minutes if hours present
+        str += `${s.toString().padStart(2, '0')}s`;
+        return str.trim(); // Trim trailing space if only seconds
+    }
+
+    /** Calculates duration between two timestamps */
+    function calculateDuration(start, end) {
+        if (!start || !end || end < start) return null;
+        return end - start;
     }
 
     /** Shows a global status message */
@@ -1738,11 +1769,34 @@ document.addEventListener('DOMContentLoaded', function() {
          globalStatusDiv.className = '';
     }
 
+    // +++ ADDED MISSING HELPER FUNCTION +++
+    /** Safely get nested property */
+    function getNested(obj, path, defaultValue = null) {
+        try {
+            // Handle cases where obj might be null or undefined early
+            if (!obj) return defaultValue;
+            // Reduce the path
+            const result = path.split('.').reduce((o, k) => (o || {})[k], obj);
+            // Return the result if it's not undefined, otherwise return defaultValue
+            // Important: Check for undefined specifically, as 0 or false are valid values
+            return result !== undefined ? result : defaultValue;
+        } catch (e) {
+            // Catch potential errors during reduction (e.g., accessing property of null)
+            console.warn(`Error accessing nested property '${path}':`, e); // Log warning
+            return defaultValue;
+        }
+    }
+    // +++++++++++++++++++++++++++++++++++++++
+
+     /** Checks if the jobs table body is empty (excluding placeholder rows) */
+     function isTableEmpty() {
+        return jobsTableBody.querySelectorAll('tr[data-job-id]').length === 0;
+    }
+
     // --- Job Rendering and Updating ---
 
     /** Creates a NEW job row and appends it */
     function createAndAppendJobRow(job) {
-       // ... (keep existing code for creating cells 0, 1, 2) ...
         const row = jobsTableBody.insertRow(-1); // Append at the end of tbody
         row.dataset.jobId = job.id; // Use job.id (from /jobs_list response) for the row identifier
 
@@ -1755,7 +1809,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // --- Parameters Cell ---
         let cellParams = row.insertCell();
-        // Prioritize meta.input_params.input_filenames if available (for rerunning/displaying original selection)
+        // Uses getNested - ensure it exists!
         let displayParams = getNested(job, 'meta.input_params.input_filenames', getNested(job, 'meta.input_params', {}));
         // If it's a staged job, the params are directly in meta.input_params
         if (job.status === 'staged' && Object.keys(displayParams || {}).length === 0) {
@@ -1768,7 +1822,6 @@ document.addEventListener('DOMContentLoaded', function() {
                  .map(([key, value]) => {
                       const displayKey = key.replace(/_/g, ' ');
                       const displayValue = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : (value || 'None');
-                      // Ensure kbd wraps long content like filenames
                       return `<div><small>${displayKey}:</small> <kbd style="word-wrap: break-word; white-space: normal;">${displayValue}</kbd></div>`;
                   })
                  .join('');
@@ -1802,7 +1855,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /** Updates the time cell content, now including resource usage */
     function updateTimeCell(cell, job) {
-        // ... (keep existing code for updateTimeCell) ...
+         // Uses getNested - ensure it exists!
          const metaDuration = getNested(job, 'meta.duration_seconds', null);
          const calculatedDuration = calculateDuration(job.started_at, job.ended_at);
          let durationSec = (typeof metaDuration === 'number') ? metaDuration : ((typeof calculatedDuration === 'number') ? calculatedDuration : null);
@@ -1851,7 +1904,6 @@ document.addEventListener('DOMContentLoaded', function() {
         let buttonsHtml = '';
 
         // Determine status icon and text (using job.status)
-        // ... (keep existing switch statement for statusHtml) ...
         switch (job.status) {
             case 'staged':
                 statusHtml = `<span class="job-status-text text-secondary"><i class="bi bi-pause-circle"></i> Staged</span>`;
@@ -1861,6 +1913,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             case 'started':
                 statusHtml = `<span class="job-status-text text-info"><i class="fas fa-sync-alt fa-spin"></i> Running</span>`;
+                // Uses getNested - ensure it exists!
                 const progress = getNested(job, 'meta.progress', null);
                 if (progress !== null) {
                      statusHtml += `<div class="progress mt-1" style="height: 5px;"><div class="progress-bar" role="progressbar" style="width: ${progress}%;" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100"></div></div>`;
@@ -1884,9 +1937,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Determine OTHER action buttons based on status (using job.status and currentJobId)
+        // Uses getNested - ensure it exists!
         if (job.status === 'staged') {
              buttonsHtml += `<button class="btn btn-success btn-sm ${BUTTON_CLASS_START}" data-staged-id="${currentJobId}">Start</button>`;
-             // REMOVED OLD STAGED REMOVE BUTTON HERE
          } else if (job.status === 'queued' || job.status === 'started') {
              buttonsHtml += `<button class="btn btn-danger btn-sm ${BUTTON_CLASS_STOP}" data-job-id="${currentJobId}">Stop</button>`;
          } else if (job.status === 'finished') {
@@ -1916,7 +1969,6 @@ document.addEventListener('DOMContentLoaded', function() {
          }
 
         // --- ALWAYS Add the Remove Button (last) ---
-        // Use data-job-id which holds the correct ID (staged or RQ) from the row data
         buttonsHtml += ` <button class="btn btn-outline-danger btn-sm ${BUTTON_CLASS_REMOVE}" data-job-id="${currentJobId}" title="Remove Job Data"><i class="fas fa-trash"></i></button>`;
 
         cell.innerHTML = statusHtml + '<br>' + buttonsHtml;
@@ -1924,11 +1976,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /** Updates an existing row with new job data from /job_status endpoint */
     function updateJobRow(row, job) { // job here is from /job_status, has 'job_id'
-        // ... (keep existing logic) ...
-        const jobId = job.job_id; // Use job_id from the response
+        const jobId = job.job_id;
 
         updateTimeCell(row.cells[2], job);
-        updateActionCell(row.cells[3], job); // This will now correctly include the remove button always
+        updateActionCell(row.cells[3], job);
         row.className = `job-state-${job.status || 'unknown'}`;
 
          if (TERMINAL_STATUSES.includes(job.status)) {
@@ -1946,13 +1997,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /** Fetches the combined list of jobs from the backend */
     async function fetchJobsList() {
-       // ... (keep existing logic) ...
         clearGlobalStatus();
         loadingRow.style.display = '';
         noJobsRow.style.display = 'none';
         errorJobsRow.style.display = 'none';
 
         const currentlyPollingIds = new Set(Object.keys(jobPollingIntervals));
+        // Clear ONLY job rows, not placeholders
         jobsTableBody.querySelectorAll('tr[data-job-id]').forEach(row => row.remove());
 
         try {
@@ -1972,12 +2023,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const activeJobIdsThisFetch = new Set();
             jobs.forEach(job => {
-                createAndAppendJobRow(job);
+                createAndAppendJobRow(job); // Uses getNested - ensure it exists!
                  if (job.status !== 'staged' && !TERMINAL_STATUSES.includes(job.status)) {
                      activeJobIdsThisFetch.add(job.id);
                  }
             });
 
+            // Stop polling for jobs that were polling but are now gone or terminal/staged
             currentlyPollingIds.forEach(jobId => {
                 if (!activeJobIdsThisFetch.has(jobId)) {
                      const fetchedJob = jobs.find(j => j.id === jobId);
@@ -1987,12 +2039,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
 
+            // Final check if empty after potential stops
              if (isTableEmpty()) {
                   noJobsRow.style.display = '';
              }
 
         } catch (error) {
-            console.error('Error fetching jobs list:', error);
+            console.error('Error fetching jobs list:', error); // Log the actual error
             showGlobalStatus(`Error loading jobs: ${error.message}`, 'danger');
             loadingRow.style.display = 'none';
             errorJobsRow.style.display = '';
@@ -2002,7 +2055,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /** Polls the status of a single job */
     async function pollJobStatus(jobId) {
-       // ... (keep existing logic) ...
        if (!jobPollingIntervals[jobId]) return;
 
         try {
@@ -2019,9 +2071,6 @@ document.addEventListener('DOMContentLoaded', function() {
                  if (response.status === 404) {
                      console.warn(`Job ${jobId} not found during polling (404). Assuming completed/deleted. Stopping polling.`);
                      stopPolling(jobId);
-                     // Consider updating row to show 'Not Found' status? Or just stop polling.
-                     // Maybe change the status text/buttons in the action cell?
-                     // For now, just stop polling. Refresh will remove it.
                  } else {
                      const errorData = await response.json().catch(() => ({ detail: response.statusText }));
                      console.error(`Error polling job ${jobId} (${response.status}): ${errorData.detail}`);
@@ -2030,7 +2079,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             const job = await response.json();
-            updateJobRow(row, job);
+            updateJobRow(row, job); // Uses getNested - ensure it exists!
 
         } catch (error) {
             console.error(`Network error polling job ${jobId}:`, error);
@@ -2039,7 +2088,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /** Starts polling for a specific job ID if not already polling */
     function startPolling(jobId) {
-        // ... (keep existing logic) ...
         if (!jobId) {
              console.warn("Attempted to start polling with invalid jobId:", jobId);
              return;
@@ -2053,7 +2101,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /** Stops polling for a specific job ID */
     function stopPolling(jobId) {
-        // ... (keep existing logic) ...
         if (!jobId) {
             console.warn("Attempted to stop polling with invalid jobId:", jobId);
             return;
@@ -2067,18 +2114,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
     // --- Button Click Handlers ---
+
     /** Handle Start Button Click */
     async function handleStartClick(button) {
-        // ... (keep existing logic, but remove the part that disables the *staged* remove button) ...
         const stagedJobId = button.dataset.stagedId;
         if (!stagedJobId) return;
 
         button.disabled = true;
         button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
-        // Also disable the corresponding unified remove button temporarily
         const removeButton = button.closest('td').querySelector(`.${BUTTON_CLASS_REMOVE}`);
         if (removeButton) removeButton.disabled = true;
-
 
         try {
             const response = await fetch(`/start_job/${stagedJobId}`, { method: 'POST', headers: { 'Accept': 'application/json' } });
@@ -2089,17 +2134,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             showGlobalStatus(`Job <code>${result.job_id}</code> enqueued successfully. Refreshing list...`, 'success');
-            // Slight delay before refresh to allow message visibility
             setTimeout(fetchJobsList, 1500);
 
         } catch (error) {
             console.error(`Error starting job ${stagedJobId}:`, error);
             showGlobalStatus(`Error starting job <code>${stagedJobId}</code>: ${error.message}`, 'danger');
-            // Re-enable buttons if the row still exists
             const actionCell = jobsTableBody.querySelector(`tr[data-job-id="${stagedJobId}"] .action-cell`);
             if (actionCell) {
                 const startBtn = actionCell.querySelector(`.${BUTTON_CLASS_START}`);
-                const removeBtn = actionCell.querySelector(`.${BUTTON_CLASS_REMOVE}`); // Enable unified remove
+                const removeBtn = actionCell.querySelector(`.${BUTTON_CLASS_REMOVE}`);
                  if (startBtn) {
                     startBtn.disabled = false;
                     startBtn.innerHTML = 'Start';
@@ -2113,7 +2156,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /** Handle Stop Button Click */
     async function handleStopClick(button) {
-       // ... (keep existing logic) ...
         const jobId = button.dataset.jobId;
         if (!jobId) return;
 
@@ -2129,7 +2171,7 @@ document.addEventListener('DOMContentLoaded', function() {
              }
 
             showGlobalStatus(`Stop request for job <code>${jobId}</code>: ${result.message}. Status will update shortly.`, 'info');
-            await pollJobStatus(jobId); // Force immediate poll
+            await pollJobStatus(jobId);
 
         } catch (error) {
             console.error(`Error stopping job ${jobId}:`, error);
@@ -2144,7 +2186,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
      /** Handle Rerun Button Click */
      async function handleRerunClick(button) {
-        // ... (keep existing logic) ...
         const jobId = button.dataset.jobId;
         if (!jobId) {
             console.error("Rerun button clicked but data-job-id is missing or invalid:", button);
@@ -2163,6 +2204,7 @@ document.addEventListener('DOMContentLoaded', function() {
              }
              const jobDetails = await response.json();
 
+             // Uses getNested - ensure it exists!
              const inputParams = getNested(jobDetails, 'meta.input_params.input_filenames', getNested(jobDetails, 'meta.input_params', {}));
 
              if (!inputParams || !inputParams.forward_reads) {
@@ -2189,7 +2231,7 @@ document.addEventListener('DOMContentLoaded', function() {
              }
 
              showGlobalStatus(`Job successfully re-staged with ID: <code>${stageResult.staged_job_id}</code>. Refreshing list...`, 'success');
-             setTimeout(fetchJobsList, 1500); // Refresh after delay
+             setTimeout(fetchJobsList, 1500);
 
          } catch (error) {
              console.error(`Error rerunning job ${jobId}:`, error);
@@ -2204,7 +2246,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
      /** Handle Error Details Button Click */
      function handleErrorDetailsClick(button) {
-        // ... (keep existing logic) ...
          const errorMsg = button.dataset.error || "No specific error message provided.";
          let extraDetails = "";
 
@@ -2212,10 +2253,7 @@ document.addEventListener('DOMContentLoaded', function() {
          errorModal.style.display = "block";
      }
 
-    // --- REMOVE handleRemoveStagedClick ---
-    // async function handleRemoveStagedClick(button) { ... } // DELETE THIS FUNCTION
-
-    // +++ ADD NEW handleRemoveClick +++
+    /** Handle Remove Button Click */
     async function handleRemoveClick(button) {
         const jobId = button.dataset.jobId;
         if (!jobId) {
@@ -2224,40 +2262,29 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const jobDesc = jobId.startsWith("staged_") ? `staged job '${jobId.substring(0, 15)}...'` : `job '${jobId}'`;
-
-        // --- Confirmation ---
         const confirmation = confirm(`Are you sure you want to permanently remove ${jobDesc} and its data? This cannot be undone.`);
-        if (!confirmation) {
-            return; // User canceled
-        }
+        if (!confirmation) return;
 
-        // Stop polling this job if we are removing it
-        stopPolling(jobId);
+        stopPolling(jobId); // Stop polling if active
 
         button.disabled = true;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; // Just spinner for small button
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
         try {
             const response = await fetch(`/remove_job/${jobId}`, {
                  method: 'DELETE',
                  headers: { 'Accept': 'application/json' }
             });
-            const result = await response.json(); // Expect success message or error detail
+            const result = await response.json();
 
             if (!response.ok) {
-                // Handle 404 (Not Found), 409 (Conflict), or other errors
                 throw new Error(result.detail || `Failed to remove job (${response.status})`);
             }
 
             showGlobalStatus(result.message || `Job <code>${jobId}</code> removed successfully.`, 'success');
-
-            // Remove the row from the table
             const rowToRemove = button.closest('tr');
-            if (rowToRemove) {
-                rowToRemove.remove();
-            }
+            if (rowToRemove) rowToRemove.remove();
 
-            // Check if table is now empty
             if (isTableEmpty()) {
                 noJobsRow.style.display = '';
                 loadingRow.style.display = 'none';
@@ -2267,11 +2294,10 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error(`Error removing job ${jobId}:`, error);
             showGlobalStatus(`Error removing job <code>${jobId}</code>: ${error.message}`, 'danger');
-            // Re-enable button if row still exists (it might if removal failed server-side)
              const existingButton = jobsTableBody.querySelector(`button[data-job-id="${jobId}"].${BUTTON_CLASS_REMOVE}`);
              if(existingButton){
                  existingButton.disabled = false;
-                 existingButton.innerHTML = '<i class="fas fa-trash"></i>'; // Reset icon
+                 existingButton.innerHTML = '<i class="fas fa-trash"></i>';
              }
         }
     }
@@ -2290,29 +2316,25 @@ document.addEventListener('DOMContentLoaded', function() {
             handleRerunClick(button);
         } else if (button.classList.contains(BUTTON_CLASS_ERROR_DETAILS)) {
             handleErrorDetailsClick(button);
-        // } else if (button.classList.contains(BUTTON_CLASS_REMOVE_STAGED)) { // <-- REMOVE THIS line
-        //     handleRemoveStagedClick(button); // <-- REMOVE THIS line
-        } else if (button.classList.contains(BUTTON_CLASS_REMOVE)) { // <-- ADD This Condition
-            handleRemoveClick(button); // <-- Call the new handler
+        } else if (button.classList.contains(BUTTON_CLASS_REMOVE)) {
+            handleRemoveClick(button);
         }
     });
 
-    // ... (keep existing refreshButton listener and modal close logic) ...
     refreshButton.addEventListener('click', fetchJobsList);
 
-     // Close modal if user clicks outside of it
+     // Modal close logic
      window.onclick = function(event) {
         if (event.target == errorModal) {
             errorModal.style.display = "none";
         }
     }
-    // Add listener for modal close button (X)
      const closeModalButton = errorModal.querySelector('.close-modal');
-        if (closeModalButton) {
-            closeModalButton.onclick = function() {
+     if (closeModalButton) {
+         closeModalButton.onclick = function() {
             errorModal.style.display = "none";
-        }
-    }
+         }
+     }
 
     // --- Initial Load ---
     fetchJobsList();

@@ -4,17 +4,16 @@ import json
 import uuid
 import time
 import redis # Import redis exceptions
-# --- ADD THIS IMPORT ---
 from typing import List, Dict, Any, Optional
-# -----------------------
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
 # RQ Imports
 from rq import Queue, Worker
 from rq.job import Job, JobStatus
-from rq.exceptions import NoSuchJobError
-from rq.registry import StartedJobRegistry, FinishedJobRegistry, FailedJobRegistry # Add more as needed
+# --- ADD JobNotFoundErr and InvalidJobOperation ---
+from rq.exceptions import NoSuchJobError, InvalidJobOperation
+from rq.registry import StartedJobRegistry, FinishedJobRegistry, FailedJobRegistry
 from rq.command import send_stop_job_command
 
 # App specific imports
@@ -46,6 +45,7 @@ async def stage_pipeline_job(
     for later execution via /start_job endpoint.
     Returns 200 OK with staged job ID.
     """
+    # ... (keep existing code for stage_pipeline_job) ...
     if not PIPELINE_SCRIPT_PATH.is_file():
         logger.error(f"Pipeline script not found at configured path: {PIPELINE_SCRIPT_PATH}")
         raise HTTPException(status_code=500, detail="Server configuration error: Pipeline script missing.")
@@ -104,6 +104,7 @@ async def start_job(
     and removes the corresponding entry from the staged jobs hash upon successful enqueueing.
     Returns 202 Accepted with the new RQ job ID.
     """
+    # ... (keep existing code for start_job) ...
     logger.info(f"Attempting to start job from staged ID: {staged_job_id}")
     try:
         # Fetch the staged job details (bytes)
@@ -178,7 +179,6 @@ async def start_job(
 
 # --- Job Listing and Status Routes ---
 
-# The response_model uses the imported List hint now
 @router.get("/jobs_list", response_model=List[Dict[str, Any]], summary="List All Relevant Jobs (Staged & RQ)")
 async def get_jobs_list(
     redis_conn: redis.Redis = Depends(get_redis_connection),
@@ -189,6 +189,7 @@ async def get_jobs_list(
     various RQ registries (queued, started, finished, failed).
     Returns a list sorted by enqueue/stage time descending (newest first).
     """
+    # ... (keep existing code for get_jobs_list) ...
     all_jobs_dict = {}
 
     # 1. Get Staged Jobs from Redis Hash
@@ -338,6 +339,7 @@ async def get_job_status(
     Fetches the status, result/error, metadata, and resource usage for a specific RQ job ID.
     Handles cases where the job might not be found in RQ.
     """
+    # ... (keep existing code for get_job_status) ...
     logger.debug(f"Fetching status for RQ job ID: {job_id}")
     try:
         # Fetch the job using the connection and serializer from the queue
@@ -421,6 +423,7 @@ async def stop_job(
     """
     Sends a stop signal to a specific RQ job if it's running or queued.
     """
+    # ... (keep existing code for stop_job) ...
     logger.info(f"Received request to stop RQ job: {job_id}")
     try:
         job = Job.fetch(job_id, connection=redis_conn)
@@ -460,42 +463,77 @@ async def stop_job(
         raise HTTPException(status_code=500, detail="Internal server error attempting to stop job.")
 
 
-@router.delete("/remove_staged_job/{staged_job_id}", status_code=200, summary="Remove a Staged Job")
-async def remove_staged_job(
-    staged_job_id: str,
-    redis_conn: redis.Redis = Depends(get_redis_connection)
+# --- REMOVE OLD remove_staged_job Endpoint ---
+# @router.delete("/remove_staged_job/{staged_job_id}", ...) <-- DELETE THIS FUNCTION
+
+
+# +++ ADD NEW remove_job Endpoint +++
+@router.delete("/remove_job/{job_id}", status_code=200, summary="Remove Staged or RQ Job Data")
+async def remove_job(
+    job_id: str,
+    redis_conn: redis.Redis = Depends(get_redis_connection),
+    queue: Queue = Depends(get_pipeline_queue) # Needed for RQ job fetching/deleting
 ):
     """
-    Removes a specific job entry from the staged jobs Redis hash.
-    Does not affect running or completed RQ jobs.
+    Removes a job's data from Redis.
+    Handles both 'staged_*' IDs (removing from Redis hash) and RQ job IDs
+    (using job.delete() to remove from RQ's storage).
     """
-    if not staged_job_id.startswith("staged_"):
-         raise HTTPException(status_code=400, detail="Invalid ID format for removing a staged job.")
+    logger.info(f"Request received to remove job/data for ID: {job_id}")
 
-    logger.info(f"Request to remove staged job: {staged_job_id}")
-    try:
-        # Attempt to delete the specific field (staged_job_id) from the hash
-        # hdel returns the number of fields that were removed (should be 0 or 1)
-        num_deleted = redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
+    # --- Case 1: Handle Staged Jobs ---
+    if job_id.startswith("staged_"):
+        logger.info(f"Attempting to remove staged job '{job_id}' from hash '{STAGED_JOBS_KEY}'.")
+        try:
+            # hdel returns the number of fields removed (0 or 1)
+            num_deleted = redis_conn.hdel(STAGED_JOBS_KEY, job_id.encode('utf-8'))
 
-        if num_deleted == 1:
-            logger.info(f"Successfully removed staged job: {staged_job_id}")
-            return JSONResponse(status_code=200, content={"message": f"Staged job '{staged_job_id}' removed successfully.", "staged_job_id": staged_job_id})
-        elif num_deleted == 0:
-            logger.warning(f"Attempted to remove non-existent staged job: {staged_job_id}")
-            # Return 404 Not Found if the job wasn't in the staged list
-            raise HTTPException(status_code=404, detail=f"Staged job '{staged_job_id}' not found.")
-        else:
-            # This case should theoretically not happen with hdel on a single key
-            logger.error(f"Unexpected result from Redis hdel for {staged_job_id}: {num_deleted}")
-            raise HTTPException(status_code=500, detail="Internal server error during job removal processing.")
+            if num_deleted == 1:
+                logger.info(f"Successfully removed staged job: {job_id}")
+                return JSONResponse(status_code=200, content={"message": f"Staged job '{job_id}' removed.", "removed_id": job_id})
+            else:
+                logger.warning(f"Staged job '{job_id}' not found in hash for removal.")
+                # It might have been started or already removed. Consider 404.
+                raise HTTPException(status_code=404, detail=f"Staged job '{job_id}' not found.")
 
-    except redis.exceptions.RedisError as e:
-        logger.error(f"Redis error removing staged job {staged_job_id}: {e}")
-        raise HTTPException(status_code=503, detail="Service unavailable: Could not remove job due to storage error.")
-    except HTTPException as e:
-        # Re-raise HTTPExceptions (like the 404 or 400)
-        raise e
-    except Exception as e:
-        logger.exception(f"Unexpected error removing staged job {staged_job_id}.")
-        raise HTTPException(status_code=500, detail="Internal server error removing job.")
+        except redis.exceptions.RedisError as e:
+            logger.error(f"Redis error removing staged job {job_id}: {e}")
+            raise HTTPException(status_code=503, detail="Service unavailable: Could not remove job due to storage error.")
+        except HTTPException as e:
+            raise e # Re-raise the 404
+        except Exception as e:
+            logger.exception(f"Unexpected error removing staged job {job_id}.")
+            raise HTTPException(status_code=500, detail="Internal server error removing staged job.")
+
+    # --- Case 2: Handle RQ Jobs ---
+    else:
+        logger.info(f"Attempting to remove RQ job '{job_id}' data.")
+        try:
+            # Fetch the job first to see if it exists
+            job = Job.fetch(job_id, connection=redis_conn, serializer=queue.serializer)
+
+            # Delete the job data (main hash and from registries)
+            # remove_from_registries=True is more thorough
+            job.delete(remove_from_registries=True)
+
+            logger.info(f"Successfully deleted RQ job '{job_id}' and associated data.")
+            # Stop any active polling for this job ID if necessary (though frontend usually handles row removal)
+            # Note: Backend doesn't track frontend polling state directly.
+            return JSONResponse(status_code=200, content={"message": f"RQ Job '{job_id}' data removed.", "removed_id": job_id})
+
+        except NoSuchJobError:
+            logger.warning(f"RQ Job '{job_id}' not found for removal. It might have already expired or been deleted.")
+            # Return 404 Not Found if the job doesn't exist in RQ
+            raise HTTPException(status_code=404, detail=f"RQ Job '{job_id}' not found.")
+        except redis.exceptions.RedisError as e:
+            logger.error(f"Redis error removing RQ job {job_id}: {e}")
+            raise HTTPException(status_code=503, detail="Service unavailable: Could not remove RQ job due to storage error.")
+        except InvalidJobOperation as e:
+            # This might occur if trying to delete a job that's currently running, depending on RQ version/config.
+            # Decide how to handle this - maybe return a 409 Conflict? Or allow deletion?
+            logger.warning(f"Invalid operation trying to remove RQ job {job_id} (possibly running?): {e}")
+            # For now, let's report it as an error preventing removal.
+            raise HTTPException(status_code=409, detail=f"Cannot remove job '{job_id}': Invalid operation (job might be active or locked).")
+        except Exception as e:
+            logger.exception(f"Unexpected error removing RQ job {job_id}.")
+            raise HTTPException(status_code=500, detail="Internal server error removing RQ job.")
