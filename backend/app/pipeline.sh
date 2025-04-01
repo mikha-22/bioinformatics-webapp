@@ -55,7 +55,7 @@ sleep 0.5
 echo "Simulated coverage report" > "$results_dir/${forward_basename}_coverage_report.txt"
 sleep 0.5
 echo "Pipeline summary" > "$results_dir/${forward_basename}_pipeline_summary.txt"
-sleep 0.5
+sleep 10
 
 # Pipeline finished
 echo "status::Pipeline finished"

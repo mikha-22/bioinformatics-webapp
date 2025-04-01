@@ -1,0 +1,98 @@
+/* frontend/static/jobs.css */
+
+#jobs-status-global {
+    /* Reserve space even when empty */
+    min-height: 3.5em; /* Adjust if needed based on font/padding */
+    display: block;
+    margin-bottom: 1rem; /* Standard margin */
+
+    /* Control visibility/opacity for transitions */
+    visibility: hidden; /* Hidden but occupies space */
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out, visibility 0s linear 0.3s; /* Fade opacity, delay visibility change */
+}
+
+/* Class to make it visible smoothly */
+#jobs-status-global.visible {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 0.3s ease-in-out; /* Fade in */
+}
+
+/* Ensure Bootstrap alert styling applies correctly when visible */
+#jobs-status-global.alert {
+    /* Styles like padding, border, colors are handled by Bootstrap */
+    /* The min-height ensures space even if Bootstrap somehow collapses it when empty */
+}
+
+/* --- Other styles from your jobs.html <style> block (moved here for better organization) --- */
+#jobs-table .action-cell {
+    width: 190px;
+    text-align: center;
+    vertical-align: middle;
+}
+#jobs-table .btn {
+     margin: 2px 3px;
+     min-width: 35px;
+}
+#jobs-table .btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    border-radius: 0.2rem;
+}
+#jobs-table .btn-remove-job i {
+     margin-right: 0;
+}
+
+.job-status-text {
+    display: inline-block;
+    vertical-align: middle;
+    font-style: italic;
+    margin-right: 5px;
+}
+.action-cell .fa-spinner,
+.action-cell .fa-sync-alt,
+.action-cell .bi {
+     margin-right: 4px;
+}
+
+/* Job State Backgrounds */
+.job-state-staged { background-color: #f8f9fa; }
+.job-state-queued { background-color: #e3f2fd; }
+.job-state-started { background-color: #e6ffed; }
+.job-state-finished { background-color: #d1e7dd; }
+.job-state-failed { background-color: #f8d7da; }
+.job-state-stopped, .job-state-canceled { background-color: #e9ecef; opacity: 0.8; }
+.job-state-unknown { background-color: #fff; }
+
+/* Parameter display */
+.job-parameters {
+    font-size: 0.8rem;
+    color: #555;
+    margin-top: 5px;
+    padding-left: 10px;
+    border-left: 2px solid #ccc;
+    max-width: 250px;
+    overflow: hidden;
+    white-space: normal;
+}
+.job-parameters kbd {
+    background-color: #4f4f4f;
+    padding: 1px 3px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    word-wrap: break-word;
+    display: inline-block;
+    max-width: 100%;
+}
+.job-parameters div {
+    margin-bottom: 2px;
+}
+
+/* Modal styles */
+.modal { display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+.modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 5px; }
+.close-modal { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
+.close-modal:hover, .close-modal:focus { color: black; text-decoration: none; cursor: pointer; }
+.modal-body pre { background-color: #eee; padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; }
