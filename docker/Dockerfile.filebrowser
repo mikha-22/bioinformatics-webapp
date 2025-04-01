@@ -27,18 +27,16 @@ COPY ./tls/server.key /build/config/server.key
 #-------------------------------------------------------------------
 # Stage 2: Final Stage - File Browser Runtime
 #-------------------------------------------------------------------
-# Use a minimal image like debian-slim again or scratch if possible (though unlikely)
 FROM debian:bookworm-slim
 
-# Install runtime dependencies (minimal needed, ca-certificates maybe for updates/plugins)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app # Set a working directory
+WORKDIR /app # Working directory still set to /app
 
-# --- Create directories expected by File Browser command/config ---
-# Ensure these paths match volume mounts and CMD flags
+# --- Create necessary directories ---
+# Only create /config and /srv. /app is just the WORKDIR.
 RUN mkdir -p /config /srv
 
 # --- Copy artifacts from builder ---
@@ -52,20 +50,22 @@ RUN groupadd --gid ${GID} appuser && \
     useradd --uid ${UID} --gid ${GID} --shell /bin/bash --create-home appuser
 
 # --- Set Permissions ---
-# Ensure the user owns the app dir and config files
-# The /srv directory will be mounted, so its permissions come from the host/volume driver
-RUN chown appuser:appuser /app /home/appuser && \
-    chown -R appuser:appuser /config && \
-    chmod 664 /config/filebrowser.db /config/settings.json
+# Change ownership ONLY for the user's home directory and the /config directory.
+# /app doesn't need explicit ownership change here. /srv permissions are handled by the mount.
+# Also adjust permissions for config files AND potentially copied TLS keys.
+RUN chown -R appuser:appuser /home/appuser /config && \
+    chmod 664 /config/filebrowser.db /config/settings.json /config/server.crt /config/server.key
 
 # Switch to the non-root user
 USER appuser
 
 # Expose the internal port File Browser will listen on
+# Make sure this matches the --port flag in CMD and the internal port in docker-compose
 EXPOSE 8081
 
 # --- Define the command ---
 # Use flags matching the paths where config files are copied/mounted
+# Ensure the --port matches the EXPOSE instruction above
 CMD ["/usr/local/bin/filebrowser", \
      "--port=8081", \
      "--root=/srv", \
