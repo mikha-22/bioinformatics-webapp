@@ -3175,6 +3175,116 @@ This is the recommended method for deployment, as it packages the application an
 ```
 --- END FILE: ./README.md ---
 
+--- START FILE: ./docker-compose.yml ---
+# ./docker-compose.yml
+version: '3.8'
+
+services:
+  webapp:
+    # Replace build: with image:
+    image: ghcr.io/mikha-22/bioinformatics-webapp/webapp:latest
+    container_name: bio_webapp
+    ports:
+      - "${WEBAPP_PORT:-8000}:8000"
+    volumes:
+      # You MAY still want to mount code/TLS/results for runtime access/updates
+      # If code/TLS is BAKED into the image and doesn't need host access, remove mounts
+      - ./backend:/app/backend:ro
+      - ./frontend:/app/frontend:ro
+      - ./main.py:/app/main.py:ro
+      - ./tls:/app/tls:ro # Needed by main.py if it reads local TLS files
+      - results_vol:/app/bioinformatics/results:ro
+    environment:
+      - REDIS_HOST=redis
+      - PYTHONUNBUFFERED=1
+    # User directive might still be needed if the image expects it or for volume permissions
+    user: "${UID:-1000}:${GID:-1000}"
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  worker:
+    # Replace build: with image:
+    image: ghcr.io/mikha-22/bioinformatics-webapp/worker:latest
+    container_name: bio_worker
+    depends_on:
+      - redis
+    volumes:
+      # --- Critical: Mount Docker socket ---
+      - /var/run/docker.sock:/var/run/docker.sock
+      # --- Mount backend code ONLY if worker image doesn't have it baked in ---
+      # - ./backend:/app/backend:ro # Remove if code is in the image
+      # --- Mount shared data volumes ---
+      - data_vol:/data
+      - results_vol:/results
+      - references_vol:/references
+      - nextflow_work_vol:/nf_work
+    environment:
+      - REDIS_HOST=redis
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app # Still needed if backend code structure is expected
+      - NXF_WORK=/nf_work
+    # User directive might still be needed for socket/volume permissions
+    user: "${UID:-1000}:${GID:-1000}"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine # Stays the same
+    container_name: bio_redis
+    volumes:
+      - redis_data_vol:/data
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  filebrowser:
+    # Replace build: with image:
+    image: ghcr.io/mikha-22/bioinformatics-webapp/filebrowser:latest
+    container_name: bio_filebrowser
+    ports:
+      - "${FILEBROWSER_PORT:-8081}:8080" # Internal port is 8080 as per your last Dockerfile
+    volumes:
+      # Mount data/results volumes
+      - data_vol:/srv/data
+      - results_vol:/srv/results
+      # Mount runtime config/TLS files - image needs CMD flags matching these paths
+      - ./docker/filebrowser.db:/config/filebrowser.db
+      - ./docker/settings.json:/config/settings.json:ro
+      - ./tls/server.crt:/config/server.crt:ro
+      - ./tls/server.key:/config/server.key:ro
+    # User directive might still be needed for volume access
+    user: "${UID:-1000}:${GID:-1000}"
+    restart: unless-stopped
+    # Ensure the CMD baked into the image uses the correct paths (/config, /srv)
+    networks:
+      - app-network
+
+# Define the network
+networks:
+  app-network:
+    driver: bridge
+
+# Define named volumes
+volumes:
+  data_vol:
+    # driver_opts:
+    #   device: '/absolute/path/on/your/host/bioinformatics/data'
+  results_vol:
+    # driver_opts:
+    #   device: '/absolute/path/on/your/host/bioinformatics/results'
+  references_vol:
+    # driver_opts:
+    #   device: '/absolute/path/on/your/host/bioinformatics/references'
+  nextflow_work_vol:
+    # driver_opts:
+    #   device: '/absolute/path/on/your/host/bioinformatics/nf_work'
+  redis_data_vol:
+--- END FILE: ./docker-compose.yml ---
+
 --- START FILE: ./contextualize.sh ---
 #!/bin/bash
 
@@ -3321,7 +3431,7 @@ rq
 redis
 Jinja2
 python-multipart # For form data if needed by FastAPI endpoints
-# psutil # Add only if webapp logic *directly* uses psutil, not just the worker
+psutil # for testing because tasks.py use psutil, later use on worker
 --- END FILE: ./requirements_webapp.txt ---
 
 --- START FILE: ./backend/app/pipeline.sh ---
