@@ -4,4 +4,4 @@ rq
 redis
 Jinja2
 python-multipart # For form data if needed by FastAPI endpoints
-# psutil # Add only if webapp logic *directly* uses psutil, not just the worker
+psutil # for testing because tasks.py use psutil, later use on worker
