@@ -1,6 +1,7 @@
 # backend/app/core/config.py
 import logging
 from pathlib import Path
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +33,13 @@ except Exception as e:
 
 
 # --- Redis/RQ Configuration ---
-REDIS_HOST = "localhost"
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = 6379
 REDIS_DB = 0
 PIPELINE_QUEUE_NAME = "pipeline_tasks"
 STAGED_JOBS_KEY = "staged_pipeline_jobs" # Key for Redis Hash storing staged jobs
+
+logger.info(f"Using REDIS_HOST: {REDIS_HOST}")
 
 # --- Job Settings ---
 DEFAULT_JOB_TIMEOUT = '2h'

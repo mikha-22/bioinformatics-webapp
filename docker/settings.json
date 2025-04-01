@@ -4,6 +4,6 @@
     "baseURL": "/filebrowser",
     "root": "/srv",
     "noauth": true,
-    "cert": "/app/tls/server.crt",
-    "key": "/app/tls/server.key"
+    "cert": "/config/server.crt",
+    "key": "/config/server.key"
 }
