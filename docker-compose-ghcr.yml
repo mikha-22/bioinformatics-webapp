@@ -1,6 +1,5 @@
-# ./docker-compose.yml
 # Main compose file for running the full application stack,
-# building images locally.
+# using pre-built images from GHCR.
 
 version: '3.8'
 
@@ -9,23 +8,22 @@ services:
   # Web Application
   ##################
   webapp:
-    build:
-      context: .
-      dockerfile: ./docker/Dockerfile.webapp
+    # --- MODIFIED: Use pre-built image instead of building ---
+    image: ghcr.io/mikha-22/bioinformatics-webapp/webapp:latest
+    # build:
+    #   context: .
+    #   dockerfile: ./docker/Dockerfile.webapp
+    # --- END MODIFICATION ---
     container_name: bio_webapp
     ports:
       - "${WEBAPP_PORT:-8000}:8000" # Webapp listens on 8000 (via main.py/uvicorn)
     volumes:
-      # Mount local code for development convenience (overrides image code)
-      # Remove these if you want to run *only* the code baked into the image
-      - ./backend:/app/backend
-      - ./frontend:/app/frontend
-      - ./main.py:/app/main.py
       # Mount TLS certificates needed by uvicorn in main.py
       - ./tls:/app/tls
-      # Mount results for potential read access by webapp (optional)
+      # Mount results/data for access by webapp
       - results_vol:/app/bioinformatics/results
       - data_vol:/app/bioinformatics/data
+      # Mount settings.json for reading File Browser baseURL
       - ./docker/settings.json:/app/docker/settings.json
     environment:
       # Must point to the 'redis' service name below
@@ -42,9 +40,12 @@ services:
   # RQ Worker
   ##################
   worker:
-    build:
-      context: .
-      dockerfile: ./docker/Dockerfile.worker
+    # --- MODIFIED: Use pre-built image instead of building ---
+    image: ghcr.io/mikha-22/bioinformatics-webapp/worker:latest
+    # build:
+    #   context: .
+    #   dockerfile: ./docker/Dockerfile.worker
+    # --- END MODIFICATION ---
     container_name: bio_worker
     depends_on:
       - redis # Worker needs Redis to connect to the queue
@@ -52,17 +53,20 @@ services:
       # Critical: Mount Docker socket if tasks use Docker (e.g., Nextflow)
       - /var/run/docker.sock:/var/run/docker.sock
       # Optional: Mount backend code if NOT fully baked into the image AND needed at runtime
-      # - ./backend:/app/backend:ro # Commented out as Dockerfile.worker copies necessary code
+      # - ./backend:/app/backend:ro # Assumes 'worker:latest' contains necessary code
       # Mount shared data volumes needed by the pipeline tasks
-      - data_vol:/data # Assuming tasks might need input from /data
-      - results_vol:/results # Tasks likely write results here
-      - references_vol:/references # If tasks need reference data
-      - nextflow_work_vol:/nf_work # If using Nextflow
+      # NOTE: Ensure the paths passed to tasks correctly map to these container paths!
+      # E.g., host path /home/user/bio/data/file.fq mounted via data_vol to /data inside container.
+      # The task function needs to handle this mapping if it receives host paths.
+      - data_vol:/data
+      - results_vol:/results
+      - references_vol:/references
+      - nextflow_work_vol:/nf_work
     environment:
       # Must match the service name below (already does)
       - REDIS_HOST=redis
       - PYTHONUNBUFFERED=1
-      - PYTHONPATH=/app # Set in Dockerfile.worker, reiterated for clarity
+      - PYTHONPATH=/app # Should match what's expected by the image/task code
       - NXF_WORK=/nf_work # For Nextflow, if used
     user: "${UID:-1000}:${GID:-1000}"
     restart: unless-stopped
@@ -73,7 +77,7 @@ services:
   # Redis
   ##################
   redis: # Service name MUST be 'redis' for hardcoded worker CMD
-    image: redis:7-alpine
+    image: redis:7-alpine # Still uses public image
     container_name: bio_redis
     volumes:
       # Persist Redis data
@@ -87,23 +91,25 @@ services:
   # File Browser
   ##################
   filebrowser:
-    build:
-      context: .
-      dockerfile: ./docker/Dockerfile.filebrowser
+    # --- MODIFIED: Use pre-built image instead of building ---
+    image: ghcr.io/mikha-22/bioinformatics-webapp/filebrowser:latest
+    # build:
+    #   context: .
+    #   dockerfile: ./docker/Dockerfile.filebrowser
+    # --- END MODIFICATION ---
     container_name: bio_filebrowser
     ports:
-      # Host port : Container port (matches Dockerfile EXPOSE and CMD --port)
+      # Host port : Container port (matches expected internal port 8080)
       - "${FILEBROWSER_PORT:-8081}:8080"
     volumes:
-      # Mount data/results for browsing (results needs write access for deletion)
-      - data_vol:/srv/data # Data likely read-only
-      - results_vol:/srv/results # Needs write access
-      # Mount runtime config/TLS files needed by CMD flags
+      # Mount data/results for browsing
+      - data_vol:/srv/data
+      - results_vol:/srv/results
+      # Mount runtime config/TLS files needed by File Browser (CMD or settings.json)
       - ./docker/filebrowser.db:/config/filebrowser.db # Needs write access
       - ./docker/settings.json:/config/settings.json
       - ./tls/server.crt:/config/server.crt
       - ./tls/server.key:/config/server.key
-      # Ensure settings.json inside ./docker/ now points to /config/server.crt and /config/server.key
     user: "${UID:-1000}:${GID:-1000}"
     restart: unless-stopped
     networks:
@@ -119,10 +125,9 @@ networks:
 ##################
 # Volumes
 ##################
+# Volume definitions remain the same, mapping host paths
 volumes:
   data_vol:
-    # Define how the volume is managed (default is Docker managed)
-    # Or use driver_opts for local path mapping if needed:
     driver: local
     driver_opts:
       type: 'none'
