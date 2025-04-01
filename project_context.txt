@@ -509,93 +509,26 @@ dependencies:
 {% block head %}
     <!-- Font Awesome is included in base.html -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <style>
-        #jobs-table .action-cell {
-            /* Adjusted width to better accommodate potential multiple buttons including remove */
-            width: 190px;
-            text-align: center;
-            vertical-align: middle;
-        }
-        #jobs-table .btn {
-             margin: 2px 3px; /* Spacing between multiple buttons */
-             min-width: 35px; /* Allow smaller buttons like remove icon */
-        }
-        #jobs-table .btn-sm { /* Ensure small buttons stay small */
-            padding: 0.25rem 0.5rem;
-            font-size: 0.875rem;
-            line-height: 1.5;
-            border-radius: 0.2rem;
-        }
-        /* Specific style for icon-only remove button */
-        #jobs-table .btn-remove-job i {
-             margin-right: 0; /* No extra margin needed if it's just the icon */
-        }
-
-        .job-status-text {
-            display: inline-block;
-            vertical-align: middle;
-            font-style: italic;
-            margin-right: 5px;
-        }
-        .action-cell .fa-spinner,
-        .action-cell .fa-sync-alt,
-        .action-cell .bi { /* Include Bootstrap Icons if used */
-             margin-right: 4px;
-        }
-         /* Job State Backgrounds */
-         .job-state-staged { background-color: #f8f9fa; } /* Light grey */
-         .job-state-queued { background-color: #e3f2fd; } /* Lighter blue */
-         .job-state-started { background-color: #e6ffed; } /* Light green */
-         .job-state-finished { background-color: #d1e7dd; } /* Bootstrap success light */
-         .job-state-failed { background-color: #f8d7da; } /* Bootstrap danger light */
-         .job-state-stopped, .job-state-canceled { background-color: #e9ecef; opacity: 0.8; } /* Slightly darker grey, more opaque */
-         .job-state-unknown { background-color: #fff; }
-
-        /* Parameter display */
-        .job-parameters {
-            font-size: 0.8rem;
-            color: #555;
-            margin-top: 5px;
-            padding-left: 10px;
-            border-left: 2px solid #ccc;
-            max-width: 250px; /* Limit width */
-            overflow: hidden; /* Hide overflow */
-            /* text-overflow: ellipsis; // Removed ellipsis to allow wrap */
-            white-space: normal; /* Allow wrapping within limits */
-        }
-        .job-parameters kbd {
-            background-color: #eee;
-            padding: 1px 3px;
-            border-radius: 3px;
-            font-size: 0.75rem;
-            word-wrap: break-word; /* Ensure long words/paths wrap */
-            /* word-break: break-all; // Alternative wrapping */
-            display: inline-block; /* Helps with wrapping */
-            max-width: 100%; /* Ensure kbd doesn't overflow parent */
-        }
-        .job-parameters div {
-            margin-bottom: 2px;
-        }
-
-         /* Modal styles (simple) */
-        .modal { display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
-        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 5px; }
-        .close-modal { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
-        .close-modal:hover, .close-modal:focus { color: black; text-decoration: none; cursor: pointer; }
-        .modal-body pre { background-color: #eee; padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; }
-
-    </style>
+    <!-- Link the NEW CSS file -->
+    <link rel="stylesheet" href="/frontend/static/jobs.css">
+    <!-- Removed the <style> block as its content is now in jobs.css -->
 {% endblock %}
 
 {% block content %}
     <h1 class="mb-4">Jobs Dashboard</h1>
     <p>Overview of staged, running, and recently completed pipeline jobs.</p>
 
-    <div id="jobs-status-global" class="mb-3" style="display: none;"></div> <!-- For global loading/error messages -->
+    <!-- Global status message placeholder -->
+    <!-- Removed inline style and mb-3 class -->
+    <div id="jobs-status-global"></div>
 
-    <button class="btn btn-secondary btn-sm mb-3" id="refresh-jobs-btn">
-        <i class="fas fa-sync-alt"></i> Refresh List
-    </button>
+    <!-- Added mb-3 class to the button's container for spacing -->
+    <div class="mb-3">
+        <button class="btn btn-secondary btn-sm" id="refresh-jobs-btn">
+            <i class="fas fa-sync-alt"></i> Refresh List
+        </button>
+    </div>
+
 
     <div class="table-responsive">
         <table class="table table-striped table-hover" id="jobs-table">
@@ -604,7 +537,7 @@ dependencies:
                     <th scope="col">Job ID / Description</th>
                     <th scope="col">Parameters</th>
                     <th scope="col">Time Info / Resources</th>
-                    <th scope="col" class="action-cell">Status / Action</th> {# Action cell width adjusted in style #}
+                    <th scope="col" class="action-cell">Status / Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -638,7 +571,8 @@ dependencies:
 {% endblock %}
 
 {% block scripts %}
-    <script src="/frontend/static/jobs.js"></script> {# This file now handles adding the remove button #}
+    <!-- Ensure the path is correct based on your Flask static folder setup -->
+    <script src="/frontend/static/jobs.js"></script>
 {% endblock %}
 --- END FILE: ./frontend/templates/pages/jobs/jobs.html ---
 
@@ -822,7 +756,8 @@ dependencies:
                 <div class="col-lg-6">
                     <div class="card dashboard-card">
                         <div class="card-header">
-                           <i class="fas fa-folder-check mr-1"></i> Recent Results
+                           <!-- Updated Icon Here -->
+                           <i class="fas fa-folder-open mr-1 text-warning"></i> Recent Results
                         </div>
                         <ul class="list-group list-group-flush" id="recent-results-list">
                              <li class="list-group-item text-muted" id="loading-recent-results" style="display: none;">
@@ -1669,6 +1604,107 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 --- END FILE: ./frontend/static/index.js ---
 
+--- START FILE: ./frontend/static/jobs.css ---
+/* frontend/static/jobs.css */
+
+#jobs-status-global {
+    /* Reserve space even when empty */
+    min-height: 3.5em; /* Adjust if needed based on font/padding */
+    display: block;
+    margin-bottom: 1rem; /* Standard margin */
+
+    /* Control visibility/opacity for transitions */
+    visibility: hidden; /* Hidden but occupies space */
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out, visibility 0s linear 0.3s; /* Fade opacity, delay visibility change */
+}
+
+/* Class to make it visible smoothly */
+#jobs-status-global.visible {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 0.3s ease-in-out; /* Fade in */
+}
+
+/* Ensure Bootstrap alert styling applies correctly when visible */
+#jobs-status-global.alert {
+    /* Styles like padding, border, colors are handled by Bootstrap */
+    /* The min-height ensures space even if Bootstrap somehow collapses it when empty */
+}
+
+/* --- Other styles from your jobs.html <style> block (moved here for better organization) --- */
+#jobs-table .action-cell {
+    width: 190px;
+    text-align: center;
+    vertical-align: middle;
+}
+#jobs-table .btn {
+     margin: 2px 3px;
+     min-width: 35px;
+}
+#jobs-table .btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    border-radius: 0.2rem;
+}
+#jobs-table .btn-remove-job i {
+     margin-right: 0;
+}
+
+.job-status-text {
+    display: inline-block;
+    vertical-align: middle;
+    font-style: italic;
+    margin-right: 5px;
+}
+.action-cell .fa-spinner,
+.action-cell .fa-sync-alt,
+.action-cell .bi {
+     margin-right: 4px;
+}
+
+/* Job State Backgrounds */
+.job-state-staged { background-color: #f8f9fa; }
+.job-state-queued { background-color: #e3f2fd; }
+.job-state-started { background-color: #e6ffed; }
+.job-state-finished { background-color: #d1e7dd; }
+.job-state-failed { background-color: #f8d7da; }
+.job-state-stopped, .job-state-canceled { background-color: #e9ecef; opacity: 0.8; }
+.job-state-unknown { background-color: #fff; }
+
+/* Parameter display */
+.job-parameters {
+    font-size: 0.8rem;
+    color: #555;
+    margin-top: 5px;
+    padding-left: 10px;
+    border-left: 2px solid #ccc;
+    max-width: 250px;
+    overflow: hidden;
+    white-space: normal;
+}
+.job-parameters kbd {
+    background-color: #4f4f4f;
+    padding: 1px 3px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    word-wrap: break-word;
+    display: inline-block;
+    max-width: 100%;
+}
+.job-parameters div {
+    margin-bottom: 2px;
+}
+
+/* Modal styles */
+.modal { display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+.modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 5px; }
+.close-modal { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
+.close-modal:hover, .close-modal:focus { color: black; text-decoration: none; cursor: pointer; }
+.modal-body pre { background-color: #eee; padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; }
+--- END FILE: ./frontend/static/jobs.css ---
+
 --- START FILE: ./frontend/static/floating_iframe.js ---
 document.addEventListener('DOMContentLoaded', function() {
     const showButton = document.getElementById('showFileBrowser');
@@ -1725,6 +1761,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Helper Functions ---
 
+    /** Safely get nested property */
+    function getNested(obj, path, defaultValue = null) {
+        try {
+            // Handle cases where obj might be null or undefined early
+            if (!obj) return defaultValue;
+            // Reduce the path
+            const result = path.split('.').reduce((o, k) => (o || {})[k], obj);
+            // Return the result if it's not undefined, otherwise return defaultValue
+            // Important: Check for undefined specifically, as 0 or false are valid values
+            return result !== undefined ? result : defaultValue;
+        } catch (e) {
+            // Catch potential errors during reduction (e.g., accessing property of null)
+            console.warn(`Error accessing nested property '${path}':`, e); // Log warning
+            return defaultValue;
+        }
+    }
+
      /** Formats a timestamp (seconds since epoch) into a locale string, or returns 'N/A' */
      function formatTimestamp(timestamp) {
         if (!timestamp) return 'N/A';
@@ -1757,36 +1810,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /** Shows a global status message */
     function showGlobalStatus(message, type = 'info') {
-        globalStatusDiv.innerHTML = message; // Use innerHTML to allow basic tags like <code>
-        globalStatusDiv.className = `alert alert-${type} mb-3`;
-        globalStatusDiv.style.display = 'block';
+        // Set the content
+        globalStatusDiv.innerHTML = message;
+        // Set Bootstrap alert classes AND the 'visible' class for CSS transition
+        globalStatusDiv.className = `alert alert-${type} visible`;
     }
 
     /** Clears the global status message */
     function clearGlobalStatus() {
-         globalStatusDiv.textContent = '';
-         globalStatusDiv.style.display = 'none';
-         globalStatusDiv.className = '';
-    }
+        // Start fade-out by removing 'visible' class (CSS transition handles opacity)
+        globalStatusDiv.classList.remove('visible');
 
-    // +++ ADDED MISSING HELPER FUNCTION +++
-    /** Safely get nested property */
-    function getNested(obj, path, defaultValue = null) {
-        try {
-            // Handle cases where obj might be null or undefined early
-            if (!obj) return defaultValue;
-            // Reduce the path
-            const result = path.split('.').reduce((o, k) => (o || {})[k], obj);
-            // Return the result if it's not undefined, otherwise return defaultValue
-            // Important: Check for undefined specifically, as 0 or false are valid values
-            return result !== undefined ? result : defaultValue;
-        } catch (e) {
-            // Catch potential errors during reduction (e.g., accessing property of null)
-            console.warn(`Error accessing nested property '${path}':`, e); // Log warning
-            return defaultValue;
-        }
+        // Clear content *after* transition completes (match CSS: 0.3s = 300ms)
+        setTimeout(() => {
+            // Only clear if it wasn't made visible again in the meantime
+            if (!globalStatusDiv.classList.contains('visible')) {
+                globalStatusDiv.innerHTML = ''; // Clear text
+                globalStatusDiv.className = ''; // Remove Bootstrap alert classes
+            }
+        }, 300); // Should match CSS transition duration
     }
-    // +++++++++++++++++++++++++++++++++++++++
 
      /** Checks if the jobs table body is empty (excluding placeholder rows) */
      function isTableEmpty() {
@@ -1978,8 +2021,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateJobRow(row, job) { // job here is from /job_status, has 'job_id'
         const jobId = job.job_id;
 
-        updateTimeCell(row.cells[2], job);
-        updateActionCell(row.cells[3], job);
+        updateTimeCell(row.cells[2], job); // Uses getNested internally
+        updateActionCell(row.cells[3], job); // Uses getNested internally
         row.className = `job-state-${job.status || 'unknown'}`;
 
          if (TERMINAL_STATUSES.includes(job.status)) {
@@ -1996,14 +2039,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- API Calls ---
 
     /** Fetches the combined list of jobs from the backend */
+    /** Fetches the combined list of jobs from the backend */
     async function fetchJobsList() {
-        clearGlobalStatus();
+        // Message display is now handled ONLY by specific actions or fetch errors
+
         loadingRow.style.display = '';
         noJobsRow.style.display = 'none';
         errorJobsRow.style.display = 'none';
 
         const currentlyPollingIds = new Set(Object.keys(jobPollingIntervals));
-        // Clear ONLY job rows, not placeholders
         jobsTableBody.querySelectorAll('tr[data-job-id]').forEach(row => row.remove());
 
         try {
@@ -2015,21 +2059,27 @@ document.addEventListener('DOMContentLoaded', function() {
             const jobs = await response.json();
             loadingRow.style.display = 'none';
 
+            // ---- COMPLETELY REMOVED clearGlobalStatus() from here ----
+            // The message set by handleRerunClick (or others) will persist
+            // until overwritten by another showGlobalStatus call (e.g., fetch error below, or another button click)
+
             if (!jobs || jobs.length === 0) {
                 noJobsRow.style.display = '';
                 currentlyPollingIds.forEach(stopPolling);
+                // Optionally, clear the status ONLY if no jobs are found AND no error occurred?
+                // clearGlobalStatus(); // Consider adding this back ONLY here if you want the message gone on an empty list result.
                 return;
             }
 
             const activeJobIdsThisFetch = new Set();
             jobs.forEach(job => {
-                createAndAppendJobRow(job); // Uses getNested - ensure it exists!
+                createAndAppendJobRow(job);
                  if (job.status !== 'staged' && !TERMINAL_STATUSES.includes(job.status)) {
                      activeJobIdsThisFetch.add(job.id);
                  }
             });
 
-            // Stop polling for jobs that were polling but are now gone or terminal/staged
+            // Stop polling management remains the same
             currentlyPollingIds.forEach(jobId => {
                 if (!activeJobIdsThisFetch.has(jobId)) {
                      const fetchedJob = jobs.find(j => j.id === jobId);
@@ -2039,13 +2089,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
 
-            // Final check if empty after potential stops
-             if (isTableEmpty()) {
+            if (isTableEmpty()) {
                   noJobsRow.style.display = '';
+                  // Optionally clear status here too if the list becomes empty after filtering/updates
+                  // clearGlobalStatus();
              }
 
         } catch (error) {
-            console.error('Error fetching jobs list:', error); // Log the actual error
+            console.error('Error fetching jobs list:', error);
+            // THIS is where a previous message (like the Rerun success) will be overwritten
             showGlobalStatus(`Error loading jobs: ${error.message}`, 'danger');
             loadingRow.style.display = 'none';
             errorJobsRow.style.display = '';
@@ -2079,7 +2131,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             const job = await response.json();
-            updateJobRow(row, job); // Uses getNested - ensure it exists!
+            updateJobRow(row, job); // Uses getNested internally
 
         } catch (error) {
             console.error(`Network error polling job ${jobId}:`, error);
@@ -2116,44 +2168,84 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Button Click Handlers ---
 
     /** Handle Start Button Click */
+    /** Handle Start Button Click */
     async function handleStartClick(button) {
         const stagedJobId = button.dataset.stagedId;
         if (!stagedJobId) return;
 
         button.disabled = true;
         button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
-        const removeButton = button.closest('td').querySelector(`.${BUTTON_CLASS_REMOVE}`);
+        const row = button.closest('tr'); // Get the row to update
+        if (!row) {
+            console.error("Could not find row associated with start button for:", stagedJobId);
+            // Optionally re-enable button here or show an error
+            button.disabled = false;
+            button.innerHTML = 'Start';
+            return;
+        }
+        const removeButton = row.querySelector(`.${BUTTON_CLASS_REMOVE}`); // Find remove button within the row
         if (removeButton) removeButton.disabled = true;
+
 
         try {
             const response = await fetch(`/start_job/${stagedJobId}`, { method: 'POST', headers: { 'Accept': 'application/json' } });
             const result = await response.json();
 
-            if (!response.ok || response.status !== 202) {
-                throw new Error(result.detail || `Failed to start job (${response.status})`);
+            if (!response.ok || response.status !== 202 || !result.job_id) { // Also check if job_id exists
+                throw new Error(result.detail || `Failed to start job or missing job_id (${response.status})`);
             }
 
-            showGlobalStatus(`Job <code>${result.job_id}</code> enqueued successfully. Refreshing list...`, 'success');
-            setTimeout(fetchJobsList, 1500);
+            const newJobId = result.job_id; // The actual RQ job ID
+
+            showGlobalStatus(`Job <code>${newJobId}</code> enqueued successfully.`, 'success');
+
+            // 1. Optimistic UI Update:
+            const actionCell = row.cells[3]; // Action cell is usually the 4th cell (index 3)
+            if (actionCell) {
+                // Update status display
+                actionCell.innerHTML = `<span class="job-status-text text-primary"><i class="bi bi-hourglass-split"></i> Queued</span><br>` +
+                                       `<button class="btn btn-outline-danger btn-sm ${BUTTON_CLASS_REMOVE}" data-job-id="${newJobId}" title="Remove Job Data"><i class="fas fa-trash"></i></button>`; // Re-add remove btn with NEW ID
+                 // Find the new remove button we just added and ensure it's enabled
+                 const newRemoveButton = actionCell.querySelector(`.${BUTTON_CLASS_REMOVE}`);
+                 if (newRemoveButton) newRemoveButton.disabled = false; // Make sure remove is usable immediately
+
+            } else {
+                 console.warn("Could not find action cell to update status for job:", newJobId);
+            }
+
+            // --- THIS IS THE CRITICAL FIX ---
+            // 2. Update the row's identifier
+            row.dataset.jobId = newJobId;
+            // --- END CRITICAL FIX ---
+
+            // 3. Update row styling class
+            row.className = `job-state-queued`;
+
+            // 4. Start Polling for the *new* RQ job ID
+            startPolling(newJobId);
+
+            // No need for full fetchJobsList anymore
 
         } catch (error) {
             console.error(`Error starting job ${stagedJobId}:`, error);
             showGlobalStatus(`Error starting job <code>${stagedJobId}</code>: ${error.message}`, 'danger');
-            const actionCell = jobsTableBody.querySelector(`tr[data-job-id="${stagedJobId}"] .action-cell`);
-            if (actionCell) {
-                const startBtn = actionCell.querySelector(`.${BUTTON_CLASS_START}`);
-                const removeBtn = actionCell.querySelector(`.${BUTTON_CLASS_REMOVE}`);
+            // Error Handling: Re-enable the original start button if it still exists
+            // Note: The row ID might still be the stagedJobId here if the update failed early
+             const originalRow = jobsTableBody.querySelector(`tr[data-job-id="${stagedJobId}"]`); // Look for original row
+             if (originalRow) {
+                const startBtn = originalRow.querySelector(`.${BUTTON_CLASS_START}`);
+                const removeBtn = originalRow.querySelector(`.${BUTTON_CLASS_REMOVE}`);
                  if (startBtn) {
                     startBtn.disabled = false;
                     startBtn.innerHTML = 'Start';
                  }
                  if (removeBtn) {
-                     removeBtn.disabled = false;
+                     removeBtn.disabled = false; // Also re-enable remove on error
                  }
             }
         }
-    }
-
+    } 
+    
     /** Handle Stop Button Click */
     async function handleStopClick(button) {
         const jobId = button.dataset.jobId;
@@ -2186,7 +2278,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
      /** Handle Rerun Button Click */
      async function handleRerunClick(button) {
-        const jobId = button.dataset.jobId;
+        const jobId = button.dataset.jobId; // Original job ID being rerun
         if (!jobId) {
             console.error("Rerun button clicked but data-job-id is missing or invalid:", button);
             showGlobalStatus("Cannot rerun: Job ID is missing.", "danger");
@@ -2197,6 +2289,7 @@ document.addEventListener('DOMContentLoaded', function() {
          button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Re-staging...';
 
         try {
+             // Fetch details of the original job
              const response = await fetch(`/job_status/${jobId}`);
              if (!response.ok) {
                 const errorText = await response.text();
@@ -2204,9 +2297,7 @@ document.addEventListener('DOMContentLoaded', function() {
              }
              const jobDetails = await response.json();
 
-             // Uses getNested - ensure it exists!
              const inputParams = getNested(jobDetails, 'meta.input_params.input_filenames', getNested(jobDetails, 'meta.input_params', {}));
-
              if (!inputParams || !inputParams.forward_reads) {
                  throw new Error("Original input parameters not found for this job, cannot rerun automatically.");
              }
@@ -2219,6 +2310,7 @@ document.addEventListener('DOMContentLoaded', function() {
                  known_variants_file: inputParams.known_variants || null
              };
 
+             // Call the staging endpoint (/run_pipeline)
              const stageResponse = await fetch('/run_pipeline', {
                  method: 'POST',
                  headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -2226,16 +2318,25 @@ document.addEventListener('DOMContentLoaded', function() {
              });
              const stageResult = await stageResponse.json();
 
-             if (!stageResponse.ok) {
-                 throw new Error(stageResult.detail || `Failed to re-stage job (${stageResponse.status})`);
+             if (!stageResponse.ok || !stageResult.staged_job_id) { // Also check if staged_job_id exists
+                 throw new Error(stageResult.detail || `Failed to re-stage job or missing staged_job_id (${stageResponse.status})`);
              }
 
-             showGlobalStatus(`Job successfully re-staged with ID: <code>${stageResult.staged_job_id}</code>. Refreshing list...`, 'success');
-             setTimeout(fetchJobsList, 1500);
+             const newStagedJobId = stageResult.staged_job_id;
+
+             // --- ADDED: Show success message BEFORE refreshing ---
+             showGlobalStatus(`Job successfully re-staged with ID: <code>${newStagedJobId}</code>. Refreshing list...`, 'success');
+             // --- End Added Message ---
+
+             // Refresh the list to show the new staged job
+             fetchJobsList(); // Refresh immediately
 
          } catch (error) {
              console.error(`Error rerunning job ${jobId}:`, error);
+             // Show error message using the status div
              showGlobalStatus(`Error rerunning job <code>${jobId}</code>: ${error.message}`, 'danger');
+
+             // Re-enable the button on error
              const existingButton = jobsTableBody.querySelector(`button[data-job-id="${jobId}"].${BUTTON_CLASS_RERUN}`);
              if(existingButton){
                 existingButton.disabled = false;
@@ -2247,7 +2348,7 @@ document.addEventListener('DOMContentLoaded', function() {
      /** Handle Error Details Button Click */
      function handleErrorDetailsClick(button) {
          const errorMsg = button.dataset.error || "No specific error message provided.";
-         let extraDetails = "";
+         let extraDetails = ""; // Placeholder if you want to add more details later
 
          errorModalText.textContent = errorMsg + extraDetails;
          errorModal.style.display = "block";
@@ -2353,15 +2454,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const addToStagingBtn = document.getElementById('addToStagingBtn');
     const pipelineStatusDiv = document.getElementById('pipeline-status');
     const mandatorySelects = [forwardReadsSelect, reverseReadsSelect, referenceGenomeSelect, targetRegionsSelect];
-    // --- MODIFIED: Include knownVariantsSelect for easier reset ---
     const allSelects = [forwardReadsSelect, reverseReadsSelect, referenceGenomeSelect, targetRegionsSelect, knownVariantsSelect];
 
     // --- Helper Functions ---
 
+    /**
+     * Populates a select dropdown with files matching given extensions,
+     * preserving the first (placeholder) option.
+     * @param {HTMLSelectElement} selectElement - The dropdown element.
+     * @param {Array<Object>} files - Array of file objects (e.g., { name: "file.txt" }).
+     * @param {Array<string>} extensions - Array of valid file extensions (e.g., ['.txt', '.csv']).
+     */
     function populateDropdown(selectElement, files, extensions) {
-        // --- Keep the first option (the placeholder) ---
-        // selectElement.length = 1; // <-- REMOVE THIS LINE or adjust if you want to rebuild placeholders too
+        // Keep the first option (placeholder)
+        // selectElement.length = 1; // Use this if you need to clear previous dynamic options first
         if (!files || files.length === 0) return;
+
         const sortedFiles = files.sort((a, b) => a.name.localeCompare(b.name));
         sortedFiles.forEach(file => {
             if (extensions.some(ext => file.name.toLowerCase().endsWith(ext.toLowerCase()))) {
@@ -2373,152 +2481,166 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    /**
+     * Checks if all mandatory select elements have a value selected.
+     * @returns {boolean} True if all mandatory files are selected, false otherwise.
+     */
     function checkMandatoryFiles() {
         return mandatorySelects.every(select => select.value !== "");
     }
 
     /**
-     * Resets all form select elements to their initial ("None"/placeholder) state.
-     * Sets the value to "" which selects the first <option> with value=""
-     * (either the disabled placeholder or the added "None" option).
-     * Also disables the staging button.
+     * Resets all form select elements to their initial state (value="").
+     * Disables the staging button.
+     * NOTE: Does NOT clear the pipeline status message, allowing success/error messages to persist.
      */
     function resetForm() {
         allSelects.forEach(select => {
-            select.value = ""; // Reset to the option with value=""
+            select.value = ""; // Reset to the option with value="" (placeholder or "None")
         });
         // Explicitly disable the button after resetting
         addToStagingBtn.disabled = true;
-        // Optionally clear status message immediately after reset
-        pipelineStatusDiv.innerHTML = '';
-        pipelineStatusDiv.className = 'mt-3 d-none';
+        // The status message is intentionally NOT cleared here.
+        // It will be cleared by user interaction via the 'change' listeners.
     }
 
-
+    /**
+     * Updates the UI elements: status message, button text, and button disabled state.
+     * @param {boolean} isSubmitting - Whether the form is currently being submitted.
+     * @param {string} statusMessage - The message to display (HTML allowed).
+     * @param {string} [messageType='info'] - The Bootstrap alert type ('info', 'success', 'warning', 'danger').
+     */
     function updateUI(isSubmitting, statusMessage, messageType = 'info') {
         pipelineStatusDiv.innerHTML = statusMessage;
-        // Make sure message is visible if there is content
+        // Show/hide the status div based on whether there's a message
         pipelineStatusDiv.className = `mt-3 alert alert-${messageType} ${statusMessage ? '' : 'd-none'}`;
 
-        // Update button state
         // Button should be disabled if submitting OR if mandatory files aren't selected
         addToStagingBtn.disabled = isSubmitting || !checkMandatoryFiles();
-
-        // Update button text
         addToStagingBtn.textContent = isSubmitting ? 'Staging...' : 'Add to Staging';
     }
 
 
-    // --- Initial Setup ---
+    // --- Initial Setup: Fetch file list and populate dropdowns ---
     fetch('/get_data')
         .then(response => {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             return response.json();
         })
         .then(data => {
-            // Populate mandatory dropdowns (keeping placeholder)
+            // Populate mandatory dropdowns
             populateDropdown(forwardReadsSelect, data, ['.fastq', '.fastq.gz', '.fq', '.fq.gz']);
             populateDropdown(reverseReadsSelect, data, ['.fastq', '.fastq.gz', '.fq', '.fq.gz']);
             populateDropdown(referenceGenomeSelect, data, ['.fasta', '.fasta.gz', '.fa', '.fa.gz']);
             populateDropdown(targetRegionsSelect, data, ['.bed']);
 
-            // Handle optional dropdown: Clear existing options except placeholder, add "None", then files
-            knownVariantsSelect.length = 1; // Keep only the placeholder initially
+            // Setup optional dropdown (Known Variants)
+            knownVariantsSelect.length = 1; // Keep only the placeholder
             const noneOption = document.createElement('option');
-            // --- Ensure value is "" to match resetForm logic ---
-            noneOption.value = "";
+            noneOption.value = ""; // Value matches resetForm logic and placeholder
             noneOption.textContent = "None (Optional)";
-            // --- Make this "None" option selected by default after population ---
-            noneOption.selected = true; // Make this the default *selectable* option
+            noneOption.selected = true; // Make this the default selectable option
             knownVariantsSelect.appendChild(noneOption);
-            // Now populate the actual VCF files
-            populateDropdown(knownVariantsSelect, data, ['.vcf', '.vcf.gz']);
-            // --- Set value to "" to ensure the added "None" or placeholder is selected ---
-            knownVariantsSelect.value = ""; // Selects the <option value="">
+            populateDropdown(knownVariantsSelect, data, ['.vcf', '.vcf.gz']); // Add actual VCF files
 
-            // --- Ensure initial state selects the placeholder/None option for ALL selects ---
+            // Ensure all selects start at their placeholder/None state
             allSelects.forEach(select => {
-                 select.value = ""; // This ensures the <option value=""> is selected initially
+                 select.value = "";
             });
 
-            addToStagingBtn.disabled = !checkMandatoryFiles(); // Initial check based on mandatory fields
+            // Set initial button state based on mandatory fields
+            addToStagingBtn.disabled = !checkMandatoryFiles();
         })
         .catch(error => {
             console.error('Error fetching file list:', error);
             updateUI(false, `Error fetching file list: ${error.message}. Cannot stage job.`, 'danger');
             addToStagingBtn.disabled = true;
-            allSelects.forEach(s => s.disabled = true); // Disable selects on error
+            allSelects.forEach(s => s.disabled = true); // Disable selects if file list fails
         });
 
-    // Event listeners to enable/disable the stage button
+    // --- Event Listeners for Select Changes ---
+
+    // Update button state and clear status message when mandatory fields change
     mandatorySelects.forEach(select => {
         select.addEventListener('change', () => {
             const isSubmitting = addToStagingBtn.textContent === 'Staging...';
             addToStagingBtn.disabled = isSubmitting || !checkMandatoryFiles();
-            // Clear status message when user interacts (unless submitting)
+            // Clear status message on user interaction (unless already submitting)
             if (!isSubmitting) {
-                 updateUI(false, '', 'info');
+                 updateUI(false, '', 'info'); // Reset message but maintain button state logic
             }
         });
     });
-    // Also listen to optional select change for UI consistency if needed (optional)
+
+    // Clear status message when optional field changes (button state doesn't depend on it)
     knownVariantsSelect.addEventListener('change', () => {
         const isSubmitting = addToStagingBtn.textContent === 'Staging...';
         if (!isSubmitting) {
-             updateUI(false, '', 'info');
+             updateUI(false, '', 'info'); // Reset message
         }
-        // Button state depends only on mandatory fields, so no need to update disable state here
     });
 
     // --- Add to Staging Button Event Listener ---
     addToStagingBtn.addEventListener('click', function() {
         if (!checkMandatoryFiles()) {
             updateUI(false, 'Please select all mandatory input files.', 'warning');
-            return;
+            return; // Stop if validation fails
         }
 
-        updateUI(true, 'Staging job...', 'info'); // Show submitting state
+        // Update UI to indicate submission is in progress
+        updateUI(true, 'Staging job...', 'info');
 
         const payload = {
             forward_reads_file: forwardReadsSelect.value,
             reverse_reads_file: reverseReadsSelect.value,
             reference_genome_file: referenceGenomeSelect.value,
             target_regions_file: targetRegionsSelect.value,
-            // Send null if value is "", otherwise send the selected file
+            // Send null if "None" or placeholder is selected, otherwise send the file name
             known_variants_file: knownVariantsSelect.value === "" ? null : knownVariantsSelect.value
         };
 
+        // Send the request to the backend
         fetch('/run_pipeline', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json' // Indicate we expect JSON back
+            },
             body: JSON.stringify(payload)
         })
-        .then(async response => {
-            if (response.ok) return response.json(); // Expect 200 OK for staging success now
-            // Handle potential errors (like validation errors from backend)
+        .then(async response => { // Use async to easily await potential error JSON
+            if (response.ok) {
+                return response.json(); // Success case (e.g., 200 OK)
+            }
+            // Handle HTTP errors (e.g., 400, 422, 500)
             let errorDetail = `HTTP ${response.status}: ${response.statusText}`;
             try {
+                // Try to parse JSON error detail from backend
                 const errData = await response.json();
                 errorDetail = `Failed to stage job (${response.status}): ${errData.detail || response.statusText}`;
-            } catch (e) { /* Ignore if response body isn't JSON */ }
-            throw new Error(errorDetail);
+            } catch (e) {
+                // Ignore if response body isn't JSON or parsing fails
+            }
+            throw new Error(errorDetail); // Throw an error to be caught by .catch()
         })
         .then(data => {
+            // Handle successful staging response
             if (data.staged_job_id) {
                 const successMessage = `Success! Job staged with ID: <code>${data.staged_job_id}</code>. <br>Go to the <a href="/jobs" class="alert-link">Jobs Dashboard</a> to monitor and start the job.`;
-                // Update UI FIRST to show success message (keeps button disabled for a moment)
+                // Show success message (button will be re-enabled by updateUI)
                 updateUI(false, successMessage, 'success');
-                // --- THEN Reset the form ---
-                resetForm(); // This will set selects to "" and disable the button
+                // Reset the form selections and disable the button again
+                resetForm();
             } else {
-                // Handle cases where staging might succeed but not return expected ID (unlikely with current backend)
+                // Handle unexpected success response (e.g., missing job ID)
                 updateUI(false, data.message || 'Job staged, but no ID received. Check Jobs Dashboard.', 'warning');
-                // Don't reset form if ID wasn't received, user might want to retry
+                // Don't reset form in this case, user might need to see selections or retry
             }
         })
         .catch(error => {
+            // Handle fetch errors or errors thrown from .then(response => ...)
             console.error('Error submitting pipeline job for staging:', error);
-            // Show error, keep button enabled (updateUI handles this)
+            // Show error message (button will be re-enabled by updateUI if mandatory files are still selected)
             updateUI(false, `Error staging job: ${error.message}`, 'danger');
         });
     });
@@ -2934,7 +3056,7 @@ sleep 0.5
 echo "Simulated coverage report" > "$results_dir/${forward_basename}_coverage_report.txt"
 sleep 0.5
 echo "Pipeline summary" > "$results_dir/${forward_basename}_pipeline_summary.txt"
-sleep 0.5
+sleep 10
 
 # Pipeline finished
 echo "status::Pipeline finished"
@@ -3315,7 +3437,7 @@ async def get_jobs_list(
                     "ended_at": None,
                     "result": None,
                     "error": None,
-                    "meta": {"input_params": details.get("input_filenames", {})}, # Extract original filenames
+                    "meta": {"input_params": details.get("input_filenames", {}),"staged_job_id_origin": job_id},
                     "staged_at": details.get("staged_at"), # Timestamp when staged
                     "resources": None # No resources for staged jobs
                 }
@@ -3619,7 +3741,7 @@ async def remove_job(
 
             # Delete the job data (main hash and from registries)
             # remove_from_registries=True is more thorough
-            job.delete(remove_from_registries=True)
+            job.delete()
 
             logger.info(f"Successfully deleted RQ job '{job_id}' and associated data.")
             # Stop any active polling for this job ID if necessary (though frontend usually handles row removal)
