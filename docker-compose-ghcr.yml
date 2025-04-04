@@ -53,13 +53,13 @@ services:
       # Critical: Mount Docker socket if tasks use Docker (e.g., Nextflow)
       - /var/run/docker.sock:/var/run/docker.sock
       # Optional: Mount backend code if NOT fully baked into the image AND needed at runtime
-      # - ./backend:/app/backend:ro # Assumes 'worker:latest' contains necessary code
+      - ./backend:/app/backend:ro # Assumes 'worker:latest' contains necessary code
       # Mount shared data volumes needed by the pipeline tasks
       # NOTE: Ensure the paths passed to tasks correctly map to these container paths!
       # E.g., host path /home/user/bio/data/file.fq mounted via data_vol to /data inside container.
       # The task function needs to handle this mapping if it receives host paths.
       - data_vol:/data
-      - results_vol:/results
+      - results_vol:/app/bioinformatics/results
       - references_vol:/references
       - nextflow_work_vol:/nf_work
     environment:
