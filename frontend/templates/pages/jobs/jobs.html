@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Jobs Queue{% endblock %}
+{% block title %}Sarek Jobs Queue{% endblock %}
 
 {% block head %}
     <!-- Font Awesome is included in base.html -->
@@ -11,8 +11,8 @@
 {% endblock %}
 
 {% block content %}
-    <h1 class="mb-4">Jobs Dashboard</h1>
-    <p>Overview of staged, running, and recently completed pipeline jobs.</p>
+    <h1 class="mb-4">Sarek Jobs Dashboard</h1>
+    <p>Overview of staged, running, and recently completed Sarek pipeline jobs.</p>
 
     <!-- Global status message placeholder -->
     <!-- Removed inline style and mb-3 class -->
@@ -31,6 +31,7 @@
             <thead class="thead-light">
                 <tr>
                     <th scope="col">Job ID / Description</th>
+                    <th scope="col">Input Files</th>
                     <th scope="col">Parameters</th>
                     <th scope="col">Time Info / Resources</th>
                     <th scope="col" class="action-cell">Status / Action</th>
@@ -39,15 +40,15 @@
             <tbody>
                 <!-- Job rows will be inserted here by JavaScript -->
                 <tr id="loading-jobs-row" style="display: none;">
-                    <td colspan="4" class="text-center text-muted">
+                    <td colspan="5" class="text-center text-muted">
                         <i class="fas fa-spinner fa-spin"></i> Loading jobs list...
                     </td>
                 </tr>
                 <tr id="no-jobs-row" style="display: none;">
-                     <td colspan="4" class="text-center text-muted">No jobs found.</td>
+                     <td colspan="5" class="text-center text-muted">No jobs found.</td>
                  </tr>
                  <tr id="error-jobs-row" style="display: none;">
-                     <td colspan="4" class="text-center text-danger">Could not load jobs list.</td>
+                     <td colspan="5" class="text-center text-danger">Could not load jobs list.</td>
                  </tr>
             </tbody>
         </table>
@@ -60,6 +61,29 @@
         <h2>Job Error Details</h2>
         <div class="modal-body">
             <pre id="error-modal-text"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Job Details Modal -->
+    <div id="job-details-modal" class="modal">
+      <div class="modal-content">
+        <span class="close-modal" onclick="document.getElementById('job-details-modal').style.display='none'">×</span>
+        <h2>Job Details</h2>
+        <div class="modal-body">
+            <div class="job-details-content">
+                <h4>Input Files</h4>
+                <ul id="job-input-files" class="list-unstyled"></ul>
+                
+                <h4>Parameters</h4>
+                <ul id="job-parameters" class="list-unstyled"></ul>
+                
+                <h4>Resource Usage</h4>
+                <ul id="job-resources" class="list-unstyled"></ul>
+                
+                <h4>Timeline</h4>
+                <ul id="job-timeline" class="list-unstyled"></ul>
+            </div>
         </div>
       </div>
     </div>

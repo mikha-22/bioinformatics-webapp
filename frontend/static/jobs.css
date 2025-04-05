@@ -96,3 +96,286 @@
 .close-modal { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
 .close-modal:hover, .close-modal:focus { color: black; text-decoration: none; cursor: pointer; }
 .modal-body pre { background-color: #eee; padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; }
+
+.jobs-container {
+    padding: 20px;
+}
+
+.jobs-header {
+    margin-bottom: 30px;
+}
+
+.jobs-title {
+    color: #2c3e50;
+    margin-bottom: 10px;
+}
+
+.jobs-description {
+    color: #7f8c8d;
+    font-size: 1.1em;
+}
+
+/* Table Styles */
+.jobs-table {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+}
+
+.jobs-table th {
+    background: #f8f9fa;
+    color: #2c3e50;
+    font-weight: 600;
+    padding: 15px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.jobs-table td {
+    padding: 15px;
+    vertical-align: middle;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.jobs-table tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* Status Badges */
+.badge {
+    padding: 8px 12px;
+    font-weight: 500;
+    border-radius: 4px;
+}
+
+.badge i {
+    margin-right: 5px;
+}
+
+.badge-secondary { background-color: #6c757d; }
+.badge-info { background-color: #17a2b8; }
+.badge-primary { background-color: #007bff; }
+.badge-success { background-color: #28a745; }
+.badge-danger { background-color: #dc3545; }
+.badge-warning { background-color: #ffc107; color: #000; }
+
+/* Action Buttons */
+.action-cell {
+    min-width: 200px;
+}
+
+.btn-group {
+    margin-top: 10px;
+}
+
+.btn-group .btn {
+    margin-right: 5px;
+    border-radius: 4px;
+}
+
+.btn i {
+    margin-right: 5px;
+}
+
+/* Job Details Modal */
+.modal-content {
+    border-radius: 8px;
+    border: none;
+}
+
+.modal-header {
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    border-radius: 8px 8px 0 0;
+    padding: 20px;
+}
+
+.modal-title {
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    border-top: 1px solid #e9ecef;
+    padding: 20px;
+}
+
+/* Job Details Sections */
+.job-details-section {
+    margin-bottom: 25px;
+}
+
+.job-details-section h5 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.job-details-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.job-details-list li {
+    margin-bottom: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.job-details-list li strong {
+    color: #2c3e50;
+    margin-right: 5px;
+}
+
+/* Loading States */
+.loading-placeholder {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+    border-radius: 4px;
+    height: 20px;
+    margin: 5px 0;
+}
+
+@keyframes loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Error States */
+.error-row {
+    background-color: #fff3f3;
+    color: #dc3545;
+    padding: 20px;
+    text-align: center;
+    border-radius: 4px;
+}
+
+/* Status Messages */
+.status-message {
+    margin-bottom: 20px;
+}
+
+.alert {
+    border-radius: 4px;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+}
+
+.alert-success {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+.alert-info {
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+    color: #0c5460;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .jobs-table {
+        display: block;
+        overflow-x: auto;
+    }
+
+    .action-cell {
+        min-width: 150px;
+    }
+
+    .btn-group {
+        flex-direction: column;
+    }
+
+    .btn-group .btn {
+        margin-bottom: 5px;
+        width: 100%;
+    }
+}
+
+/* File Type Icons */
+.file-type-icon {
+    margin-right: 5px;
+    color: #6c757d;
+}
+
+/* Parameter Tags */
+.parameter-tag {
+    display: inline-block;
+    padding: 4px 8px;
+    margin: 2px;
+    background: #e9ecef;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: #495057;
+}
+
+/* Resource Usage */
+.resource-usage {
+    display: inline-block;
+    padding: 4px 8px;
+    margin: 2px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.resource-usage.cpu {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.resource-usage.memory {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}
+
+.resource-usage.disk {
+    background: #e8f5e9;
+    color: #388e3c;
+}
+
+/* Timeline */
+.timeline-item {
+    position: relative;
+    padding-left: 20px;
+    margin-bottom: 10px;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #007bff;
+}
+
+.timeline-item::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 16px;
+    width: 2px;
+    height: calc(100% - 16px);
+    background: #e9ecef;
+}
+
+.timeline-item:last-child::after {
+    display: none;
+}

@@ -1,401 +1,293 @@
 // frontend/static/results.js
 document.addEventListener('DOMContentLoaded', function() {
-    // --- DOM Elements ---
-    const runsListContainer = document.getElementById('runs-list');
-    const loadingRunsDiv = document.getElementById('loading-runs');
-    const noRunsDiv = document.getElementById('no-runs');
-    const errorRunsDiv = document.getElementById('error-runs');
-    const filterInput = document.getElementById('filter-runs');
-    const sortButtons = document.querySelectorAll('#results-controls [data-sort]');
-    const sortDirectionButton = document.getElementById('sort-direction-btn');
+    // DOM Elements
+    const resultsContainer = document.getElementById('results-container');
+    const loadingPlaceholder = document.getElementById('loading-placeholder');
+    const noResultsMessage = document.getElementById('no-results-message');
+    const errorMessage = document.getElementById('error-message');
+    const parametersModal = document.getElementById('parameters-modal');
 
-    // --- Constants ---
-    // Define the base URL for the File Browser iframe, matching base.html
-    // Use protocol-relative //localhost:8081 or explicit https://localhost:8081
-    // Using explicit https is usually safer if your main app uses https.
-    const FILE_BROWSER_BASE_URL = 'https://localhost:8081'; // <-- Correct Port
+    // File Categories
+    const FILE_CATEGORIES = {
+        'bam': {
+            icon: 'fa-dna',
+            title: 'Aligned BAM Files',
+            description: 'Binary Alignment Map files containing aligned reads'
+        },
+        'vcf': {
+            icon: 'fa-code-branch',
+            title: 'VCF Files',
+            description: 'Variant Call Format files containing variant calls'
+        },
+        'qc': {
+            icon: 'fa-chart-bar',
+            title: 'Quality Control Reports',
+            description: 'Quality control metrics and reports'
+        },
+        'multiqc': {
+            icon: 'fa-tasks',
+            title: 'MultiQC Reports',
+            description: 'Aggregated quality control reports'
+        },
+        'other': {
+            icon: 'fa-file',
+            title: 'Other Files',
+            description: 'Additional pipeline output files'
+        }
+    };
 
-    // --- State ---
-    let allRunsData = []; // Store the fetched run data
-    let currentSort = { field: 'date', direction: 'desc' }; // Default sort: newest first
-
-    // --- Helper Functions ---
-
-    /** Formats bytes into human-readable format */
-    function formatBytes(bytes, decimals = 2) {
-        if (bytes === 0 || bytes === null || bytes === undefined) return '0 Bytes';
-        const k = 1024;
-        const dm = decimals < 0 ? 0 : decimals;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-    }
-
-    /** Formats a timestamp (seconds since epoch) into a locale string */
-    function formatTimestamp(timestamp) {
-        if (!timestamp) return 'N/A';
+    // Load Results
+    async function loadResults() {
         try {
-            return new Date(timestamp * 1000).toLocaleString();
-        } catch (e) {
-            return 'Invalid Date';
-        }
-    }
-
-    /** Gets a Font Awesome or Bootstrap icon class based on file extension */
-    function getFileIconClass(extension) {
-        // Simple mapping, expand as needed
-        const ext = extension ? extension.toLowerCase() : '';
-        switch (ext) {
-            case '.bam': case '.sam': case '.cram': return 'fas fa-dna text-primary'; // DNA icon
-            case '.bai': case '.crai': return 'fas fa-barcode text-secondary'; // Index/Barcode
-            case '.vcf': case '.vcf.gz': case '.gvcf': return 'fas fa-file-medical-alt text-info'; // Variant file
-            case '.bed': case '.gtf': case '.gff': return 'fas fa-bed text-warning'; // Genomic intervals
-            case '.fasta': case '.fa': case '.fastq': case '.fq': case '.fasta.gz': case '.fastq.gz': return 'fas fa-dna text-success'; // Sequence file
-            case '.log': case '.txt': case '.out': case '.err': return 'far fa-file-alt text-muted'; // Text/Log file
-            case '.tsv': case '.csv': return 'fas fa-table text-dark'; // Table
-            case '.json': return 'fas fa-code text-purple'; // Code/JSON
-            case '.png': case '.jpg': case '.jpeg': case '.gif': case '.svg': case '.pdf': return 'far fa-image text-danger'; // Image/PDF
-            case '.zip': case '.gz': case '.tar': case '.bz2': return 'far fa-file-archive text-secondary'; // Archive
-            default: return 'far fa-file'; // Generic file
-        }
-    }
-
-    /** Toggles the visibility of status messages */
-    function showStatus(element, show = true) {
-        if (element) {
-            element.style.display = show ? 'block' : 'none';
-        }
-    }
-
-    // --- Core Logic ---
-
-    /** Fetches the list of run directories from the backend */
-    async function fetchRuns() {
-        showStatus(loadingRunsDiv, true);
-        showStatus(noRunsDiv, false);
-        showStatus(errorRunsDiv, false);
-        runsListContainer.innerHTML = ''; // Clear previous runs
-
-        try {
-            const response = await fetch('/get_results');
-            if (!response.ok) {
-                throw new Error(`Failed to fetch runs list (${response.status})`);
-            }
-            allRunsData = await response.json();
-            showStatus(loadingRunsDiv, false);
-
-            if (allRunsData.length === 0) {
-                showStatus(noRunsDiv, true);
-            } else {
-                sortAndRenderRuns(); // Initial sort and render
-                applyHighlight(); // Apply highlight after rendering
-            }
+            showLoading();
+            const response = await fetch('/api/results');
+            if (!response.ok) throw new Error('Failed to load results');
+            
+            const results = await response.json();
+            displayResults(results);
         } catch (error) {
-            console.error('Error fetching runs:', error);
-            showStatus(loadingRunsDiv, false);
-            showStatus(errorRunsDiv, true);
+            console.error('Error loading results:', error);
+            showError('Failed to load results. Please try again.');
         }
     }
 
-    /** Sorts the `allRunsData` array based on `currentSort` */
-    function sortRunsData() {
-        const { field, direction } = currentSort;
-        allRunsData.sort((a, b) => {
-            let valA, valB;
-            if (field === 'name') {
-                valA = a.name.toLowerCase();
-                valB = b.name.toLowerCase();
-            } else { // date (modified_time)
-                valA = a.modified_time || 0;
-                valB = b.modified_time || 0;
-            }
+    // Display Results
+    function displayResults(results) {
+        resultsContainer.innerHTML = '';
 
-            let comparison = 0;
-            if (valA > valB) {
-                comparison = 1;
-            } else if (valA < valB) {
-                comparison = -1;
-            }
-            return direction === 'asc' ? comparison : comparison * -1;
+        if (!results || results.length === 0) {
+            showNoResults();
+            return;
+        }
+
+        results.forEach(result => {
+            const resultElement = createResultElement(result);
+            resultsContainer.appendChild(resultElement);
         });
     }
 
+    // Create Result Element
+    function createResultElement(result) {
+        const resultDiv = document.createElement('div');
+        resultDiv.className = 'result-item';
+        resultDiv.dataset.jobId = result.job_id;
 
-    /** Renders the list of runs into the container */
-    function renderRuns() {
-        runsListContainer.innerHTML = ''; // Clear previous content
-        const fragment = document.createDocumentFragment();
+        // Header
+        const header = document.createElement('div');
+        header.className = 'result-header';
+        header.innerHTML = `
+            <h3>${result.description || 'Sarek Pipeline Run'}</h3>
+            <div class="result-metadata">
+                <span><i class="fas fa-clock"></i> ${formatDate(result.completed_at)}</span>
+                <span><i class="fas fa-hourglass-half"></i> ${formatDuration(result.duration)}</span>
+                <button class="btn btn-info btn-sm view-parameters" title="View Parameters">
+                    <i class="fas fa-cog"></i> Parameters
+                </button>
+            </div>
+        `;
 
-        allRunsData.forEach(run => {
-             // Filter logic applied here before creating the element
-            const filterText = filterInput.value.toLowerCase();
-             if (filterText && !run.name.toLowerCase().includes(filterText)) {
-                 return; // Skip rendering if it doesn't match filter
-             }
+        // File Categories
+        const categories = document.createElement('div');
+        categories.className = 'result-categories';
 
-            const runItem = document.createElement('div');
-            runItem.className = 'run-item card mb-2';
-            runItem.dataset.runName = run.name; // Store name for filtering/fetching files
+        // BAM Files
+        if (result.bam_files && result.bam_files.length > 0) {
+            categories.appendChild(createFileCategory('bam', result.bam_files));
+        }
 
-            // Construct File Browser PATH ONLY. The full URL is built onClick.
-            // Ensure the backend link only contains the path part (e.g., /filebrowser/files/results/...)
-            const fbPath = run.filebrowser_link || '#'; // Expecting PATH, not full URL
+        // VCF Files
+        if (result.vcf_files && result.vcf_files.length > 0) {
+            categories.appendChild(createFileCategory('vcf', result.vcf_files));
+        }
 
-            runItem.innerHTML = `
-                <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
-                    <div class="d-flex align-items-center">
-                        <button class="btn btn-sm btn-light mr-2 expand-btn" title="Show/Hide Files" data-target-id="files-${run.name.replace(/[^a-zA-Z0-9]/g, '-')}" aria-expanded="false">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                        <div>
-                           <strong class="run-name mr-2">${run.name}</strong>
-                           <small class="run-date text-muted">Modified: ${formatTimestamp(run.modified_time)}</small>
+        // QC Reports
+        if (result.qc_reports && result.qc_reports.length > 0) {
+            categories.appendChild(createFileCategory('qc', result.qc_reports));
+        }
+
+        // MultiQC Reports
+        if (result.multiqc_reports && result.multiqc_reports.length > 0) {
+            categories.appendChild(createFileCategory('multiqc', result.multiqc_reports));
+        }
+
+        // Other Files
+        if (result.other_files && result.other_files.length > 0) {
+            categories.appendChild(createFileCategory('other', result.other_files));
+        }
+
+        resultDiv.appendChild(header);
+        resultDiv.appendChild(categories);
+
+        // Add event listeners
+        addResultEventListeners(resultDiv, result);
+
+        return resultDiv;
+    }
+
+    // Create File Category
+    function createFileCategory(category, files) {
+        const categoryDiv = document.createElement('div');
+        categoryDiv.className = 'file-category';
+        categoryDiv.innerHTML = `
+            <h4><i class="fas ${FILE_CATEGORIES[category].icon}"></i> ${FILE_CATEGORIES[category].title}</h4>
+            <p class="category-description">${FILE_CATEGORIES[category].description}</p>
+            <ul class="file-list">
+                ${files.map(file => `
+                    <li>
+                        <i class="fas fa-file"></i>
+                        <span class="file-name">${file.name}</span>
+                        <div class="file-actions">
+                            <button class="btn btn-sm btn-primary download-file" data-file="${file.path}" title="Download">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button class="btn btn-sm btn-info view-file" data-file="${file.path}" title="View">
+                                <i class="fas fa-eye"></i>
+                            </button>
                         </div>
-                    </div>
-                    <a href="${fbPath}" class="btn btn-sm btn-outline-primary filebrowser-link ml-auto mt-1 mt-md-0" title="Open in File Browser">
-                        <i class="bi bi-folder-symlink"></i> <span class="d-none d-md-inline">File Browser</span>
-                    </a>
-                </div>
-                <div id="files-${run.name.replace(/[^a-zA-Z0-9]/g, '-')}" class="collapse">
-                    <div class="card-body p-0">
-                        <ul class="list-group list-group-flush file-list">
-                            <li class="list-group-item file-list-loading text-muted" style="display: none;">
-                                <i class="fas fa-spinner fa-spin"></i> Loading files...
-                            </li>
-                            <li class="list-group-item file-list-error text-danger" style="display: none;">
-                                Error loading files for this run.
-                            </li>
-                            <!-- File items will be added here -->
-                        </ul>
-                    </div>
-                </div>
+                    </li>
+                `).join('')}
+            </ul>
+        `;
+
+        return categoryDiv;
+    }
+
+    // Add Result Event Listeners
+    function addResultEventListeners(resultElement, result) {
+        // View Parameters
+        const viewParamsBtn = resultElement.querySelector('.view-parameters');
+        if (viewParamsBtn) {
+            viewParamsBtn.addEventListener('click', () => showParameters(result));
+        }
+
+        // File Actions
+        const downloadBtns = resultElement.querySelectorAll('.download-file');
+        downloadBtns.forEach(btn => {
+            btn.addEventListener('click', () => downloadFile(btn.dataset.file));
+        });
+
+        const viewBtns = resultElement.querySelectorAll('.view-file');
+        viewBtns.forEach(btn => {
+            btn.addEventListener('click', () => viewFile(btn.dataset.file));
+        });
+    }
+
+    // Show Parameters
+    function showParameters(result) {
+        const inputFilesList = document.getElementById('param-input-files');
+        const parametersList = document.getElementById('param-pipeline-config');
+        const resourcesList = document.getElementById('param-resource-usage');
+
+        // Clear previous content
+        inputFilesList.innerHTML = '';
+        parametersList.innerHTML = '';
+        resourcesList.innerHTML = '';
+
+        // Input Files
+        inputFilesList.innerHTML = `
+            <li><strong>Input CSV:</strong> ${result.input_csv_file}</li>
+            <li><strong>Reference Genome:</strong> ${result.reference_genome_file}</li>
+            ${result.intervals_file ? `<li><strong>Intervals:</strong> ${result.intervals_file}</li>` : ''}
+            ${result.known_variants_file ? `<li><strong>Known Variants:</strong> ${result.known_variants_file}</li>` : ''}
+        `;
+
+        // Pipeline Configuration
+        parametersList.innerHTML = `
+            <li><strong>Genome Build:</strong> ${result.genome}</li>
+            <li><strong>Tools:</strong> ${result.tools || 'default'}</li>
+            <li><strong>Step:</strong> ${result.step || 'mapping'}</li>
+            <li><strong>Profile:</strong> ${result.profile || 'docker'}</li>
+            <li><strong>Joint Germline:</strong> ${result.joint_germline ? 'Yes' : 'No'}</li>
+            <li><strong>WES:</strong> ${result.wes ? 'Yes' : 'No'}</li>
+        `;
+
+        // Resource Usage
+        if (result.resources) {
+            resourcesList.innerHTML = `
+                <li><strong>CPU Usage:</strong> ${result.resources.cpu_usage || 'N/A'}</li>
+                <li><strong>Memory Usage:</strong> ${result.resources.memory_usage || 'N/A'}</li>
+                <li><strong>Disk Usage:</strong> ${result.resources.disk_usage || 'N/A'}</li>
             `;
-            fragment.appendChild(runItem);
-        });
-        runsListContainer.appendChild(fragment);
-    }
-
-    /** Sorts the data and re-renders the list */
-    function sortAndRenderRuns() {
-        sortRunsData();
-        renderRuns();
-    }
-
-    /** Applies highlight to a run if specified in URL */
-    function applyHighlight() {
-        if (window.highlightRun) {
-            // Find the element using the data attribute
-            const targetElement = runsListContainer.querySelector(`.run-item[data-run-name="${window.highlightRun}"]`);
-            if (targetElement) {
-                targetElement.classList.add('highlighted');
-                targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            } else {
-                console.warn(`Highlight run "${window.highlightRun}" not found in the list.`);
-            }
         }
+
+        // Show modal
+        parametersModal.style.display = 'block';
     }
 
-
-    /** Fetches and displays files for a specific run */
-    async function fetchAndRenderFiles(runName, fileListUl, loadingLi, errorLi) {
-        showStatus(loadingLi, true);
-        showStatus(errorLi, false);
-
-        // Clear previous file list items
-        Array.from(fileListUl.children).forEach(child => {
-            if (!child.classList.contains('file-list-loading') && !child.classList.contains('file-list-error')) {
-                child.remove();
-            }
-        });
-
+    // Download File
+    async function downloadFile(filePath) {
         try {
-            // Encode the run name for the URL path segment
-            const encodedRunName = encodeURIComponent(runName);
-            const response = await fetch(`/get_results/${encodedRunName}`);
-            if (!response.ok) {
-                 const errorData = await response.json().catch(() => ({detail: `HTTP ${response.status}`}));
-                throw new Error(`Failed to fetch files for ${runName} (${response.status}): ${errorData.detail || 'Unknown error'}`);
-            }
-            const files = await response.json();
-            showStatus(loadingLi, false);
-
-            if (files.length === 0) {
-                const noFilesLi = document.createElement('li');
-                noFilesLi.className = 'list-group-item text-muted';
-                noFilesLi.textContent = 'No files found in this run directory.';
-                fileListUl.appendChild(noFilesLi);
-            } else {
-                const fragment = document.createDocumentFragment();
-                files.sort((a, b) => a.name.localeCompare(b.name)); // Sort files alphabetically
-                files.forEach(file => {
-                    const fileLi = document.createElement('li');
-                    fileLi.className = 'list-group-item d-flex justify-content-between align-items-center file-list-item';
-                    const iconClass = getFileIconClass(file.extension);
-
-                    fileLi.innerHTML = `
-                        <div>
-                           <span class="file-icon"><i class="${iconClass}"></i></span>
-                           <span class="file-name">${file.name}</span>
-                        </div>
-                        <span class="file-meta">
-                            ${file.is_dir ? '(Directory)' : formatBytes(file.size)}
-                             - ${formatTimestamp(file.modified_time)}
-                        </span>
-                    `;
-                    fragment.appendChild(fileLi);
-                });
-                fileListUl.appendChild(fragment);
-            }
-
+            const response = await fetch(`/api/files/download?path=${encodeURIComponent(filePath)}`);
+            if (!response.ok) throw new Error('Failed to download file');
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filePath.split('/').pop();
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
         } catch (error) {
-            console.error(`Error fetching files for ${runName}:`, error);
-            showStatus(loadingLi, false);
-            errorLi.textContent = `Error loading files: ${error.message}`;
-            showStatus(errorLi, true);
+            console.error('Error downloading file:', error);
+            showError('Failed to download file. Please try again.');
         }
     }
 
-    /** Handles expand/collapse button clicks */
-    function handleExpandCollapse(button, runName) {
-        const targetId = button.dataset.targetId;
-        const targetCollapse = document.getElementById(targetId);
-        const fileListUl = targetCollapse.querySelector('.file-list');
-        const loadingLi = targetCollapse.querySelector('.file-list-loading');
-        const errorLi = targetCollapse.querySelector('.file-list-error');
-        const icon = button.querySelector('i');
-
-        const isExpanded = button.getAttribute('aria-expanded') === 'true';
-
-        if (isExpanded) {
-            // Collapse
-            targetCollapse.style.maxHeight = null;
-            targetCollapse.classList.remove('show');
-             button.setAttribute('aria-expanded', 'false');
-             icon.classList.remove('fa-minus');
-             icon.classList.add('fa-plus');
-        } else {
-            // Expand
-            targetCollapse.classList.add('show');
-            targetCollapse.style.maxHeight = targetCollapse.scrollHeight + "px";
-             button.setAttribute('aria-expanded', 'true');
-             icon.classList.remove('fa-plus');
-             icon.classList.add('fa-minus');
-
-            // Fetch files only if the list hasn't been loaded yet
-            const hasFiles = Array.from(fileListUl.children).some(child =>
-                 !child.classList.contains('file-list-loading') && !child.classList.contains('file-list-error')
-            );
-            if (!hasFiles) {
-                fetchAndRenderFiles(runName, fileListUl, loadingLi, errorLi);
-            }
-        }
-         // Adjust maxHeight after content is potentially loaded
-        setTimeout(() => {
-             if(button.getAttribute('aria-expanded') === 'true') {
-                 targetCollapse.style.maxHeight = targetCollapse.scrollHeight + "px";
-             }
-         }, 300);
+    // View File
+    function viewFile(filePath) {
+        // Open file in new tab
+        window.open(`/api/files/view?path=${encodeURIComponent(filePath)}`, '_blank');
     }
 
+    // Helper Functions
+    function showLoading() {
+        loadingPlaceholder.style.display = 'block';
+        noResultsMessage.style.display = 'none';
+        errorMessage.style.display = 'none';
+        resultsContainer.innerHTML = '';
+    }
 
-    // --- Event Listeners ---
+    function showNoResults() {
+        loadingPlaceholder.style.display = 'none';
+        noResultsMessage.style.display = 'block';
+        errorMessage.style.display = 'none';
+        resultsContainer.innerHTML = '';
+    }
 
-    // Filter input
-    filterInput.addEventListener('input', () => {
-        renderRuns();
-        applyHighlight();
-    });
+    function showError(message) {
+        loadingPlaceholder.style.display = 'none';
+        noResultsMessage.style.display = 'none';
+        errorMessage.style.display = 'block';
+        errorMessage.textContent = message;
+        resultsContainer.innerHTML = '';
+    }
 
-    // Sort buttons
-    sortButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            const newSortField = button.dataset.sort;
-            if (currentSort.field === newSortField) {
-                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
-            } else {
-                currentSort.field = newSortField;
-                currentSort.direction = 'desc';
-            }
-             updateSortUI();
-             sortAndRenderRuns();
-             applyHighlight();
-        });
-    });
+    function formatDate(dateString) {
+        return new Date(dateString).toLocaleString();
+    }
 
-     // Sort direction button
-     sortDirectionButton.addEventListener('click', () => {
-        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
-        updateSortUI();
-        sortAndRenderRuns();
-        applyHighlight();
-    });
+    function formatDuration(seconds) {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const remainingSeconds = seconds % 60;
 
+        const parts = [];
+        if (hours > 0) parts.push(`${hours}h`);
+        if (minutes > 0) parts.push(`${minutes}m`);
+        if (remainingSeconds > 0 || parts.length === 0) parts.push(`${remainingSeconds}s`);
 
-    // Expand/Collapse AND File Browser Link Handling (using event delegation)
-    runsListContainer.addEventListener('click', function(event) {
-        const expandButton = event.target.closest('.expand-btn');
-        const fileBrowserLink = event.target.closest('.filebrowser-link');
+        return parts.join(' ');
+    }
 
-        if (expandButton) {
-            // --- Handle Expand/Collapse ---
-            const runItem = expandButton.closest('.run-item');
-            const runName = runItem.dataset.runName;
-            handleExpandCollapse(expandButton, runName);
-
-        } else if (fileBrowserLink) {
-            // --- Handle File Browser Link Click ---
-            event.preventDefault(); // Prevent opening new tab
-
-            const targetPath = fileBrowserLink.getAttribute('href'); // Get the PATH from href (e.g., /filebrowser/files/results/...)
-            if (!targetPath || targetPath === '#') {
-                console.error("File Browser link has invalid href:", targetPath);
-                return; // Don't proceed if the path is missing
-            }
-
-            // Construct the FULL URL for the iframe using the defined base URL and the path
-            const targetUrl = FILE_BROWSER_BASE_URL + targetPath; // <-- Combine Base URL + Path
-
-            console.log("Opening File Browser iframe to:", targetUrl);
-
-            // Get references to the iframe elements from base.html
-            const iframe = document.getElementById('fileBrowserFrame');
-            const iframeContainer = document.getElementById('fileBrowserContainer');
-            const overlay = document.getElementById('overlay');
-
-            if (iframe && iframeContainer && overlay) {
-                // Set the iframe source to the correctly constructed URL
-                iframe.src = targetUrl; // <-- Use the full URL with correct port
-
-                // Show the iframe container and overlay
-                iframeContainer.classList.add('active');
-                overlay.classList.add('active');
-            } else {
-                console.error("Could not find File Browser iframe elements in base.html");
-                // Fallback: open the constructed full URL in new tab if iframe elements are missing
-                console.warn("Falling back to opening link in new tab.");
-                window.open(targetUrl, '_blank');
-            }
+    // Event Listeners
+    window.addEventListener('click', function(event) {
+        if (event.target === parametersModal) {
+            parametersModal.style.display = 'none';
         }
     });
 
-     // --- UI Update Helpers ---
-     function updateSortUI() {
-        // Update active sort button
-        sortButtons.forEach(btn => {
-             if(btn.dataset.sort === currentSort.field) {
-                 btn.classList.add('active');
-             } else {
-                 btn.classList.remove('active');
-             }
-         });
-        // Update sort direction icon
-        const icon = sortDirectionButton.querySelector('i');
-         icon.className = `fas ${currentSort.direction === 'asc' ? 'fa-sort-up' : 'fa-sort-down'}`;
-     }
-
-
-    // --- Initial Load ---
-    updateSortUI(); // Set initial sort button active state
-    fetchRuns();
-
+    // Initial load
+    loadResults();
 });

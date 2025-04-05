@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Pipeline Results{% endblock %}
+{% block title %}Sarek Pipeline Results{% endblock %}
 
 {% block head %}
     <!-- Font Awesome is included in base.html -->
@@ -27,12 +27,20 @@
             background-color: #f8f9fa;
             border-radius: 0.25rem;
         }
+        .file-category {
+            font-weight: bold;
+            color: #495057;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid #dee2e6;
+        }
     </style>
 {% endblock %}
 
 {% block content %}
-    <h1 class="mb-4">Pipeline Results</h1>
-    <p>List of completed pipeline runs. Expand a run to see the generated files or click the <i class="bi bi-folder-symlink"></i> icon to open it in File Browser.</p>
+    <h1 class="mb-4">Sarek Pipeline Results</h1>
+    <p>List of completed Sarek pipeline runs. Expand a run to see the generated files or click the <i class="bi bi-folder-symlink"></i> icon to open it in File Browser.</p>
 
     <!-- Controls for Sorting and Filtering -->
     <div id="results-controls" class="d-flex justify-content-between align-items-center">
@@ -69,8 +77,7 @@
         Could not load pipeline results. Please check server logs or try again later.
     </div>
 
-    <!-- Hidden template for a single run item (optional, but can clean up JS) -->
-    <!--
+    <!-- Template for a single run item -->
     <template id="run-item-template">
         <div class="run-item card mb-2" data-run-name="">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -81,26 +88,98 @@
                     <strong class="run-name"></strong>
                     <small class="run-date text-muted ml-2"></small>
                 </div>
-                <a href="#" class="btn btn-sm btn-outline-primary filebrowser-link" target="_blank" title="Open in File Browser">
-                    <i class="bi bi-folder-symlink"></i> File Browser
-                </a>
+                <div>
+                    <button class="btn btn-sm btn-outline-info mr-2 view-params-btn" title="View Parameters">
+                        <i class="fas fa-cog"></i> Parameters
+                    </button>
+                    <a href="#" class="btn btn-sm btn-outline-primary filebrowser-link" target="_blank" title="Open in File Browser">
+                        <i class="bi bi-folder-symlink"></i> File Browser
+                    </a>
+                </div>
             </div>
-            <div class="collapse"> // Note: Bootstrap 4 needs collapse class, not show by default
-                <div class="card-body p-0"> // card-body for padding control
-                    <ul class="list-group list-group-flush file-list">
-                        <li class="list-group-item file-list-loading text-muted" style="display: none;">
-                            <i class="fas fa-spinner fa-spin"></i> Loading files...
-                        </li>
-                        <li class="list-group-item file-list-error text-danger" style="display: none;">
-                            Error loading files for this run.
-                        </li>
-                        // File items will be added here
-                    </ul>
+            <div class="collapse">
+                <div class="card-body p-0">
+                    <!-- Parameters Summary -->
+                    <div class="parameters-summary p-3 bg-light border-bottom" style="display: none;">
+                        <h5>Pipeline Parameters</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Input Files:</strong>
+                                <ul class="list-unstyled ml-3 input-files-list"></ul>
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Parameters:</strong>
+                                <ul class="list-unstyled ml-3 parameters-list"></ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- File Categories -->
+                    <div class="file-categories">
+                        <!-- Aligned BAMs -->
+                        <div class="file-category">Aligned BAM Files</div>
+                        <ul class="list-group list-group-flush file-list bam-files">
+                            <li class="list-group-item file-list-loading text-muted" style="display: none;">
+                                <i class="fas fa-spinner fa-spin"></i> Loading BAM files...
+                            </li>
+                        </ul>
+
+                        <!-- VCF Files -->
+                        <div class="file-category">Variant Call Files (VCF)</div>
+                        <ul class="list-group list-group-flush file-list vcf-files">
+                            <li class="list-group-item file-list-loading text-muted" style="display: none;">
+                                <i class="fas fa-spinner fa-spin"></i> Loading VCF files...
+                            </li>
+                        </ul>
+
+                        <!-- QC Reports -->
+                        <div class="file-category">Quality Control Reports</div>
+                        <ul class="list-group list-group-flush file-list qc-files">
+                            <li class="list-group-item file-list-loading text-muted" style="display: none;">
+                                <i class="fas fa-spinner fa-spin"></i> Loading QC files...
+                            </li>
+                        </ul>
+
+                        <!-- MultiQC Report -->
+                        <div class="file-category">MultiQC Report</div>
+                        <ul class="list-group list-group-flush file-list multiqc-files">
+                            <li class="list-group-item file-list-loading text-muted" style="display: none;">
+                                <i class="fas fa-spinner fa-spin"></i> Loading MultiQC files...
+                            </li>
+                        </ul>
+
+                        <!-- Other Files -->
+                        <div class="file-category">Other Files</div>
+                        <ul class="list-group list-group-flush file-list other-files">
+                            <li class="list-group-item file-list-loading text-muted" style="display: none;">
+                                <i class="fas fa-spinner fa-spin"></i> Loading other files...
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
     </template>
-     -->
+
+    <!-- Parameters Modal -->
+    <div id="parameters-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="document.getElementById('parameters-modal').style.display='none'">×</span>
+            <h2>Pipeline Parameters</h2>
+            <div class="modal-body">
+                <div class="parameters-content">
+                    <h4>Input Files</h4>
+                    <ul id="modal-input-files" class="list-unstyled"></ul>
+                    
+                    <h4>Pipeline Configuration</h4>
+                    <ul id="modal-parameters" class="list-unstyled"></ul>
+                    
+                    <h4>Resource Usage</h4>
+                    <ul id="modal-resources" class="list-unstyled"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
 
 {% endblock %}
 

@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const errorJobsRow = document.getElementById('error-jobs-row');
     const errorModal = document.getElementById('error-modal');
     const errorModalText = document.getElementById('error-modal-text');
+    const jobDetailsModal = document.getElementById('job-details-modal');
 
     // --- State ---
     let jobPollingIntervals = {}; // Store polling intervals {jobId: intervalId}
@@ -21,6 +22,26 @@ document.addEventListener('DOMContentLoaded', function() {
     const BUTTON_CLASS_RESULTS = 'btn-view-results';
     const BUTTON_CLASS_ERROR_DETAILS = 'btn-error-details';
     const BUTTON_CLASS_REMOVE = 'btn-remove-job'; // Unified remove class
+
+    // Job Status Colors
+    const STATUS_COLORS = {
+        'staged': 'secondary',
+        'queued': 'info',
+        'running': 'primary',
+        'completed': 'success',
+        'failed': 'danger',
+        'cancelled': 'warning'
+    };
+
+    // Job Status Icons
+    const STATUS_ICONS = {
+        'staged': 'fa-clock',
+        'queued': 'fa-hourglass-half',
+        'running': 'fa-play',
+        'completed': 'fa-check',
+        'failed': 'fa-times',
+        'cancelled': 'fa-ban'
+    };
 
     // --- Helper Functions ---
 
@@ -691,6 +712,9 @@ document.addEventListener('DOMContentLoaded', function() {
      window.onclick = function(event) {
         if (event.target == errorModal) {
             errorModal.style.display = "none";
+        }
+        if (event.target == jobDetailsModal) {
+            jobDetailsModal.style.display = "none";
         }
     }
      const closeModalButton = errorModal.querySelector('.close-modal');
