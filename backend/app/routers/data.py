@@ -77,3 +77,42 @@ async def get_results_run_files(run_dir_name: str, fb_config: Dict = Depends(get
 
     # List both files and directories within the specific run directory
     return get_directory_contents(target_run_dir, list_dirs=True, list_files=True, fb_base_url=fb_config["baseURL"])
+
+
+@router.get("/files", response_model=List[Dict[str, str]], summary="List Files by Type")
+async def get_files_by_type(type: str):
+    """Lists files of a specific type from the data directory."""
+    if not DATA_DIR.exists() or not DATA_DIR.is_dir():
+        logger.error(f"Configured DATA_DIR does not exist or is not a directory: {DATA_DIR}")
+        raise HTTPException(status_code=500, detail="Server configuration error: Data directory not found.")
+
+    # Define file extensions for each type
+    type_extensions = {
+        'inputCsv': ['.csv'],
+        'referenceGenome': ['.fa', '.fasta', '.fa.gz', '.fasta.gz'],
+        'intervals': ['.bed'],
+        'knownVariants': ['.vcf', '.vcf.gz']
+    }
+
+    if type not in type_extensions:
+        raise HTTPException(status_code=400, detail=f"Invalid file type: {type}")
+
+    try:
+        # List files in DATA_DIR
+        contents = get_directory_contents(
+            DATA_DIR, 
+            list_dirs=False, 
+            list_files=True,
+            file_extensions=type_extensions[type]
+        )
+        
+        # Filter and format response
+        response_data = [
+            {"name": item.get("name", "Unknown"), "type": "file"}
+            for item in contents 
+            if not item.get("is_dir") and "name" in item
+        ]
+        return response_data
+    except Exception as e:
+        logger.exception(f"Error listing files of type {type}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error processing file list.")

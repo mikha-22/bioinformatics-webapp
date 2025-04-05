@@ -3,118 +3,195 @@
 {% block title %}Run Pipeline{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container-fluid mt-4">
     <h1 class="mb-4">Run Sarek Pipeline</h1>
     
     <form id="pipelineForm" class="needs-validation" novalidate>
-        <!-- Sample Information Section -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">Sample Information</h5>
-            </div>
-            <div class="card-body">
-                <div id="samplesContainer">
-                    <!-- Sample entries will be added here dynamically -->
+        <div class="row">
+            <!-- Left Column -->
+            <div class="col-md-6">
+                <!-- Sample Information Section -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-vial me-2"></i>Sample Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="samplesContainer">
+                            <!-- Sample entries will be added here dynamically -->
+                        </div>
+                        <button type="button" class="btn btn-outline-primary mt-3" id="addSampleBtn">
+                            <i class="fas fa-plus"></i> Add Another Sample
+                        </button>
+                    </div>
                 </div>
-                <button type="button" class="btn btn-secondary mt-3" id="addSampleBtn">
-                    <i class="fas fa-plus"></i> Add Sample
-                </button>
+
+                <!-- Reference Files Section -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-dna me-2"></i>Reference Files</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="referenceGenomeFile" class="form-label">
+                                Reference Genome File <span class="text-danger">*</span>
+                                <i class="fas fa-info-circle" data-bs-toggle="tooltip" title="Required: The reference genome file in FASTA format"></i>
+                            </label>
+                            <input type="file" class="form-control" id="referenceGenomeFile" name="reference_genome_file" required>
+                            <div class="invalid-feedback">Please select a reference genome file.</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="intervalsFile" class="form-label">
+                                Intervals File
+                                <i class="fas fa-info-circle" data-bs-toggle="tooltip" title="Optional: BED file defining target regions for analysis"></i>
+                            </label>
+                            <input type="file" class="form-control" id="intervalsFile" name="intervals_file">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="knownVariantsFile" class="form-label">
+                                Known Variants File
+                                <i class="fas fa-info-circle" data-bs-toggle="tooltip" title="Optional: VCF file containing known variants for annotation"></i>
+                            </label>
+                            <input type="file" class="form-control" id="knownVariantsFile" name="known_variants_file">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="col-md-6">
+                <!-- Pipeline Parameters Section -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Pipeline Parameters</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-4">
+                            <label for="genome" class="form-label">
+                                Genome Build <span class="text-danger">*</span>
+                                <i class="fas fa-info-circle" data-bs-toggle="tooltip" title="Select the reference genome build to use"></i>
+                            </label>
+                            <select class="form-select" id="genome" name="genome" required>
+                                <option value="">Select a genome build...</option>
+                                <option value="GRCh37">GRCh37 (Human Genome Build 37)</option>
+                                <option value="GRCh38">GRCh38 (Human Genome Build 38)</option>
+                                <option value="hg19">hg19 (Human Genome Build 19)</option>
+                                <option value="hg38">hg38 (Human Genome Build 38)</option>
+                            </select>
+                            <div class="invalid-feedback">Please select a genome build.</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">
+                                Variant Calling Tools <span class="text-danger">*</span>
+                                <i class="fas fa-info-circle" data-bs-toggle="tooltip" title="Select one or more tools to use for variant calling"></i>
+                            </label>
+                            <div class="tool-options">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="tools" value="strelka" id="tool-strelka">
+                                    <label class="form-check-label" for="tool-strelka">
+                                        Strelka
+                                        <small class="text-muted d-block">Sensitive somatic and germline variant caller</small>
+                                    </label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="tools" value="mutect2" id="tool-mutect2">
+                                    <label class="form-check-label" for="tool-mutect2">
+                                        Mutect2
+                                        <small class="text-muted d-block">Somatic variant caller with machine learning filtering</small>
+                                    </label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="tools" value="freebayes" id="tool-freebayes">
+                                    <label class="form-check-label" for="tool-freebayes">
+                                        FreeBayes
+                                        <small class="text-muted d-block">Bayesian genetic variant detector</small>
+                                    </label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="tools" value="mpileup" id="tool-mpileup">
+                                    <label class="form-check-label" for="tool-mpileup">
+                                        mpileup
+                                        <small class="text-muted d-block">Basic variant caller from SAMtools</small>
+                                    </label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="tools" value="vardict" id="tool-vardict">
+                                    <label class="form-check-label" for="tool-vardict">
+                                        VarDict
+                                        <small class="text-muted d-block">Sensitive variant caller for tumor-normal pairs</small>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="invalid-feedback">Please select at least one variant calling tool.</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="step" class="form-label">
+                                Pipeline Step <span class="text-danger">*</span>
+                                <i class="fas fa-info-circle" data-bs-toggle="tooltip" title="Select which step of the pipeline to run"></i>
+                            </label>
+                            <select class="form-select" id="step" name="step" required>
+                                <option value="">Select a pipeline step...</option>
+                                <option value="mapping">1. Mapping (Align reads to reference)</option>
+                                <option value="markduplicates">2. Mark Duplicates (Remove PCR duplicates)</option>
+                                <option value="prepare_recalibration">3. Prepare Recalibration (Base quality recalibration)</option>
+                                <option value="recalibrate">4. Recalibrate (Apply base quality recalibration)</option>
+                                <option value="variant_calling">5. Variant Calling (Identify genetic variants)</option>
+                            </select>
+                            <div class="invalid-feedback">Please select a pipeline step.</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="profile" class="form-label">
+                                Profile <span class="text-danger">*</span>
+                                <i class="fas fa-info-circle" data-bs-toggle="tooltip" title="Select the container system to use for running the pipeline"></i>
+                            </label>
+                            <select class="form-select" id="profile" name="profile" required>
+                                <option value="">Select a profile...</option>
+                                <option value="docker">Docker (Recommended)</option>
+                                <option value="singularity">Singularity (HPC environments)</option>
+                                <option value="conda">Conda (Local environment)</option>
+                            </select>
+                            <div class="invalid-feedback">Please select a profile.</div>
+                        </div>
+
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">Additional Options</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="jointGermline" name="joint_germline">
+                                    <label class="form-check-label" for="jointGermline">
+                                        Joint Germline Analysis
+                                        <i class="fas fa-info-circle" data-bs-toggle="tooltip" title="Perform joint analysis of multiple samples"></i>
+                                    </label>
+                                </div>
+
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="wes" name="wes">
+                                    <label class="form-check-label" for="wes">
+                                        Whole Exome Sequencing
+                                        <i class="fas fa-info-circle" data-bs-toggle="tooltip" title="Optimize parameters for whole exome sequencing data"></i>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Reference Files Section -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">Reference Files</h5>
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <label for="referenceGenomeFile" class="form-label">Reference Genome File (Required)</label>
-                    <input type="file" class="form-control" id="referenceGenomeFile" name="reference_genome_file" required>
-                    <div class="invalid-feedback">Please select a reference genome file.</div>
-                </div>
-                
-                <div class="mb-3">
-                    <label for="intervalsFile" class="form-label">Intervals File (Optional)</label>
-                    <input type="file" class="form-control" id="intervalsFile" name="intervals_file">
-                </div>
-                
-                <div class="mb-3">
-                    <label for="knownVariantsFile" class="form-label">Known Variants File (Optional)</label>
-                    <input type="file" class="form-control" id="knownVariantsFile" name="known_variants_file">
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                        <i class="fas fa-play me-2"></i>Start Pipeline Run
+                    </button>
                 </div>
             </div>
-        </div>
-
-        <!-- Pipeline Parameters Section -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">Pipeline Parameters</h5>
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <label for="genome" class="form-label">Genome Build</label>
-                    <select class="form-select" id="genome" name="genome" required>
-                        <option value="GRCh37">GRCh37</option>
-                        <option value="GRCh38">GRCh38</option>
-                        <option value="hg19">hg19</option>
-                        <option value="hg38">hg38</option>
-                    </select>
-                    <div class="invalid-feedback">Please select a genome build.</div>
-                </div>
-
-                <div class="mb-3">
-                    <label for="tools" class="form-label">Tools</label>
-                    <select class="form-select" id="tools" name="tools[]" multiple size="5">
-                        <option value="strelka">Strelka</option>
-                        <option value="mutect2">Mutect2</option>
-                        <option value="freebayes">FreeBayes</option>
-                        <option value="mpileup">mpileup</option>
-                        <option value="vardict">VarDict</option>
-                    </select>
-                    <div class="form-text">Hold Ctrl (Windows) or Command (Mac) to select multiple tools</div>
-                </div>
-
-                <div class="mb-3">
-                    <label for="step" class="form-label">Pipeline Step</label>
-                    <select class="form-select" id="step" name="step" required>
-                        <option value="mapping">Mapping</option>
-                        <option value="markduplicates">Mark Duplicates</option>
-                        <option value="prepare_recalibration">Prepare Recalibration</option>
-                        <option value="recalibrate">Recalibrate</option>
-                        <option value="variant_calling">Variant Calling</option>
-                    </select>
-                    <div class="invalid-feedback">Please select a pipeline step.</div>
-                </div>
-
-                <div class="mb-3">
-                    <label for="profile" class="form-label">Profile</label>
-                    <select class="form-select" id="profile" name="profile" required>
-                        <option value="docker">Docker</option>
-                        <option value="singularity">Singularity</option>
-                        <option value="conda">Conda</option>
-                    </select>
-                    <div class="invalid-feedback">Please select a profile.</div>
-                </div>
-
-                <div class="form-check mb-3">
-                    <input class="form-check-input" type="checkbox" id="jointGermline" name="joint_germline">
-                    <label class="form-check-label" for="jointGermline">
-                        Joint Germline Analysis
-                    </label>
-                </div>
-
-                <div class="form-check mb-3">
-                    <input class="form-check-input" type="checkbox" id="wes" name="wes">
-                    <label class="form-check-label" for="wes">
-                        Whole Exome Sequencing
-                    </label>
-                </div>
-            </div>
-        </div>
-
-        <div class="d-grid gap-2">
-            <button type="submit" class="btn btn-primary" id="submitBtn">Submit Pipeline Job</button>
         </div>
     </form>
 </div>
@@ -125,43 +202,45 @@
         <div class="card-body">
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Patient ID</label>
+                    <label class="form-label">Patient ID <span class="text-danger">*</span></label>
                     <input type="text" class="form-control patient" required>
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Sample ID</label>
+                    <label class="form-label">Sample ID <span class="text-danger">*</span></label>
                     <input type="text" class="form-control sample" required>
                 </div>
             </div>
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Sex</label>
+                    <label class="form-label">Sex <span class="text-danger">*</span></label>
                     <select class="form-select sex" required>
-                        <option value="XX">XX</option>
-                        <option value="XY">XY</option>
-                        <option value="X">X</option>
-                        <option value="Y">Y</option>
+                        <option value="">Select sex...</option>
+                        <option value="XX">XX (Female)</option>
+                        <option value="XY">XY (Male)</option>
+                        <option value="X">X (Single X)</option>
+                        <option value="Y">Y (Single Y)</option>
                     </select>
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Status</label>
+                    <label class="form-label">Status <span class="text-danger">*</span></label>
                     <select class="form-select status" required>
-                        <option value="0">0</option>
-                        <option value="1">1</option>
+                        <option value="">Select status...</option>
+                        <option value="0">0 (Control)</option>
+                        <option value="1">1 (Case)</option>
                     </select>
                 </div>
             </div>
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">FASTQ R1</label>
+                    <label class="form-label">FASTQ R1 <span class="text-danger">*</span></label>
                     <input type="file" class="form-control fastq_1" required>
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">FASTQ R2</label>
+                    <label class="form-label">FASTQ R2 <span class="text-danger">*</span></label>
                     <input type="file" class="form-control fastq_2" required>
                 </div>
             </div>
-            <button type="button" class="btn btn-danger btn-sm remove-sample">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-sample">
                 <i class="fas fa-trash"></i> Remove Sample
             </button>
         </div>
