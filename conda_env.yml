@@ -1,15 +1,18 @@
 name: bio-webapp
 channels:
   - conda-forge
-  #  - bioconda
+  - defaults
 dependencies:
-  - python
+  - python=3.9
   - fastapi
   - uvicorn[standard]
   - rq
   - redis
-  - psutil
-  #  - samtools
-  #  - bcftools
-  #  - gatk4
-  #  some components are disabled temporarily to ensure ligthweight container building process
+  - jinja2
+  - python-multipart
+  # Development tools
+  - pytest
+  - black
+  - flake8
+  # Note: nextflow, psutil, and bioinformatics tools are installed in the container
+  # and not needed for local testing
