@@ -19,7 +19,8 @@ from rq.command import send_stop_job_command
 # App specific imports
 from ..core.config import (
     PIPELINE_SCRIPT_PATH, STAGED_JOBS_KEY, DEFAULT_JOB_TIMEOUT,
-    DEFAULT_RESULT_TTL, DEFAULT_FAILURE_TTL, MAX_REGISTRY_JOBS
+    DEFAULT_RESULT_TTL, DEFAULT_FAILURE_TTL, MAX_REGISTRY_JOBS,
+    SAREK_DEFAULT_PROFILE, SAREK_DEFAULT_TOOLS
 )
 from ..core.redis_rq import get_redis_connection, get_pipeline_queue
 from ..models.pipeline import PipelineInput
@@ -45,7 +46,6 @@ async def stage_pipeline_job(
     for later execution via /start_job endpoint.
     Returns 200 OK with staged job ID.
     """
-    # ... (keep existing code for stage_pipeline_job) ...
     if not PIPELINE_SCRIPT_PATH.is_file():
         logger.error(f"Pipeline script not found at configured path: {PIPELINE_SCRIPT_PATH}")
         raise HTTPException(status_code=500, detail="Server configuration error: Pipeline script missing.")
@@ -54,35 +54,37 @@ async def stage_pipeline_job(
     paths_map, known_variants_path_str, validation_errors = validate_pipeline_input(input_data)
     if validation_errors:
         logger.warning(f"Validation errors staging job: {validation_errors}")
-        # Join errors for a user-friendly message
         error_detail = "Input validation failed: " + "; ".join(validation_errors)
         raise HTTPException(status_code=400, detail=error_detail)
 
     try:
         staged_job_id = f"staged_{uuid.uuid4()}"
-        # Store original *relative* filenames in meta for potential rerun/display
+        # Store original filenames in meta for potential rerun/display
         input_filenames = {
-            "forward_reads": input_data.forward_reads_file,
-            "reverse_reads": input_data.reverse_reads_file,
+            "input_csv": input_data.input_csv_file,
             "reference_genome": input_data.reference_genome_file,
-            "target_regions": input_data.target_regions_file,
-            "known_variants": input_data.known_variants_file # Store original value (can be None)
+            "intervals": input_data.intervals_file,
+            "known_variants": input_data.known_variants_file
         }
-        # Store absolute paths needed for the task execution
+        # Store absolute paths and parameters needed for the task execution
         job_details = {
-            "pipeline_script_path": str(PIPELINE_SCRIPT_PATH),
-            "forward_reads_path": str(paths_map["forward_reads"]),
-            "reverse_reads_path": str(paths_map["reverse_reads"]),
+            "input_csv_path": str(paths_map["input_csv"]),
             "reference_genome_path": str(paths_map["reference_genome"]),
-            "target_regions_path": str(paths_map["target_regions"]),
-            "known_variants_path": known_variants_path_str, # This is the absolute path string or None
-            "description": f"Pipeline for {input_data.forward_reads_file}",
+            "genome": input_data.genome,
+            "tools": input_data.tools or SAREK_DEFAULT_TOOLS,
+            "step": input_data.step or "mapping",
+            "profile": input_data.profile or SAREK_DEFAULT_PROFILE,
+            "intervals_path": str(paths_map["intervals"]) if "intervals" in paths_map else None,
+            "known_variants_path": known_variants_path_str,
+            "joint_germline": input_data.joint_germline,
+            "wes": input_data.wes,
+            "description": f"Sarek pipeline for {input_data.input_csv_file}",
             "staged_at": time.time(),
-            "input_filenames": input_filenames # Embed original filenames here
+            "input_filenames": input_filenames
         }
-        # Store as bytes in Redis hash (RQ uses bytes)
+        # Store as bytes in Redis hash
         redis_conn.hset(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'), json.dumps(job_details).encode('utf-8'))
-        logger.info(f"Staged job '{staged_job_id}' for file '{input_data.forward_reads_file}'.")
+        logger.info(f"Staged Sarek job '{staged_job_id}' for file '{input_data.input_csv_file}'.")
         return JSONResponse(status_code=200, content={"message": "Job staged successfully.", "staged_job_id": staged_job_id})
 
     except redis.exceptions.RedisError as e:
@@ -104,51 +106,53 @@ async def start_job(
     and removes the corresponding entry from the staged jobs hash upon successful enqueueing.
     Returns 202 Accepted with the new RQ job ID.
     """
-    # ... (keep existing code for start_job) ...
     logger.info(f"Attempting to start job from staged ID: {staged_job_id}")
     try:
-        # Fetch the staged job details (bytes)
+        # Fetch the staged job details
         job_details_bytes = redis_conn.hget(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
         if not job_details_bytes:
             logger.warning(f"Start job request failed: Staged job ID '{staged_job_id}' not found.")
-            raise HTTPException(status_code=404, detail=f"Staged job '{staged_job_id}' not found. It may have already been started or removed.")
+            raise HTTPException(status_code=404, detail=f"Staged job '{staged_job_id}' not found.")
 
-        # Decode and parse JSON
         try:
             job_details = json.loads(job_details_bytes.decode('utf-8'))
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
-             logger.error(f"Corrupted staged job data for {staged_job_id}: {e}. Removing entry.")
-             redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8')) # Clean up bad entry
-             raise HTTPException(status_code=500, detail="Corrupted staged job data found. Please try staging again.")
+            logger.error(f"Corrupted staged job data for {staged_job_id}: {e}. Removing entry.")
+            redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
+            raise HTTPException(status_code=500, detail="Corrupted staged job data found. Please try staging again.")
 
-        # Basic check for required keys before enqueueing
-        required_keys = ["pipeline_script_path", "forward_reads_path", "reverse_reads_path", "reference_genome_path", "target_regions_path"]
+        # Check for required keys
+        required_keys = ["input_csv_path", "reference_genome_path", "genome", "tools", "step", "profile"]
         if not all(key in job_details for key in required_keys):
-             logger.error(f"Corrupted staged job data for {staged_job_id}: Missing required keys. Data: {job_details}")
-             redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8')) # Clean up bad entry
-             raise HTTPException(status_code=500, detail="Incomplete staged job data found. Please try staging again.")
+            logger.error(f"Corrupted staged job data for {staged_job_id}: Missing required keys. Data: {job_details}")
+            redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
+            raise HTTPException(status_code=500, detail="Incomplete staged job data found. Please try staging again.")
 
-        # Prepare arguments and metadata for the RQ task
+        # Prepare arguments for the RQ task
         job_args = (
-            job_details["pipeline_script_path"],
-            job_details["forward_reads_path"],
-            job_details["reverse_reads_path"],
+            job_details["input_csv_path"],
             job_details["reference_genome_path"],
-            job_details["target_regions_path"],
-            job_details.get("known_variants_path"), # Pass the absolute path or None
+            job_details["genome"],
+            job_details["tools"],
+            job_details["step"],
+            job_details["profile"],
+            job_details.get("intervals_path"),
+            job_details.get("known_variants_path"),
+            job_details.get("joint_germline", False),
+            job_details.get("wes", False)
         )
         job_meta = {
-            "input_params": job_details.get("input_filenames", {}), # Include original filenames
-            "staged_job_id_origin": staged_job_id # Keep track of the original staged ID
+            "input_params": job_details.get("input_filenames", {}),
+            "staged_job_id_origin": staged_job_id
         }
-        job_description = job_details.get("description", f"Run originating from {staged_job_id}")
+        job_description = job_details.get("description", f"Sarek pipeline run from {staged_job_id}")
 
         # Enqueue the job to RQ
         job = queue.enqueue(
             f=run_pipeline_task,
             args=job_args,
             meta=job_meta,
-            job_id_prefix="bio_pipeline_", # Custom prefix for RQ job IDs
+            job_id_prefix="sarek_",
             job_timeout=DEFAULT_JOB_TIMEOUT,
             result_ttl=DEFAULT_RESULT_TTL,
             failure_ttl=DEFAULT_FAILURE_TTL,
@@ -156,22 +160,20 @@ async def start_job(
         )
         logger.info(f"Successfully enqueued RQ job {job.id} from staged job {staged_job_id}")
 
-        # --- Critical Step: Remove the staged job entry ONLY AFTER successful enqueueing ---
+        # Remove the staged job entry after successful enqueueing
         try:
             redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
             logger.info(f"Removed staged job entry {staged_job_id} after enqueueing.")
         except redis.exceptions.RedisError as del_e:
-             # Log error but don't fail the request, job is already enqueued
-             logger.error(f"Failed to remove staged job entry {staged_job_id} after enqueueing: {del_e}")
+            logger.error(f"Failed to remove staged job entry {staged_job_id} after enqueueing: {del_e}")
 
         return JSONResponse(status_code=202, content={"message": "Job successfully enqueued.", "job_id": job.id})
 
     except HTTPException as e:
-         # Re-raise HTTP exceptions (like 404)
-         raise e
+        raise e
     except redis.exceptions.RedisError as e:
-         logger.error(f"Redis error during start job process for {staged_job_id}: {e}")
-         raise HTTPException(status_code=503, detail="Service unavailable: Could not access job storage.")
+        logger.error(f"Redis error during start job process for {staged_job_id}: {e}")
+        raise HTTPException(status_code=503, detail="Service unavailable: Could not access job storage.")
     except Exception as e:
         logger.exception(f"Unexpected error starting/enqueuing staged job {staged_job_id}.")
         raise HTTPException(status_code=500, detail="Internal server error: Could not start job.")
