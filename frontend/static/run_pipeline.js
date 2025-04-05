@@ -19,8 +19,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    // Initialize form elements
-    const form = document.getElementById('pipeline-form');
+    const form = document.getElementById('pipelineForm');
+    const samplesContainer = document.getElementById('samplesContainer');
+    const addSampleBtn = document.getElementById('addSampleBtn');
+    const sampleTemplate = document.getElementById('sampleEntryTemplate');
     const fileSelects = {};
     const addToStagingBtn = document.getElementById('addToStagingBtn');
     const statusDiv = document.getElementById('pipeline-status');
@@ -44,6 +46,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (option) option.selected = true;
         });
     }
+
+    // Add initial sample entry
+    addSampleEntry();
+
+    // Add sample button click handler
+    addSampleBtn.addEventListener('click', addSampleEntry);
 
     // Load files for a specific file type
     async function loadFiles(fileType) {
@@ -128,54 +136,98 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('genome')?.addEventListener('change', validateForm);
     document.getElementById('tools')?.addEventListener('change', validateForm);
 
-    // Handle form submission
-    addToStagingBtn.addEventListener('click', async function() {
-        const formData = {
-            input_csv_file: fileSelects['inputCsv'].value,
-            reference_genome_file: fileSelects['referenceGenome'].value,
-            intervals_file: fileSelects['intervals']?.value === 'none' ? null : fileSelects['intervals']?.value,
-            known_variants_file: fileSelects['knownVariants']?.value === 'none' ? null : fileSelects['knownVariants']?.value,
-            genome: document.getElementById('genome').value,
-            tools: Array.from(document.getElementById('tools').selectedOptions).map(opt => opt.value).join(','),
-            step: document.getElementById('step').value,
-            profile: document.getElementById('profile').value,
-            joint_germline: document.getElementById('jointGermline').checked,
-            wes: document.getElementById('wes').checked,
-            description: document.getElementById('description').value
-        };
+    // Form submission handler
+    form.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        
+        if (!form.checkValidity()) {
+            event.stopPropagation();
+            form.classList.add('was-validated');
+            return;
+        }
 
         try {
-            showStatus('Staging pipeline job...', 'info');
+            const formData = new FormData();
             
-            const response = await fetch('/api/jobs/stage', {
+            // Add reference files
+            formData.append('reference_genome_file', document.getElementById('referenceGenomeFile').files[0]);
+            const intervalsFile = document.getElementById('intervalsFile').files[0];
+            if (intervalsFile) {
+                formData.append('intervals_file', intervalsFile);
+            }
+            const knownVariantsFile = document.getElementById('knownVariantsFile').files[0];
+            if (knownVariantsFile) {
+                formData.append('known_variants_file', knownVariantsFile);
+            }
+
+            // Add pipeline parameters
+            formData.append('genome', document.getElementById('genome').value);
+            const toolsSelect = document.getElementById('tools');
+            const selectedTools = Array.from(toolsSelect.selectedOptions).map(option => option.value);
+            if (selectedTools.length === 0) {
+                alert('Please select at least one tool');
+                return;
+            }
+            formData.append('tools', JSON.stringify(selectedTools));
+            formData.append('step', document.getElementById('step').value);
+            formData.append('profile', document.getElementById('profile').value);
+            formData.append('joint_germline', document.getElementById('jointGermline').checked);
+            formData.append('wes', document.getElementById('wes').checked);
+
+            // Add sample information
+            const samples = [];
+            document.querySelectorAll('.sample-entry').forEach(entry => {
+                const sample = {
+                    patient: entry.querySelector('.patient').value,
+                    sample: entry.querySelector('.sample').value,
+                    sex: entry.querySelector('.sex').value,
+                    status: entry.querySelector('.status').value,
+                    fastq_1: entry.querySelector('.fastq_1').files[0].name,
+                    fastq_2: entry.querySelector('.fastq_2').files[0].name
+                };
+                samples.push(sample);
+                formData.append('fastq_1_' + sample.sample, entry.querySelector('.fastq_1').files[0]);
+                formData.append('fastq_2_' + sample.sample, entry.querySelector('.fastq_2').files[0]);
+            });
+            formData.append('samples', JSON.stringify(samples));
+
+            // Submit the form
+            const response = await fetch('/api/run_pipeline', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
+                body: formData
             });
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Failed to stage job');
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to submit pipeline job');
             }
 
             const result = await response.json();
-            showStatus(`Job staged successfully! Job ID: ${result.job_id}`, 'success');
-            
-            // Reset form
-            form.reset();
-            validateForm();
-            
-            // Redirect to jobs page after a short delay
-            setTimeout(() => {
-                window.location.href = '/jobs';
-            }, 2000);
+            window.location.href = `/jobs?staged_job_id=${result.staged_job_id}`;
+
         } catch (error) {
-            console.error('Error staging job:', error);
-            showStatus(`Error staging job: ${error.message}`, 'danger');
+            console.error('Error submitting pipeline job:', error);
+            alert('Error submitting pipeline job: ' + error.message);
         }
     });
+
+    // Function to add a new sample entry
+    function addSampleEntry() {
+        const clone = sampleTemplate.content.cloneNode(true);
+        const sampleEntry = clone.querySelector('.sample-entry');
+        
+        // Add remove button handler
+        const removeBtn = sampleEntry.querySelector('.remove-sample');
+        removeBtn.addEventListener('click', function() {
+            if (document.querySelectorAll('.sample-entry').length > 1) {
+                sampleEntry.remove();
+            } else {
+                alert('At least one sample is required');
+            }
+        });
+
+        samplesContainer.appendChild(sampleEntry);
+    }
 
     // Show status message
     function showStatus(message, type = 'info') {
@@ -191,4 +243,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initial form validation
     validateForm();
+
+    // Add form validation styles
+    form.classList.add('needs-validation');
 });

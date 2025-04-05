@@ -20,6 +20,8 @@ services:
     volumes:
       # Mount TLS certificates needed by uvicorn in main.py
       - ./tls:/app/tls
+      # Mount local backend code for development
+      - ./backend:/app/backend:ro
       # Mount results/data for access by webapp
       - results_vol:/app/bioinformatics/results
       - data_vol:/app/bioinformatics/data

@@ -20,10 +20,10 @@ from rq.command import send_stop_job_command
 from ..core.config import (
     PIPELINE_SCRIPT_PATH, STAGED_JOBS_KEY, DEFAULT_JOB_TIMEOUT,
     DEFAULT_RESULT_TTL, DEFAULT_FAILURE_TTL, MAX_REGISTRY_JOBS,
-    SAREK_DEFAULT_PROFILE, SAREK_DEFAULT_TOOLS
+    SAREK_DEFAULT_PROFILE, SAREK_DEFAULT_TOOLS, SAREK_DEFAULT_STEP
 )
 from ..core.redis_rq import get_redis_connection, get_pipeline_queue
-from ..models.pipeline import PipelineInput
+from ..models.pipeline import PipelineInput, SampleInfo
 from ..utils.validation import validate_pipeline_input
 from ..utils.time import dt_to_timestamp
 from ..tasks import run_pipeline_task # Import the actual task function
@@ -42,57 +42,66 @@ async def stage_pipeline_job(
     redis_conn: redis.Redis = Depends(get_redis_connection)
 ):
     """
-    Validates inputs, generates a unique ID, and stores job details in Redis hash
-    for later execution via /start_job endpoint.
-    Returns 200 OK with staged job ID.
+    Stages a new Sarek pipeline job with the provided input files and parameters.
+    The job is stored in Redis but not yet enqueued for execution.
+    Returns a staged job ID that can be used to start the job later.
     """
-    if not PIPELINE_SCRIPT_PATH.is_file():
-        logger.error(f"Pipeline script not found at configured path: {PIPELINE_SCRIPT_PATH}")
-        raise HTTPException(status_code=500, detail="Server configuration error: Pipeline script missing.")
-
-    # Validate inputs and get absolute paths (raises HTTPException on failure)
+    logger.info(f"Staging Sarek pipeline job with {len(input_data.samples)} samples")
+    
+    # Validate input files and parameters
     paths_map, known_variants_path_str, validation_errors = validate_pipeline_input(input_data)
+    
     if validation_errors:
-        logger.warning(f"Validation errors staging job: {validation_errors}")
-        error_detail = "Input validation failed: " + "; ".join(validation_errors)
-        raise HTTPException(status_code=400, detail=error_detail)
+        error_message = "Validation errors:\n" + "\n".join(f"- {error}" for error in validation_errors)
+        logger.warning(f"Validation errors staging job: {error_message}")
+        raise HTTPException(status_code=400, detail=error_message)
 
     try:
         staged_job_id = f"staged_{uuid.uuid4()}"
         # Store original filenames in meta for potential rerun/display
         input_filenames = {
-            "input_csv": input_data.input_csv_file,
             "reference_genome": input_data.reference_genome_file,
             "intervals": input_data.intervals_file,
             "known_variants": input_data.known_variants_file
         }
+        
+        # Store sample information for display
+        sample_info = []
+        for sample in input_data.samples:
+            sample_info.append({
+                "patient": sample.patient,
+                "sample": sample.sample,
+                "sex": sample.sex,
+                "status": sample.status,
+                "fastq_1": sample.fastq_1,
+                "fastq_2": sample.fastq_2
+            })
+        
         # Store absolute paths and parameters needed for the task execution
         job_details = {
             "input_csv_path": str(paths_map["input_csv"]),
             "reference_genome_path": str(paths_map["reference_genome"]),
             "genome": input_data.genome,
             "tools": input_data.tools or SAREK_DEFAULT_TOOLS,
-            "step": input_data.step or "mapping",
+            "step": input_data.step or SAREK_DEFAULT_STEP,
             "profile": input_data.profile or SAREK_DEFAULT_PROFILE,
             "intervals_path": str(paths_map["intervals"]) if "intervals" in paths_map else None,
             "known_variants_path": known_variants_path_str,
             "joint_germline": input_data.joint_germline,
             "wes": input_data.wes,
-            "description": f"Sarek pipeline for {input_data.input_csv_file}",
+            "description": f"Sarek pipeline for {len(input_data.samples)} samples",
             "staged_at": time.time(),
-            "input_filenames": input_filenames
+            "input_filenames": input_filenames,
+            "sample_info": sample_info
         }
         # Store as bytes in Redis hash
         redis_conn.hset(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'), json.dumps(job_details).encode('utf-8'))
-        logger.info(f"Staged Sarek job '{staged_job_id}' for file '{input_data.input_csv_file}'.")
+        logger.info(f"Staged Sarek job '{staged_job_id}' for {len(input_data.samples)} samples.")
         return JSONResponse(status_code=200, content={"message": "Job staged successfully.", "staged_job_id": staged_job_id})
 
     except redis.exceptions.RedisError as e:
         logger.error(f"Redis error staging job: {e}")
         raise HTTPException(status_code=503, detail="Service unavailable: Could not stage job due to storage error.")
-    except Exception as e:
-        logger.exception("Failed to stage pipeline job due to unexpected error.")
-        raise HTTPException(status_code=500, detail="Internal server error: Could not stage job.")
 
 
 @router.post("/start_job/{staged_job_id}", status_code=202, summary="Enqueue Staged Job")

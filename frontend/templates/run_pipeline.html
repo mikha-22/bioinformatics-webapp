@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Run Pipeline{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Run Sarek Pipeline</h1>
+    
+    <form id="pipelineForm" class="needs-validation" novalidate>
+        <!-- Sample Information Section -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Sample Information</h5>
+            </div>
+            <div class="card-body">
+                <div id="samplesContainer">
+                    <!-- Sample entries will be added here dynamically -->
+                </div>
+                <button type="button" class="btn btn-secondary mt-3" id="addSampleBtn">
+                    <i class="fas fa-plus"></i> Add Sample
+                </button>
+            </div>
+        </div>
+
+        <!-- Reference Files Section -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Reference Files</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="referenceGenomeFile" class="form-label">Reference Genome File (Required)</label>
+                    <input type="file" class="form-control" id="referenceGenomeFile" name="reference_genome_file" required>
+                    <div class="invalid-feedback">Please select a reference genome file.</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="intervalsFile" class="form-label">Intervals File (Optional)</label>
+                    <input type="file" class="form-control" id="intervalsFile" name="intervals_file">
+                </div>
+                
+                <div class="mb-3">
+                    <label for="knownVariantsFile" class="form-label">Known Variants File (Optional)</label>
+                    <input type="file" class="form-control" id="knownVariantsFile" name="known_variants_file">
+                </div>
+            </div>
+        </div>
+
+        <!-- Pipeline Parameters Section -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Pipeline Parameters</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="genome" class="form-label">Genome Build</label>
+                    <select class="form-select" id="genome" name="genome" required>
+                        <option value="GRCh37">GRCh37</option>
+                        <option value="GRCh38">GRCh38</option>
+                        <option value="hg19">hg19</option>
+                        <option value="hg38">hg38</option>
+                    </select>
+                    <div class="invalid-feedback">Please select a genome build.</div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="tools" class="form-label">Tools</label>
+                    <select class="form-select" id="tools" name="tools[]" multiple size="5">
+                        <option value="strelka">Strelka</option>
+                        <option value="mutect2">Mutect2</option>
+                        <option value="freebayes">FreeBayes</option>
+                        <option value="mpileup">mpileup</option>
+                        <option value="vardict">VarDict</option>
+                    </select>
+                    <div class="form-text">Hold Ctrl (Windows) or Command (Mac) to select multiple tools</div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="step" class="form-label">Pipeline Step</label>
+                    <select class="form-select" id="step" name="step" required>
+                        <option value="mapping">Mapping</option>
+                        <option value="markduplicates">Mark Duplicates</option>
+                        <option value="prepare_recalibration">Prepare Recalibration</option>
+                        <option value="recalibrate">Recalibrate</option>
+                        <option value="variant_calling">Variant Calling</option>
+                    </select>
+                    <div class="invalid-feedback">Please select a pipeline step.</div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="profile" class="form-label">Profile</label>
+                    <select class="form-select" id="profile" name="profile" required>
+                        <option value="docker">Docker</option>
+                        <option value="singularity">Singularity</option>
+                        <option value="conda">Conda</option>
+                    </select>
+                    <div class="invalid-feedback">Please select a profile.</div>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="jointGermline" name="joint_germline">
+                    <label class="form-check-label" for="jointGermline">
+                        Joint Germline Analysis
+                    </label>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="wes" name="wes">
+                    <label class="form-check-label" for="wes">
+                        Whole Exome Sequencing
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary" id="submitBtn">Submit Pipeline Job</button>
+        </div>
+    </form>
+</div>
+
+<!-- Sample Entry Template -->
+<template id="sampleEntryTemplate">
+    <div class="sample-entry card mb-3">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Patient ID</label>
+                    <input type="text" class="form-control patient" required>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Sample ID</label>
+                    <input type="text" class="form-control sample" required>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Sex</label>
+                    <select class="form-select sex" required>
+                        <option value="XX">XX</option>
+                        <option value="XY">XY</option>
+                        <option value="X">X</option>
+                        <option value="Y">Y</option>
+                    </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select status" required>
+                        <option value="0">0</option>
+                        <option value="1">1</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">FASTQ R1</label>
+                    <input type="file" class="form-control fastq_1" required>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">FASTQ R2</label>
+                    <input type="file" class="form-control fastq_2" required>
+                </div>
+            </div>
+            <button type="button" class="btn btn-danger btn-sm remove-sample">
+                <i class="fas fa-trash"></i> Remove Sample
+            </button>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='run_pipeline.js') }}"></script>
+{% endblock %} 

@@ -1,13 +1,22 @@
 # backend/app/models/pipeline.py
 from pydantic import BaseModel, Field
-from typing import Optional
+
+from typing import Optional, List
+
+class SampleInfo(BaseModel):
+    patient: str = Field(..., description="Patient identifier")
+    sample: str = Field(..., description="Sample identifier")
+    sex: str = Field(..., description="Sex (XX, XY)")
+    status: int = Field(..., description="0 for normal, 1 for tumor")
+    fastq_1: str = Field(..., description="Path to first FASTQ file")
+    fastq_2: str = Field(..., description="Path to second FASTQ file")
 
 class PipelineInput(BaseModel):
-    # Required files
-    input_csv_file: str = Field(..., description="Path to the input CSV file containing sample information")
-    reference_genome_file: str = Field(..., description="Path to the reference genome file")
+    # Sample information (replaces input_csv_file)
+    samples: List[SampleInfo] = Field(..., description="List of sample information")
     
     # Required parameters
+    reference_genome_file: str = Field(..., description="Path to the reference genome file")
     genome: str = Field(..., description="Genome build to use (e.g., GRCh38)")
     
     # Optional files

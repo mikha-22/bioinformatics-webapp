@@ -46,3 +46,8 @@ DEFAULT_JOB_TIMEOUT = '2h'
 DEFAULT_RESULT_TTL = 86400  # Keep result 1 day
 DEFAULT_FAILURE_TTL = 604800 # Keep failed 1 week
 MAX_REGISTRY_JOBS = 50 # Max finished/failed jobs to fetch for the list view
+
+# --- Sarek Pipeline Configuration ---
+SAREK_DEFAULT_PROFILE = "docker"  # Default container system to use
+SAREK_DEFAULT_TOOLS = "strelka,mutect2"  # Default variant calling tools
+SAREK_DEFAULT_STEP = "mapping"  # Default pipeline step to start from
