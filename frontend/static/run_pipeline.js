@@ -1,10 +1,4 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize tooltips
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-
     // File type definitions for Sarek
     const FILE_TYPES = {
         'inputCsv': {
@@ -43,10 +37,15 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Initialize multiple select for tools
-    const toolCheckboxes = document.querySelectorAll('input[name="tools"]');
-    toolCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', validateForm);
-    });
+    const toolsSelect = document.getElementById('tools');
+    if (toolsSelect) {
+        // Set default values
+        const defaultTools = ['strelka', 'mutect2'];
+        defaultTools.forEach(tool => {
+            const option = toolsSelect.querySelector(`option[value="${tool}"]`);
+            if (option) option.selected = true;
+        });
+    }
 
     // Add initial sample entry
     addSampleEntry();
@@ -98,13 +97,15 @@ document.addEventListener('DOMContentLoaded', function() {
         let isValid = true;
         
         // Check required files
-        const referenceGenomeFile = document.getElementById('referenceGenomeFile');
-        if (referenceGenomeFile && !referenceGenomeFile.files.length) {
-            isValid = false;
-            referenceGenomeFile.classList.add('is-invalid');
-        } else if (referenceGenomeFile) {
-            referenceGenomeFile.classList.remove('is-invalid');
-        }
+        ['inputCsv', 'referenceGenome'].forEach(fileType => {
+            const select = fileSelects[fileType];
+            if (select && !select.value) {
+                isValid = false;
+                select.classList.add('is-invalid');
+            } else if (select) {
+                select.classList.remove('is-invalid');
+            }
+        });
 
         // Check required parameters
         const genomeSelect = document.getElementById('genome');
@@ -116,62 +117,30 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Check tools selection
-        const selectedTools = Array.from(document.querySelectorAll('input[name="tools"]:checked'));
-        if (selectedTools.length === 0) {
+        const toolsSelect = document.getElementById('tools');
+        if (toolsSelect && toolsSelect.selectedOptions.length === 0) {
             isValid = false;
-            document.querySelector('.tool-options').classList.add('is-invalid');
-        } else {
-            document.querySelector('.tool-options').classList.remove('is-invalid');
+            toolsSelect.classList.add('is-invalid');
+        } else if (toolsSelect) {
+            toolsSelect.classList.remove('is-invalid');
         }
-
-        // Check pipeline step
-        const stepSelect = document.getElementById('step');
-        if (stepSelect && !stepSelect.value) {
-            isValid = false;
-            stepSelect.classList.add('is-invalid');
-        } else if (stepSelect) {
-            stepSelect.classList.remove('is-invalid');
-        }
-
-        // Check profile
-        const profileSelect = document.getElementById('profile');
-        if (profileSelect && !profileSelect.value) {
-            isValid = false;
-            profileSelect.classList.add('is-invalid');
-        } else if (profileSelect) {
-            profileSelect.classList.remove('is-invalid');
-        }
-
-        // Check sample entries
-        const sampleEntries = document.querySelectorAll('.sample-entry');
-        sampleEntries.forEach(entry => {
-            const requiredInputs = entry.querySelectorAll('[required]');
-            requiredInputs.forEach(input => {
-                if (!input.value) {
-                    isValid = false;
-                    input.classList.add('is-invalid');
-                } else {
-                    input.classList.remove('is-invalid');
-                }
-            });
-        });
 
         addToStagingBtn.disabled = !isValid;
-        return isValid;
     }
 
     // Add event listeners for form validation
-    form.addEventListener('input', function(event) {
-        if (event.target.hasAttribute('required')) {
-            validateForm();
-        }
+    Object.values(fileSelects).forEach(select => {
+        select.addEventListener('change', validateForm);
     });
+
+    document.getElementById('genome')?.addEventListener('change', validateForm);
+    document.getElementById('tools')?.addEventListener('change', validateForm);
 
     // Form submission handler
     form.addEventListener('submit', async function(event) {
         event.preventDefault();
         
-        if (!validateForm()) {
+        if (!form.checkValidity()) {
             event.stopPropagation();
             form.classList.add('was-validated');
             return;
@@ -193,7 +162,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Add pipeline parameters
             formData.append('genome', document.getElementById('genome').value);
-            const selectedTools = Array.from(document.querySelectorAll('input[name="tools"]:checked')).map(cb => cb.value);
+            const toolsSelect = document.getElementById('tools');
+            const selectedTools = Array.from(toolsSelect.selectedOptions).map(option => option.value);
+            if (selectedTools.length === 0) {
+                alert('Please select at least one tool');
+                return;
+            }
             formData.append('tools', JSON.stringify(selectedTools));
             formData.append('step', document.getElementById('step').value);
             formData.append('profile', document.getElementById('profile').value);
@@ -250,12 +224,6 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 alert('At least one sample is required');
             }
-        });
-
-        // Add validation listeners to new inputs
-        const requiredInputs = sampleEntry.querySelectorAll('[required]');
-        requiredInputs.forEach(input => {
-            input.addEventListener('input', validateForm);
         });
 
         samplesContainer.appendChild(sampleEntry);

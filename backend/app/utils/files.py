@@ -98,24 +98,18 @@ def get_directory_contents(
     directory: Path,
     list_dirs: bool = False,
     list_files: bool = False,
-    fb_base_url: str = "filebrowser",
-    file_extensions: List[str] = None
+    fb_base_url: str = "filebrowser"
     ) -> List[Dict[str, Any]]:
     """
     Retrieves metadata for items in a directory.
     Uses get_safe_path internally if needed, but assumes 'directory' path is already trusted here.
-    
-    Args:
-        directory: Path to the directory to list
-        list_dirs: Whether to include directories in the results
-        list_files: Whether to include files in the results
-        fb_base_url: Base URL for File Browser links
-        file_extensions: Optional list of file extensions to filter by (e.g., ['.txt', '.csv'])
     """
     items = []
     if not directory.is_dir():
         logger.warning(f"Directory not found or is not a directory: {directory}")
-        return items
+        # Consider raising 404 here if called directly from an endpoint
+        # raise HTTPException(status_code=404, detail=f"Directory '{directory.name}' not found.")
+        return items # Return empty list if directory doesn't exist
 
     try:
         # Sort: Directories first, then alphabetically ignoring case
@@ -126,38 +120,39 @@ def get_directory_contents(
 
         for item_path in sorted_paths:
             try:
-                stat_result = item_path.stat()
-                is_dir = item_path.is_dir()
-
-                # Skip if it's a file and doesn't match the extension filter
-                if not is_dir and file_extensions:
-                    if not any(item_path.name.lower().endswith(ext.lower()) for ext in file_extensions):
-                        continue
+                stat_result = item_path.stat() # Can raise FileNotFoundError if item disappears
+                is_dir = item_path.is_dir() # Check type after stat
 
                 if (is_dir and list_dirs) or (not is_dir and list_files):
                     fb_link = None
+                    # Construct File Browser link IF it's a directory listing for the main RESULTS_DIR
                     if is_dir and list_dirs and directory.resolve() == RESULTS_DIR.resolve():
-                        relative_path_to_fb_root = Path("results") / item_path.name
-                        fb_link = f"/{fb_base_url}/files/{urllib.parse.quote(str(relative_path_to_fb_root))}"
+                         # Construct link relative to the File Browser root
+                         # Assumes File Browser root is `/data` which is peer to `results`
+                         # Example: /filebrowser/files/results/run_xyz
+                         relative_path_to_fb_root = Path("results") / item_path.name
+                         fb_link = f"/{fb_base_url}/files/{urllib.parse.quote(str(relative_path_to_fb_root))}"
+                         # logger.debug(f"Generated FB link for {item_path.name}: {fb_link}") # Debug
 
                     item_info = {
                         "name": item_path.name,
                         "is_dir": is_dir,
-                        "modified_time": stat_result.st_mtime,
+                        "modified_time": stat_result.st_mtime, # Unix timestamp
                         "size": stat_result.st_size if not is_dir else None,
                         "extension": item_path.suffix.lower() if not is_dir else None,
-                        "filebrowser_link": fb_link
+                        "filebrowser_link": fb_link # Include link if generated
                     }
                     items.append(item_info)
 
             except FileNotFoundError:
                 logger.warning(f"Item '{item_path.name}' disappeared while listing directory '{directory}'. Skipping.")
-                continue
+                continue # Skip this item
             except OSError as stat_e:
                 logger.error(f"Could not get stat info for item {item_path}: {stat_e}")
+                # Optionally include error items in the list
                 items.append({
                     "name": item_path.name,
-                    "is_dir": item_path.is_dir(),
+                    "is_dir": item_path.is_dir(), # Best guess
                     "error": "Could not access item metadata."
                 })
     except OSError as list_e:
