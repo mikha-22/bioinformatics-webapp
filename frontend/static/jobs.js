@@ -1,4 +1,3 @@
-// frontend/static/jobs.js
 document.addEventListener('DOMContentLoaded', function() {
     const jobsTableBody = document.querySelector('#jobs-table tbody');
     const globalStatusDiv = document.getElementById('jobs-status-global');
@@ -562,72 +561,76 @@ document.addEventListener('DOMContentLoaded', function() {
 
      /** Handle Rerun Button Click */
      async function handleRerunClick(button) {
-        const jobId = button.dataset.jobId; // Original job ID being rerun
+        const jobId = button.dataset.jobId;
         if (!jobId) {
             console.error("Rerun button clicked but data-job-id is missing or invalid:", button);
             showGlobalStatus("Cannot rerun: Job ID is missing.", "danger");
             return;
         }
 
-         button.disabled = true;
-         button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Re-staging...';
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Re-staging...';
 
         try {
-             // Fetch details of the original job
-             const response = await fetch(`/job_status/${jobId}`);
-             if (!response.ok) {
+            const response = await fetch(`/job_status/${jobId}`);
+            if (!response.ok) {
                 const errorText = await response.text();
                 throw new Error(`Error rerunning job ${jobId}: Could not fetch job details for rerun (${response.status} - ${errorText})`);
-             }
-             const jobDetails = await response.json();
+            }
+            const jobDetails = await response.json();
 
-             const inputParams = getNested(jobDetails, 'meta.input_params.input_filenames', getNested(jobDetails, 'meta.input_params', {}));
-             if (!inputParams || !inputParams.forward_reads) {
-                 throw new Error("Original input parameters not found for this job, cannot rerun automatically.");
-             }
+            const inputParams = getNested(jobDetails, 'meta.input_params', {});
+            if (!inputParams || !inputParams.input_filenames) {
+                throw new Error("Original input parameters not found for this job, cannot rerun automatically.");
+            }
 
-             const payload = {
-                 forward_reads_file: inputParams.forward_reads,
-                 reverse_reads_file: inputParams.reverse_reads,
-                 reference_genome_file: inputParams.reference_genome,
-                 target_regions_file: inputParams.target_regions,
-                 known_variants_file: inputParams.known_variants || null
-             };
+            const payload = {
+                input_csv_file: inputParams.input_filenames.input_csv,
+                reference_genome_file: inputParams.input_filenames.reference_genome,
+                intervals_file: inputParams.input_filenames.intervals || null,
+                known_variants_file: inputParams.input_filenames.known_variants || null,
+                genome: inputParams.genome,
+                tools: inputParams.tools,
+                step: inputParams.step,
+                profile: inputParams.profile,
+                joint_germline: inputParams.joint_germline,
+                wes: inputParams.wes,
+                description: `Rerun of job ${jobId}`
+            };
 
-             // Call the staging endpoint (/run_pipeline)
-             const stageResponse = await fetch('/run_pipeline', {
-                 method: 'POST',
-                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                 body: JSON.stringify(payload)
-             });
-             const stageResult = await stageResponse.json();
+            const stageResponse = await fetch('/run_pipeline', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const stageResult = await stageResponse.json();
 
-             if (!stageResponse.ok || !stageResult.staged_job_id) { // Also check if staged_job_id exists
-                 throw new Error(stageResult.detail || `Failed to re-stage job or missing staged_job_id (${stageResponse.status})`);
-             }
+            if (!stageResponse.ok || !stageResult.staged_job_id) { // Also check if staged_job_id exists
+                throw new Error(stageResult.detail || `Failed to re-stage job or missing staged_job_id (${stageResponse.status})`);
+            }
 
-             const newStagedJobId = stageResult.staged_job_id;
+            const newStagedJobId = stageResult.staged_job_id;
 
-             // --- ADDED: Show success message BEFORE refreshing ---
-             showGlobalStatus(`Job successfully re-staged with ID: <code>${newStagedJobId}</code>. Refreshing list...`, 'success');
-             // --- End Added Message ---
+            // --- ADDED: Show success message BEFORE refreshing ---
+            showGlobalStatus(`Job successfully re-staged with ID: <code>${newStagedJobId}</code>. Refreshing list...`, 'success');
+            // --- End Added Message ---
 
-             // Refresh the list to show the new staged job
-             fetchJobsList(); // Refresh immediately
+            // Refresh the list to show the new staged job
+            fetchJobsList(); // Refresh immediately
 
-         } catch (error) {
-             console.error(`Error rerunning job ${jobId}:`, error);
-             // Show error message using the status div
-             showGlobalStatus(`Error rerunning job <code>${jobId}</code>: ${error.message}`, 'danger');
+        } catch (error) {
+            console.error(`Error rerunning job ${jobId}:`, error);
+            // Show error message using the status div
+            showGlobalStatus(`Error rerunning job <code>${jobId}</code>: ${error.message}`, 'danger');
 
-             // Re-enable the button on error
-             const existingButton = jobsTableBody.querySelector(`button[data-job-id="${jobId}"].${BUTTON_CLASS_RERUN}`);
-             if(existingButton){
+            // Re-enable the button on error
+            const existingButton = jobsTableBody.querySelector(`button[data-job-id="${jobId}"].${BUTTON_CLASS_RERUN}`);
+            if(existingButton){
                 existingButton.disabled = false;
                 existingButton.innerHTML = 'Rerun';
-             }
-         }
-     }
+            }
+        }
+    }
 
      /** Handle Error Details Button Click */
      function handleErrorDetailsClick(button) {

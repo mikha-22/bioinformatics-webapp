@@ -174,26 +174,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Show Parameters
     function showParameters(result) {
-        const inputFilesList = document.getElementById('param-input-files');
-        const parametersList = document.getElementById('param-pipeline-config');
-        const resourcesList = document.getElementById('param-resource-usage');
-
-        // Clear previous content
-        inputFilesList.innerHTML = '';
-        parametersList.innerHTML = '';
-        resourcesList.innerHTML = '';
+        const modalInputFiles = document.getElementById('modal-input-files');
+        const modalParameters = document.getElementById('modal-parameters');
+        const modalResources = document.getElementById('modal-resources');
 
         // Input Files
-        inputFilesList.innerHTML = `
-            <li><strong>Input CSV:</strong> ${result.input_csv_file}</li>
-            <li><strong>Reference Genome:</strong> ${result.reference_genome_file}</li>
-            ${result.intervals_file ? `<li><strong>Intervals:</strong> ${result.intervals_file}</li>` : ''}
-            ${result.known_variants_file ? `<li><strong>Known Variants:</strong> ${result.known_variants_file}</li>` : ''}
+        modalInputFiles.innerHTML = `
+            <li><strong>Input CSV:</strong> ${result.input_filenames?.input_csv || 'N/A'}</li>
+            <li><strong>Reference Genome:</strong> ${result.input_filenames?.reference_genome || 'N/A'}</li>
+            <li><strong>Intervals:</strong> ${result.input_filenames?.intervals || 'None'}</li>
+            <li><strong>Known Variants:</strong> ${result.input_filenames?.known_variants || 'None'}</li>
         `;
 
-        // Pipeline Configuration
-        parametersList.innerHTML = `
-            <li><strong>Genome Build:</strong> ${result.genome}</li>
+        // Pipeline Parameters
+        modalParameters.innerHTML = `
+            <li><strong>Genome Build:</strong> ${result.genome || 'N/A'}</li>
             <li><strong>Tools:</strong> ${result.tools || 'default'}</li>
             <li><strong>Step:</strong> ${result.step || 'mapping'}</li>
             <li><strong>Profile:</strong> ${result.profile || 'docker'}</li>
@@ -203,10 +198,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Resource Usage
         if (result.resources) {
-            resourcesList.innerHTML = `
-                <li><strong>CPU Usage:</strong> ${result.resources.cpu_usage || 'N/A'}</li>
-                <li><strong>Memory Usage:</strong> ${result.resources.memory_usage || 'N/A'}</li>
-                <li><strong>Disk Usage:</strong> ${result.resources.disk_usage || 'N/A'}</li>
+            modalResources.innerHTML = `
+                <li><strong>Peak Memory:</strong> ${result.resources.peak_memory_mb || 'N/A'} MB</li>
+                <li><strong>Average CPU:</strong> ${result.resources.average_cpu_percent || 'N/A'}%</li>
+                <li><strong>Duration:</strong> ${formatDuration(result.resources.duration_seconds || 0)}</li>
             `;
         }
 
