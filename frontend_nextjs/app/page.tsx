@@ -216,17 +216,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function fetchAndRenderRecentJobs() {
         showListStatus(recentJobsList, loadingRecentJobs, errorRecentJobs, noRecentJobs, false);
-
+        let response = null;
         try {
-            let response = null;
-            try {
-                let response = await fetch('/jobs_list');
-                if (!response.ok) {
-                    throw new Error(\`HTTP error ${response.status}\`);
-                }
-            } catch (error) {
-                console.error('Error during fetch:', error);
-                return []; // Return an empty array to continue page rendering
+            response = await fetch('/jobs_list');
+            if (!response.ok) {
+                throw new Error(\`HTTP error ${response.status}\`);
+            }
+        } catch (error) {
+            console.error('Error during fetch:', error);
+            return []; // Return an empty array to continue page rendering
             }
             const jobs = await response?.json() || [];
 
