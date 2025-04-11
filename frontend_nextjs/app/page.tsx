@@ -220,7 +220,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             let response = null;
             try {
-                response = await fetch('/jobs_list');
+                let response = await fetch('/jobs_list');
                 if (!response.ok) {
                     throw new Error(\`HTTP error ${response.status}\`);
                 }
