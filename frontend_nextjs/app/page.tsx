@@ -218,7 +218,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showListStatus(recentJobsList, loadingRecentJobs, errorRecentJobs, noRecentJobs, false);
 
         try {
-            let response;
+            let response = null;
             try {
                 response = await fetch('/jobs_list');
                 if (!response.ok) {
