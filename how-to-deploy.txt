@@ -1,0 +1,53 @@
+# PREREQUISITES
+install miniforge3 conda mamba
+
+cd bioinfo-webapp
+
+mamba env create -f conda_env.yml -n sarek-webapp
+
+mamba activate sarek-webapp
+
+# RUN EACH OF THE COMPONENTS MANUALLY FOR TESTING AND DEVELOPMENT
+
+1. redis server (on container):
+docker pull redis:7-alpine
+cd bioinformatics-webapp
+docker run \
+  -d \
+  --name bio_redis_local \
+  -p 6379:6379 \
+  -v redis_data_vol:/data \
+  --restart unless-stopped \
+  redis:7-alpine
+
+2. backend : 
+cd bioinformatics-webapp
+python main.py
+
+3. frontend:
+cd bioinformatics-webapp/frontend_app
+npm install
+npm run dev
+
+4. rq :
+cd bioinformatics-webapp
+export PYTHONPATH=$(pwd)
+rq worker pipeline_tasks --url redis://localhost:6379/0
+
+5. filebrowser (on container):
+cd bioinformatics-webapp
+docker pull ghcr.io/mikha-22/bioinformatics-webapp/filebrowser:latest
+docker run \
+  -d \
+  --name bio_filebrowser_local \
+  -p 8081:8080 \
+  -u "$(id -u):$(id -g)" \
+  -v "/home/admin01/work/mnt/nas/mikha_temp/data:/srv/data" \
+  -v "/home/admin01/work/mnt/nas/mikha_temp/results:/srv/results" \
+  -v "$(pwd)/docker/filebrowser.db:/config/filebrowser.db" \
+  -v "$(pwd)/docker/settings.json:/config/settings.json" \
+  -v "$(pwd)/tls/server.crt:/config/server.crt" \
+  -v "$(pwd)/tls/server.key:/config/server.key" \
+  --restart unless-stopped \
+  ghcr.io/mikha-22/bioinformatics-webapp/filebrowser:latest
+
