@@ -1,0 +1,1031 @@
+Apr-16 00:02:15.204 [main] DEBUG nextflow.cli.Launcher - $> nextflow run nf-core/sarek -r 3.5.1 -profile test,docker --outdir /home/admin01/work/mnt/nas/mikha_temp/results/
+Apr-16 00:02:15.276 [main] DEBUG nextflow.cli.CmdRun - N E X T F L O W  ~  version 24.10.5
+Apr-16 00:02:15.293 [main] DEBUG nextflow.plugin.PluginsFacade - Setting up plugin manager > mode=prod; embedded=false; plugins-dir=/root/.nextflow/plugins; core-plugins: nf-amazon@2.9.2,nf-azure@1.10.2,nf-cloudcache@0.4.2,nf-codecommit@0.2.2,nf-console@1.1.4,nf-google@1.15.4,nf-tower@1.9.3,nf-wave@1.7.4
+Apr-16 00:02:15.310 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Enabled plugins: []
+Apr-16 00:02:15.311 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Disabled plugins: []
+Apr-16 00:02:15.314 [main] INFO  org.pf4j.DefaultPluginManager - PF4J version 3.12.0 in 'deployment' mode
+Apr-16 00:02:15.324 [main] INFO  org.pf4j.AbstractPluginManager - No plugins
+Apr-16 00:02:15.333 [main] DEBUG nextflow.scm.ProviderConfig - Using SCM config path: /root/.nextflow/scm
+Apr-16 00:02:16.248 [main] DEBUG nextflow.scm.AssetManager - Git config: /root/.nextflow/assets/nf-core/sarek/.git/config; branch: null; remote: origin; url: https://github.com/nf-core/sarek.git
+Apr-16 00:02:16.275 [main] DEBUG nextflow.scm.RepositoryFactory - Found Git repository result: [RepositoryFactory]
+Apr-16 00:02:16.283 [main] DEBUG nextflow.scm.AssetManager - Git config: /root/.nextflow/assets/nf-core/sarek/.git/config; branch: null; remote: origin; url: https://github.com/nf-core/sarek.git
+Apr-16 00:02:17.667 [main] DEBUG nextflow.config.ConfigBuilder - Found config base: /root/.nextflow/assets/nf-core/sarek/nextflow.config
+Apr-16 00:02:17.672 [main] DEBUG nextflow.config.ConfigBuilder - Parsing config file: /root/.nextflow/assets/nf-core/sarek/nextflow.config
+Apr-16 00:02:17.690 [main] DEBUG n.secret.LocalSecretsProvider - Secrets store: /root/.nextflow/secrets/store.json
+Apr-16 00:02:17.697 [main] DEBUG nextflow.secret.SecretsLoader - Discovered secrets providers: [nextflow.secret.LocalSecretsProvider@2de6f1bc] - activable => nextflow.secret.LocalSecretsProvider@2de6f1bc
+Apr-16 00:02:17.720 [main] DEBUG nextflow.config.ConfigBuilder - Applying config profile: `test,docker`
+Apr-16 00:02:20.519 [main] DEBUG nextflow.config.ConfigBuilder - Available config profiles: [uzl_omics, denbi_qbic, mjolnir_globe, uppmax, incliva, uge, icr_alma, rosalind_uge, tools_germline_deepvariant, lugh, mccleary, unibe_ibu, czbiohub_aws, jax, roslin, tes, scw, tigem, tubingen_apg, google, vsc_calcua, pdc_kth, use_gatk_spark, humantechnopole, alignment_from_everything, stjude, daisybio, eddie, alignment_to_fastq, medair, biowulf, bi, cedars, spark, utd_ganymede, charliecloud, targeted, seattlechildrens, arm, rosalind, annotation, cfc, uzh, variantcalling_channels, ccga_dx, crick, recalibrate_bam, ku_sund_danhead, marvin, shifter, biohpc_gen, mana, wehi, test_aws, arcc, imperial, maestro, cannon, nci_gadi, skip_markduplicates, googlebatch, sahmri, kaust, alliance_canada, trimming, cambridge, tools_tumoronly, jex, cheaha, nyu_hpc, test, prepare_recalibration_bam, seg_globe, sanger, tools_somatic_ascat, pasteur, einstein, ethz_euler, tuos_stanage, azurebatch, crukmi, csiro_petrichor, wave, docker, test_azure, test_full_azure, umi, hypatia, psmn, markduplicates_bam, fgcz, conda, sentieon_dedup_bam, mpcdf_viper, pe2, uw_hyak_pedslabs, tools_somatic, genouest, markduplicates_cram, unsw_katana, recalibrate_cram, prepare_recalibration_cram, pair, gitpod, seawulf, uct_hpc, aws_tower, test_full_germline_azure, binac, bih, cfc_dev, ifb_core, embl_hd, alice, giga, ilifu, ki_luria, test_full_germline, vai, ccga_med, unc_longleaf, apollo, ipop_up, googlels, ceci_nic5, apptainer, bigpurple, adcra, tools, pawsey_setonix, vsc_kul_uhasselt, pawsey_nimbus, ucl_myriad, icr_davros, save_bam_mapped, ceres, munin, hasta, test_full_aws, split_fastq, shu_bmrc, ebi_codon_slurm, ebc, mamba, york_viking, unc_lccc, awsbatch, wustl_htcf, test_full_germline_ncbench_agilent, ceci_dragon2, skip_bqsr, software_license, genotoul, abims, test_full_germline_aws, janelia, nu_genomics, oist, mpcdf, leicester, vsc_ugent, create, sage, podman, ebi_codon, xanadu, marjorie, tools_germline, computerome, ucd_sonic, dkfz, bluebear, m3c, test_full, imb, ucl_cscluster, hki, seadragon, qmul_apocrita, engaging, gis, eva, unity, cropdiversityhpc, nygc, crg, singularity, self_hosted_runner, tufts, sentieon_dedup_cram, debug, cbe, no_intervals, phoenix, uod_hpc, fub_curta, fsu_draco]
+Apr-16 00:02:20.563 [main] DEBUG nextflow.cli.CmdRun - Applied DSL=2 from script declaration
+Apr-16 00:02:20.564 [main] DEBUG nextflow.cli.CmdRun - Launching `https://github.com/nf-core/sarek` [lethal_ekeblad] DSL2 - revision: 5fe5cdff17 [3.5.1]
+Apr-16 00:02:20.565 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins declared=[nf-schema@2.2.1, nf-prov@1.2.2]
+Apr-16 00:02:20.565 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins default=[]
+Apr-16 00:02:20.566 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins resolved requirement=[nf-schema@2.2.1, nf-prov@1.2.2]
+Apr-16 00:02:20.566 [main] DEBUG nextflow.plugin.PluginUpdater - Installing plugin nf-schema version: 2.2.1
+Apr-16 00:02:20.570 [main] INFO  org.pf4j.AbstractPluginManager - Plugin 'nf-schema@2.2.1' resolved
+Apr-16 00:02:20.571 [main] INFO  org.pf4j.AbstractPluginManager - Start plugin 'nf-schema@2.2.1'
+Apr-16 00:02:20.574 [main] DEBUG nextflow.plugin.BasePlugin - Plugin started nf-schema@2.2.1
+Apr-16 00:02:20.575 [main] DEBUG nextflow.plugin.PluginUpdater - Installing plugin nf-prov version: 1.2.2
+Apr-16 00:02:20.575 [main] INFO  org.pf4j.AbstractPluginManager - Plugin 'nf-prov@1.2.2' resolved
+Apr-16 00:02:20.576 [main] INFO  org.pf4j.AbstractPluginManager - Start plugin 'nf-prov@1.2.2'
+Apr-16 00:02:20.577 [main] DEBUG nextflow.plugin.BasePlugin - Plugin started nf-prov@1.2.2
+Apr-16 00:02:20.635 [main] DEBUG nextflow.Session - Session UUID: 3b55d465-1927-432e-a035-4ec4c66b04c3
+Apr-16 00:02:20.635 [main] DEBUG nextflow.Session - Run name: lethal_ekeblad
+Apr-16 00:02:20.636 [main] DEBUG nextflow.Session - Executor pool size: 48
+Apr-16 00:02:20.641 [main] DEBUG nextflow.file.FilePorter - File porter settings maxRetries=3; maxTransfers=50; pollTimeout=null
+Apr-16 00:02:20.645 [main] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'FileTransfer' minSize=10; maxSize=144; workQueue=LinkedBlockingQueue[-1]; allowCoreThreadTimeout=false
+Apr-16 00:02:20.657 [main] DEBUG nextflow.cli.CmdRun - 
+  Version: 24.10.5 build 5935
+  Created: 04-03-2025 17:55 UTC 
+  System: Linux 5.15.0-105-generic
+  Runtime: Groovy 4.0.23 on OpenJDK 64-Bit Server VM 17.0.14+7-Ubuntu-122.04.1
+  Encoding: UTF-8 (UTF-8)
+  Process: 258033@idsvrugm001 [127.0.1.1]
+  CPUs: 48 - Mem: 125.3 GB (12.5 GB) - Swap: 64 GB (61.5 GB)
+Apr-16 00:02:20.666 [main] DEBUG nextflow.Session - Work-dir: /home/admin01/lab/bioinformatics-webapp/backend/app/work [ext2/ext3]
+Apr-16 00:02:20.680 [main] DEBUG nextflow.executor.ExecutorFactory - Extension executors providers=[]
+Apr-16 00:02:20.688 [main] DEBUG nextflow.Session - Observer factory: DefaultObserverFactory
+Apr-16 00:02:20.702 [main] DEBUG nextflow.Session - Observer factory: ProvObserverFactory
+Apr-16 00:02:20.772 [main] DEBUG nextflow.cache.CacheFactory - Using Nextflow cache factory: nextflow.cache.DefaultCacheFactory
+Apr-16 00:02:20.780 [main] DEBUG nextflow.util.CustomThreadPool - Creating default thread pool > poolSize: 49; maxThreads: 1000
+Apr-16 00:02:20.877 [main] DEBUG nextflow.Session - Session start
+Apr-16 00:02:20.879 [main] DEBUG nextflow.trace.TraceFileObserver - Workflow started -- trace file: /home/admin01/work/mnt/nas/mikha_temp/results/pipeline_info/execution_trace_2025-04-16_00-02-19.txt
+Apr-16 00:02:21.306 [main] DEBUG nextflow.script.ScriptRunner - > Launching execution
+Apr-16 00:02:22.025 [main] DEBUG nextflow.script.IncludeDef - Loading included plugin extensions with names: [paramsSummaryMap:paramsSummaryMap]; plugin Id: nf-schema
+Apr-16 00:02:22.738 [main] DEBUG nextflow.script.IncludeDef - Loading included plugin extensions with names: [paramsSummaryLog:paramsSummaryLog]; plugin Id: nf-schema
+Apr-16 00:02:22.739 [main] DEBUG nextflow.script.IncludeDef - Loading included plugin extensions with names: [validateParameters:validateParameters]; plugin Id: nf-schema
+Apr-16 00:02:22.743 [main] DEBUG nextflow.script.IncludeDef - Loading included plugin extensions with names: [paramsSummaryMap:paramsSummaryMap]; plugin Id: nf-schema
+Apr-16 00:02:22.743 [main] DEBUG nextflow.script.IncludeDef - Loading included plugin extensions with names: [samplesheetToList:samplesheetToList]; plugin Id: nf-schema
+Apr-16 00:02:33.137 [main] DEBUG nextflow.script.IncludeDef - Loading included plugin extensions with names: [paramsSummaryLog:paramsSummaryLog]; plugin Id: nf-schema
+Apr-16 00:02:33.138 [main] DEBUG nextflow.script.IncludeDef - Loading included plugin extensions with names: [validateParameters:validateParameters]; plugin Id: nf-schema
+Apr-16 00:02:33.140 [main] DEBUG nextflow.script.IncludeDef - Loading included plugin extensions with names: [paramsSummaryMap:paramsSummaryMap]; plugin Id: nf-schema
+Apr-16 00:02:33.140 [main] DEBUG nextflow.script.IncludeDef - Loading included plugin extensions with names: [samplesheetToList:samplesheetToList]; plugin Id: nf-schema
+Apr-16 00:02:33.918 [main] INFO  nextflow.Nextflow - 
+-[2m----------------------------------------------------[0m-
+                                        [0;32m,--.[0;30m/[0;32m,-.[0m
+[0;34m        ___     __   __   __   ___     [0;32m/,-._.--~'[0m
+[0;34m  |\ | |__  __ /  ` /  \ |__) |__         [0;33m}  {[0m
+[0;34m  | \| |       \__, \__/ |  \ |___     [0;32m\`-._,-`-,[0m
+                                        [0;32m`._,._,'[0m
+[0;37m      ____[0m
+[0;37m    .´ _  `.[0m
+[0;37m   /  [0;32m|\[0m`-_ \[0m     [0;34m __        __   ___     [0m
+[0;37m  |   [0;32m| \[0m  `-|[0m    [0;34m|__`  /\  |__) |__  |__/[0m
+[0;37m   \ [0;32m|   \[0m  /[0m     [0;34m.__| /¯¯\ |  \ |___ |  \[0m
+[0;37m    `[0;32m|[0m____[0;32m\[0m´[0m
+
+[0;35m  nf-core/sarek 3.5.1[0m
+-[2m----------------------------------------------------[0m-
+[1mInput/output options[0m
+  [0;34minput                     : [0;32m/root/.nextflow/assets/nf-core/sarek/tests/csv/3.0/fastq_single.csv[0m
+  [0;34moutdir                    : [0;32m/home/admin01/work/mnt/nas/mikha_temp/results/[0m
+
+[1mMain options[0m
+  [0;34msplit_fastq               : [0;32m0[0m
+  [0;34mintervals                 : [0;32mhttps://raw.githubusercontent.com/nf-core/test-datasets/modules/data//genomics/homo_sapiens/genome/genome.interval_list[0m
+  [0;34mtools                     : [0;32mstrelka[0m
+
+[1mAnnotation[0m
+  [0;34mbcftools_annotations      : [0;32mhttps://raw.githubusercontent.com/nf-core/test-datasets/modules/data//genomics/sarscov2/illumina/vcf/test2.vcf.gz[0m
+  [0;34mbcftools_annotations_tbi  : [0;32mhttps://raw.githubusercontent.com/nf-core/test-datasets/modules/data//genomics/sarscov2/illumina/vcf/test2.vcf.gz.tbi[0m
+  [0;34mbcftools_header_lines     : [0;32m/root/.nextflow/assets/nf-core/sarek/tests/config/bcfann_test_header.txt[0m
+
+[1mGeneral reference genome options[0m
+  [0;34migenomes_base             : [0;32mhttps://raw.githubusercontent.com/nf-core/test-datasets/modules/data/[0m
+
+[1mReference genome options[0m
+  [0;34mgenome                    : [0;32mtestdata.nf-core.sarek[0m
+  [0;34mdbsnp                     : [0;32mhttps://raw.githubusercontent.com/nf-core/test-datasets/modules/data//genomics/homo_sapiens/genome/vcf/dbsnp_146.hg38.vcf.gz[0m
+  [0;34mdbsnp_tbi                 : [0;32mhttps://raw.githubusercontent.com/nf-core/test-datasets/modules/data//genomics/homo_sapiens/genome/vcf/dbsnp_146.hg38.vcf.gz.tbi[0m
+  [0;34mdbsnp_vqsr                : [0;32m--resource:dbsnp,known=false,training=true,truth=false,prior=2.0 dbsnp_146.hg38.vcf.gz[0m
+  [0;34mdict                      : [0;32mhttps://raw.githubusercontent.com/nf-core/test-datasets/modules/data//genomics/homo_sapiens/genome/genome.dict[0m
+  [0;34mfasta                     : [0;32mhttps://raw.githubusercontent.com/nf-core/test-datasets/modules/data//genomics/homo_sapiens/genome/genome.fasta[0m
+  [0;34mfasta_fai                 : [0;32mhttps://raw.githubusercontent.com/nf-core/test-datasets/modules/data//genomics/homo_sapiens/genome/genome.fasta.fai[0m
+  [0;34mgermline_resource         : [0;32mhttps://raw.githubusercontent.com/nf-core/test-datasets/modules/data//genomics/homo_sapiens/genome/vcf/gnomAD.r2.1.1.vcf.gz[0m
+  [0;34mgermline_resource_tbi     : [0;32mhttps://raw.githubusercontent.com/nf-core/test-datasets/modules/data//genomics/homo_sapiens/genome/vcf/gnomAD.r2.1.1.vcf.gz.tbi[0m
+  [0;34mknown_indels              : [0;32mhttps://raw.githubusercontent.com/nf-core/test-datasets/modules/data//genomics/homo_sapiens/genome/vcf/mills_and_1000G.indels.vcf.gz[0m
+  [0;34mknown_indels_tbi          : [0;32mhttps://raw.githubusercontent.com/nf-core/test-datasets/modules/data//genomics/homo_sapiens/genome/vcf/mills_and_1000G.indels.vcf.gz.tbi[0m
+  [0;34mknown_indels_vqsr         : [0;32m--resource:mills,known=false,training=true,truth=true,prior=10.0 mills_and_1000G.indels.vcf.gz[0m
+  [0;34mngscheckmate_bed          : [0;32mhttps://raw.githubusercontent.com/nf-core/test-datasets/modules/data//genomics/homo_sapiens/genome/chr21/germlineresources/SNP_GRCh38_hg38_wChr.bed[0m
+  [0;34msentieon_dnascope_model   : [0;32ms3://ngi-igenomes/igenomes/Homo_sapiens/GATK/GRCh38/Annotation/Sentieon/SentieonDNAscopeModel1.1.model[0m
+  [0;34msnpeff_cache              : [0;32mnull[0m
+  [0;34msnpeff_db                 : [0;32mWBcel235.105[0m
+  [0;34mvep_cache                 : [0;32mnull[0m
+  [0;34mvep_cache_version         : [0;32m113[0m
+  [0;34mvep_genome                : [0;32mWBcel235[0m
+  [0;34mvep_species               : [0;32mcaenorhabditis_elegans[0m
+
+[1mInstitutional config options[0m
+  [0;34mconfig_profile_name       : [0;32mTest profile[0m
+  [0;34mconfig_profile_description: [0;32mMinimal test dataset to check pipeline function[0m
+  [0;34mmodules_testdata_base_path: [0;32mhttps://raw.githubusercontent.com/nf-core/test-datasets/modules/data/[0m
+
+[1mCore Nextflow options[0m
+  [0;34mrevision                  : [0;32m3.5.1[0m
+  [0;34mrunName                   : [0;32mlethal_ekeblad[0m
+  [0;34mcontainerEngine           : [0;32mdocker[0m
+  [0;34mlaunchDir                 : [0;32m/home/admin01/lab/bioinformatics-webapp/backend/app[0m
+  [0;34mworkDir                   : [0;32m/home/admin01/lab/bioinformatics-webapp/backend/app/work[0m
+  [0;34mprojectDir                : [0;32m/root/.nextflow/assets/nf-core/sarek[0m
+  [0;34muserName                  : [0;32mroot[0m
+  [0;34mprofile                   : [0;32mtest,docker[0m
+  [0;34mconfigFiles               : [0;32m/root/.nextflow/assets/nf-core/sarek/nextflow.config[0m
+
+!! Only displaying parameters that differ from the pipeline defaults !!
+-[2m----------------------------------------------------[0m-
+* The pipeline
+    https://doi.org/10.12688/f1000research.16665.2
+    https://doi.org/10.1093/nargab/lqae031
+    https://doi.org/10.5281/zenodo.3476425
+
+* The nf-core framework
+    https://doi.org/10.1038/s41587-020-0439-x
+
+* Software dependencies
+    https://github.com/nf-core/sarek/blob/master/CITATIONS.md
+
+Apr-16 00:02:33.921 [main] DEBUG nextflow.validation.SchemaValidator - Starting parameters validation
+Apr-16 00:02:34.065 [main] DEBUG nextflow.validation.SchemaEvaluator - Started validating /root/.nextflow/assets/nf-core/sarek/tests/csv/3.0/fastq_single.csv
+Apr-16 00:02:40.525 [main] DEBUG nextflow.validation.SchemaEvaluator - Validation of file '/root/.nextflow/assets/nf-core/sarek/tests/csv/3.0/fastq_single.csv' passed!
+Apr-16 00:02:40.923 [main] DEBUG n.file.http.XFileSystemProvider - Got HTTP error=404 waiting for 250ms (attempt=1)
+Apr-16 00:02:41.260 [main] DEBUG n.file.http.XFileSystemProvider - Got HTTP error=404 waiting for 750ms (attempt=2)
+Apr-16 00:02:42.091 [main] DEBUG n.file.http.XFileSystemProvider - Got HTTP error=404 waiting for 2250ms (attempt=3)
+Apr-16 00:02:46.472 [main] DEBUG n.validation.FormatFilePathEvaluator - S3 paths are not supported by 'FormatFilePathEvaluator': 's3://ngi-igenomes/igenomes/Homo_sapiens/GATK/GRCh38/Annotation/Sentieon/SentieonDNAscopeModel1.1.model'
+Apr-16 00:02:46.472 [main] DEBUG nextflow.validation.ExistsEvaluator - S3 paths are not supported by 'ExistsEvaluator': 's3://ngi-igenomes/igenomes/Homo_sapiens/GATK/GRCh38/Annotation/Sentieon/SentieonDNAscopeModel1.1.model'
+Apr-16 00:02:49.305 [main] DEBUG nextflow.validation.SchemaValidator - Finishing parameters validation
+Apr-16 00:02:51.237 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:PREPARE_GENOME:BWAMEM1_INDEX
+Apr-16 00:02:51.247 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BWAMEM1_INDEX` matches process NFCORE_SAREK:PREPARE_GENOME:BWAMEM1_INDEX
+Apr-16 00:02:51.267 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.268 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.275 [main] DEBUG nextflow.executor.Executor - [warm up] executor > local
+Apr-16 00:02:51.281 [main] DEBUG n.processor.LocalPollingMonitor - Creating local task monitor for executor 'local' > cpus=48; memory=125.3 GB; capacity=48; pollInterval=100ms; dumpInterval=5m
+Apr-16 00:02:51.293 [main] DEBUG n.processor.TaskPollingMonitor - >>> barrier register (monitor: local)
+Apr-16 00:02:51.340 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:PREPARE_GENOME:BWAMEM2_INDEX
+Apr-16 00:02:51.342 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BWAMEM2_INDEX` matches process NFCORE_SAREK:PREPARE_GENOME:BWAMEM2_INDEX
+Apr-16 00:02:51.350 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.350 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.364 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_high` matches labels `process_high` for process with name NFCORE_SAREK:PREPARE_GENOME:DRAGMAP_HASHTABLE
+Apr-16 00:02:51.365 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:DRAGMAP_HASHTABLE` matches process NFCORE_SAREK:PREPARE_GENOME:DRAGMAP_HASHTABLE
+Apr-16 00:02:51.372 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.372 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.379 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium` for process with name NFCORE_SAREK:PREPARE_GENOME:GATK4_CREATESEQUENCEDICTIONARY
+Apr-16 00:02:51.381 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:GATK4_CREATESEQUENCEDICTIONARY` matches process NFCORE_SAREK:PREPARE_GENOME:GATK4_CREATESEQUENCEDICTIONARY
+Apr-16 00:02:51.388 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.388 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.395 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_low` matches labels `process_low` for process with name NFCORE_SAREK:PREPARE_GENOME:MSISENSORPRO_SCAN
+Apr-16 00:02:51.396 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:MSISENSORPRO_SCAN` matches process NFCORE_SAREK:PREPARE_GENOME:MSISENSORPRO_SCAN
+Apr-16 00:02:51.403 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.403 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.411 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:PREPARE_GENOME:SAMTOOLS_FAIDX
+Apr-16 00:02:51.412 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:SAMTOOLS_FAIDX` matches process NFCORE_SAREK:PREPARE_GENOME:SAMTOOLS_FAIDX
+Apr-16 00:02:51.418 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.418 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.431 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:PREPARE_GENOME:TABIX_BCFTOOLS_ANNOTATIONS
+Apr-16 00:02:51.432 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_BCFTOOLS_ANNOTATIONS
+Apr-16 00:02:51.434 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_BCFTOOLS_ANNOTATIONS
+Apr-16 00:02:51.435 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:TABIX_BCFTOOLS_ANNOTATIONS` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_BCFTOOLS_ANNOTATIONS
+Apr-16 00:02:51.441 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.441 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.449 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:PREPARE_GENOME:TABIX_DBSNP
+Apr-16 00:02:51.450 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_DBSNP
+Apr-16 00:02:51.452 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_DBSNP
+Apr-16 00:02:51.452 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:TABIX_DBSNP` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_DBSNP
+Apr-16 00:02:51.458 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.458 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.465 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:PREPARE_GENOME:TABIX_GERMLINE_RESOURCE
+Apr-16 00:02:51.466 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_GERMLINE_RESOURCE
+Apr-16 00:02:51.468 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_GERMLINE_RESOURCE
+Apr-16 00:02:51.468 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:TABIX_GERMLINE_RESOURCE` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_GERMLINE_RESOURCE
+Apr-16 00:02:51.474 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.474 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.481 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:PREPARE_GENOME:TABIX_KNOWN_SNPS
+Apr-16 00:02:51.482 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_KNOWN_SNPS
+Apr-16 00:02:51.484 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_KNOWN_SNPS
+Apr-16 00:02:51.485 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:TABIX_KNOWN_SNPS` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_KNOWN_SNPS
+Apr-16 00:02:51.491 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.491 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.497 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:PREPARE_GENOME:TABIX_KNOWN_INDELS
+Apr-16 00:02:51.498 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_KNOWN_INDELS
+Apr-16 00:02:51.500 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_KNOWN_INDELS
+Apr-16 00:02:51.501 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:TABIX_KNOWN_INDELS` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_KNOWN_INDELS
+Apr-16 00:02:51.507 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.507 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.513 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:PREPARE_GENOME:TABIX_PON
+Apr-16 00:02:51.514 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_PON
+Apr-16 00:02:51.516 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_PON
+Apr-16 00:02:51.517 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:TABIX_PON` matches process NFCORE_SAREK:PREPARE_GENOME:TABIX_PON
+Apr-16 00:02:51.522 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.522 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.613 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:PREPARE_INTERVALS:CREATE_INTERVALS_BED
+Apr-16 00:02:51.614 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_INTERVALS:CREATE_INTERVALS_BED
+Apr-16 00:02:51.615 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:CREATE_INTERVALS_BED` matches process NFCORE_SAREK:PREPARE_INTERVALS:CREATE_INTERVALS_BED
+Apr-16 00:02:51.621 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.621 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.631 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_low` matches labels `process_low` for process with name NFCORE_SAREK:PREPARE_INTERVALS:GATK4_INTERVALLISTTOBED
+Apr-16 00:02:51.632 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:GATK4_INTERVALLISTTOBED` matches process NFCORE_SAREK:PREPARE_INTERVALS:GATK4_INTERVALLISTTOBED
+Apr-16 00:02:51.639 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.639 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.673 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:PREPARE_INTERVALS:TABIX_BGZIPTABIX_INTERVAL_SPLIT
+Apr-16 00:02:51.674 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_INTERVALS:TABIX_BGZIPTABIX_INTERVAL_SPLIT
+Apr-16 00:02:51.675 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_INTERVALS:TABIX_BGZIPTABIX_INTERVAL_SPLIT
+Apr-16 00:02:51.676 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:TABIX_BGZIPTABIX_INTERVAL_SPLIT|TABIX_BGZIPTABIX_INTERVAL_COMBINED` matches process NFCORE_SAREK:PREPARE_INTERVALS:TABIX_BGZIPTABIX_INTERVAL_SPLIT
+Apr-16 00:02:51.682 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.682 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.694 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:PREPARE_INTERVALS:TABIX_BGZIPTABIX_INTERVAL_COMBINED
+Apr-16 00:02:51.696 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_INTERVALS:TABIX_BGZIPTABIX_INTERVAL_COMBINED
+Apr-16 00:02:51.699 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:PREPARE_INTERVALS:TABIX_BGZIPTABIX_INTERVAL_COMBINED
+Apr-16 00:02:51.700 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:TABIX_BGZIPTABIX_INTERVAL_SPLIT|TABIX_BGZIPTABIX_INTERVAL_COMBINED` matches process NFCORE_SAREK:PREPARE_INTERVALS:TABIX_BGZIPTABIX_INTERVAL_COMBINED
+Apr-16 00:02:51.707 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.707 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.757 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium` for process with name NFCORE_SAREK:SAREK:SPRING_DECOMPRESS_TO_FQ_PAIR
+Apr-16 00:02:51.760 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:NFCORE_SAREK:SAREK:SPRING_DECOMPRESS_.*` matches process NFCORE_SAREK:SAREK:SPRING_DECOMPRESS_TO_FQ_PAIR
+Apr-16 00:02:51.765 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.765 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.774 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium` for process with name NFCORE_SAREK:SAREK:SPRING_DECOMPRESS_TO_R1_FQ
+Apr-16 00:02:51.777 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:NFCORE_SAREK:SAREK:SPRING_DECOMPRESS_.*` matches process NFCORE_SAREK:SAREK:SPRING_DECOMPRESS_TO_R1_FQ
+Apr-16 00:02:51.781 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.781 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.789 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium` for process with name NFCORE_SAREK:SAREK:SPRING_DECOMPRESS_TO_R2_FQ
+Apr-16 00:02:51.792 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:NFCORE_SAREK:SAREK:SPRING_DECOMPRESS_.*` matches process NFCORE_SAREK:SAREK:SPRING_DECOMPRESS_TO_R2_FQ
+Apr-16 00:02:51.795 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.796 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.820 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_low` matches labels `process_low` for process with name NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:SAMTOOLS_VIEW_MAP_MAP
+Apr-16 00:02:51.823 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:SAMTOOLS_VIEW_MAP_MAP` matches process NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:SAMTOOLS_VIEW_MAP_MAP
+Apr-16 00:02:51.829 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.829 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.840 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_low` matches labels `process_low` for process with name NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:SAMTOOLS_VIEW_UNMAP_UNMAP
+Apr-16 00:02:51.842 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:SAMTOOLS_VIEW_UNMAP_UNMAP` matches process NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:SAMTOOLS_VIEW_UNMAP_UNMAP
+Apr-16 00:02:51.847 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.847 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.861 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_low` matches labels `process_low` for process with name NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:SAMTOOLS_VIEW_UNMAP_MAP
+Apr-16 00:02:51.864 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:SAMTOOLS_VIEW_UNMAP_MAP` matches process NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:SAMTOOLS_VIEW_UNMAP_MAP
+Apr-16 00:02:51.870 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.870 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.885 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_low` matches labels `process_low` for process with name NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:SAMTOOLS_VIEW_MAP_UNMAP
+Apr-16 00:02:51.886 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:SAMTOOLS_VIEW_MAP_UNMAP` matches process NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:SAMTOOLS_VIEW_MAP_UNMAP
+Apr-16 00:02:51.891 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.891 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.913 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_low` matches labels `process_low` for process with name NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:SAMTOOLS_MERGE_UNMAP
+Apr-16 00:02:51.915 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:SAMTOOLS_MERGE_UNMAP` matches process NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:SAMTOOLS_MERGE_UNMAP
+Apr-16 00:02:51.920 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.920 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.932 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_low` matches labels `process_low` for process with name NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:COLLATE_FASTQ_UNMAP
+Apr-16 00:02:51.934 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:COLLATE_FASTQ_UNMAP` matches process NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:COLLATE_FASTQ_UNMAP
+Apr-16 00:02:51.938 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.938 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.946 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_low` matches labels `process_low` for process with name NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:COLLATE_FASTQ_MAP
+Apr-16 00:02:51.954 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:COLLATE_FASTQ_MAP` matches process NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:COLLATE_FASTQ_MAP
+Apr-16 00:02:51.958 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.959 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:51.971 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:CAT_FASTQ
+Apr-16 00:02:51.972 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:CAT_FASTQ` matches process NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:CAT_FASTQ
+Apr-16 00:02:51.976 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:51.976 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.000 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium` for process with name NFCORE_SAREK:SAREK:FASTQC
+Apr-16 00:02:52.000 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:FASTQC` matches process NFCORE_SAREK:SAREK:FASTQC
+Apr-16 00:02:52.004 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.004 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.030 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_high` matches labels `process_high` for process with name NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM
+Apr-16 00:02:52.031 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BWAMEM1_MEM|BWAMEM2_MEM` matches process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM
+Apr-16 00:02:52.032 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BWAMEM1_MEM` matches process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM
+Apr-16 00:02:52.032 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BWAMEM.*_MEM|DRAGMAP_ALIGN|SENTIEON_BWAMEM` matches process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM
+Apr-16 00:02:52.032 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BWAMEM.*_MEM|DRAGMAP_ALIGN` matches process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM
+Apr-16 00:02:52.032 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BWAMEM.*_MEM|SENTIEON_BWAMEM` matches process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM
+Apr-16 00:02:52.036 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.036 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.050 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_high` matches labels `process_high` for process with name NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM2_MEM
+Apr-16 00:02:52.050 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BWAMEM1_MEM|BWAMEM2_MEM` matches process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM2_MEM
+Apr-16 00:02:52.051 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BWAMEM2_MEM` matches process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM2_MEM
+Apr-16 00:02:52.051 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BWAMEM.*_MEM|DRAGMAP_ALIGN|SENTIEON_BWAMEM` matches process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM2_MEM
+Apr-16 00:02:52.051 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BWAMEM.*_MEM|DRAGMAP_ALIGN` matches process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM2_MEM
+Apr-16 00:02:52.051 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BWAMEM.*_MEM|SENTIEON_BWAMEM` matches process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM2_MEM
+Apr-16 00:02:52.056 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.056 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.070 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_high` matches labels `process_high` for process with name NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:DRAGMAP_ALIGN
+Apr-16 00:02:52.071 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:DRAGMAP_ALIGN` matches process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:DRAGMAP_ALIGN
+Apr-16 00:02:52.071 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BWAMEM.*_MEM|DRAGMAP_ALIGN|SENTIEON_BWAMEM` matches process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:DRAGMAP_ALIGN
+Apr-16 00:02:52.071 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BWAMEM.*_MEM|DRAGMAP_ALIGN` matches process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:DRAGMAP_ALIGN
+Apr-16 00:02:52.075 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.075 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.088 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_high` matches labels `process_high,sentieon` for process with name NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:SENTIEON_BWAMEM
+Apr-16 00:02:52.089 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:SENTIEON_BWAMEM` matches process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:SENTIEON_BWAMEM
+Apr-16 00:02:52.089 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BWAMEM.*_MEM|DRAGMAP_ALIGN|SENTIEON_BWAMEM` matches process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:SENTIEON_BWAMEM
+Apr-16 00:02:52.089 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BWAMEM.*_MEM|SENTIEON_BWAMEM` matches process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:SENTIEON_BWAMEM
+Apr-16 00:02:52.093 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.093 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.152 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium` for process with name NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:GATK4_MARKDUPLICATES
+Apr-16 00:02:52.152 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:GATK4_MARKDUPLICATES|GATK4SPARK_MARKDUPLICATES` matches process NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:GATK4_MARKDUPLICATES
+Apr-16 00:02:52.153 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:GATK4_MARKDUPLICATES` matches process NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:GATK4_MARKDUPLICATES
+Apr-16 00:02:52.157 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.157 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.172 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:SAMTOOLS_STATS
+Apr-16 00:02:52.173 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:NFCORE_SAREK:SAREK:(BAM_MARKDUPLICATES|BAM_MARKDUPLICATES_SPARK):CRAM_QC_MOSDEPTH_SAMTOOLS:SAMTOOLS_STATS` matches process NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:SAMTOOLS_STATS
+Apr-16 00:02:52.176 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.177 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.194 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium` for process with name NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:MOSDEPTH
+Apr-16 00:02:52.195 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:MOSDEPTH` matches process NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:MOSDEPTH
+Apr-16 00:02:52.199 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.199 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.248 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_low` matches labels `process_low` for process with name NFCORE_SAREK:SAREK:CRAM_TO_BAM
+Apr-16 00:02:52.249 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:SAMTOOLS_CONVERT` matches process NFCORE_SAREK:SAREK:CRAM_TO_BAM
+Apr-16 00:02:52.249 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:CRAM_TO_BAM` matches process NFCORE_SAREK:SAREK:CRAM_TO_BAM
+Apr-16 00:02:52.250 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:NFCORE_SAREK:SAREK:CRAM_TO_BAM` matches process NFCORE_SAREK:SAREK:CRAM_TO_BAM
+Apr-16 00:02:52.254 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.254 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.331 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_low` matches labels `process_low` for process with name NFCORE_SAREK:SAREK:BAM_BASERECALIBRATOR:GATK4_BASERECALIBRATOR
+Apr-16 00:02:52.332 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:GATK4_APPLYBQSR|GATK4SPARK_APPLYBQSR|GATK4_BASERECALIBRATOR|GATK4SPARK_BASERECALIBRATOR|GATK4_GATHERBQSRREPORTS` matches process NFCORE_SAREK:SAREK:BAM_BASERECALIBRATOR:GATK4_BASERECALIBRATOR
+Apr-16 00:02:52.332 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:GATK4_BASERECALIBRATOR|GATK4SPARK_BASERECALIBRATOR` matches process NFCORE_SAREK:SAREK:BAM_BASERECALIBRATOR:GATK4_BASERECALIBRATOR
+Apr-16 00:02:52.335 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.335 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.350 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium` for process with name NFCORE_SAREK:SAREK:BAM_BASERECALIBRATOR:GATK4_GATHERBQSRREPORTS
+Apr-16 00:02:52.350 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:GATK4_APPLYBQSR|GATK4SPARK_APPLYBQSR|GATK4_BASERECALIBRATOR|GATK4SPARK_BASERECALIBRATOR|GATK4_GATHERBQSRREPORTS` matches process NFCORE_SAREK:SAREK:BAM_BASERECALIBRATOR:GATK4_GATHERBQSRREPORTS
+Apr-16 00:02:52.351 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:GATK4_GATHERBQSRREPORTS` matches process NFCORE_SAREK:SAREK:BAM_BASERECALIBRATOR:GATK4_GATHERBQSRREPORTS
+Apr-16 00:02:52.353 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.353 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.395 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_low` matches labels `process_low` for process with name NFCORE_SAREK:SAREK:BAM_APPLYBQSR:GATK4_APPLYBQSR
+Apr-16 00:02:52.396 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:GATK4_APPLYBQSR|GATK4SPARK_APPLYBQSR|GATK4_BASERECALIBRATOR|GATK4SPARK_BASERECALIBRATOR|GATK4_GATHERBQSRREPORTS` matches process NFCORE_SAREK:SAREK:BAM_APPLYBQSR:GATK4_APPLYBQSR
+Apr-16 00:02:52.396 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:GATK4_APPLYBQSR|GATK4SPARK_APPLYBQSR` matches process NFCORE_SAREK:SAREK:BAM_APPLYBQSR:GATK4_APPLYBQSR
+Apr-16 00:02:52.399 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.399 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.425 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_low` matches labels `process_low` for process with name NFCORE_SAREK:SAREK:BAM_APPLYBQSR:CRAM_MERGE_INDEX_SAMTOOLS:MERGE_CRAM
+Apr-16 00:02:52.427 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:NFCORE_SAREK:SAREK:(BAM_APPLYBQSR|BAM_APPLYBQSR_SPARK):CRAM_MERGE_INDEX_SAMTOOLS:MERGE_CRAM` matches process NFCORE_SAREK:SAREK:BAM_APPLYBQSR:CRAM_MERGE_INDEX_SAMTOOLS:MERGE_CRAM
+Apr-16 00:02:52.429 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.429 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.444 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_low` matches labels `process_low` for process with name NFCORE_SAREK:SAREK:BAM_APPLYBQSR:CRAM_MERGE_INDEX_SAMTOOLS:INDEX_CRAM
+Apr-16 00:02:52.445 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:SAREK:BAM_APPLYBQSR:CRAM_MERGE_INDEX_SAMTOOLS:INDEX_CRAM
+Apr-16 00:02:52.447 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:NFCORE_SAREK:SAREK:(BAM_APPLYBQSR|BAM_APPLYBQSR_SPARK):CRAM_MERGE_INDEX_SAMTOOLS:INDEX_CRAM` matches process NFCORE_SAREK:SAREK:BAM_APPLYBQSR:CRAM_MERGE_INDEX_SAMTOOLS:INDEX_CRAM
+Apr-16 00:02:52.449 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.449 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.481 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_low` matches labels `process_low` for process with name NFCORE_SAREK:SAREK:CRAM_TO_BAM_RECAL
+Apr-16 00:02:52.481 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:SAMTOOLS_CONVERT` matches process NFCORE_SAREK:SAREK:CRAM_TO_BAM_RECAL
+Apr-16 00:02:52.482 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:CRAM_TO_BAM_RECAL` matches process NFCORE_SAREK:SAREK:CRAM_TO_BAM_RECAL
+Apr-16 00:02:52.488 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.488 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.525 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:SAMTOOLS_STATS
+Apr-16 00:02:52.527 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:SAMTOOLS_STATS` matches process NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:SAMTOOLS_STATS
+Apr-16 00:02:52.530 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.530 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.548 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium` for process with name NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:MOSDEPTH
+Apr-16 00:02:52.549 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:MOSDEPTH` matches process NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:MOSDEPTH
+Apr-16 00:02:52.550 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:MOSDEPTH` matches process NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:MOSDEPTH
+Apr-16 00:02:52.553 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.553 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.606 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium` for process with name NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:BAM_NGSCHECKMATE:BCFTOOLS_MPILEUP
+Apr-16 00:02:52.606 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:BAM_NGSCHECKMATE:BCFTOOLS_MPILEUP
+Apr-16 00:02:52.607 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BCFTOOLS_MPILEUP` matches process NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:BAM_NGSCHECKMATE:BCFTOOLS_MPILEUP
+Apr-16 00:02:52.608 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:.*BAM_NGSCHECKMATE:BCFTOOLS_MPILEUP` matches process NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:BAM_NGSCHECKMATE:BCFTOOLS_MPILEUP
+Apr-16 00:02:52.610 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.611 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.639 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_low` matches labels `process_low` for process with name NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:BAM_NGSCHECKMATE:NGSCHECKMATE_NCM
+Apr-16 00:02:52.641 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:.*BAM_NGSCHECKMATE:NGSCHECKMATE_NCM` matches process NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:BAM_NGSCHECKMATE:NGSCHECKMATE_NCM
+Apr-16 00:02:52.643 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.643 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.754 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:error_retry` matches labels `process_medium,error_retry` for process with name NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:STRELKA_SINGLE
+Apr-16 00:02:52.754 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium,error_retry` for process with name NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:STRELKA_SINGLE
+Apr-16 00:02:52.754 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:STRELKA.*|MANTA.*` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:STRELKA_SINGLE
+Apr-16 00:02:52.755 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:STRELKA_.*` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:STRELKA_SINGLE
+Apr-16 00:02:52.755 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:STRELKA.*|MANTA.*` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:STRELKA_SINGLE
+Apr-16 00:02:52.756 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:STRELKA_.*` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:STRELKA_SINGLE
+Apr-16 00:02:52.780 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.780 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.801 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium` for process with name NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:MERGE_STRELKA
+Apr-16 00:02:52.801 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:GATK4_MERGEVCFS` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:MERGE_STRELKA
+Apr-16 00:02:52.802 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:MERGE_STRELKA.*` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:MERGE_STRELKA
+Apr-16 00:02:52.802 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:MERGE_STRELKA` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:MERGE_STRELKA
+Apr-16 00:02:52.804 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.804 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.810 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium` for process with name NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:MERGE_STRELKA_GENOME
+Apr-16 00:02:52.811 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:GATK4_MERGEVCFS` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:MERGE_STRELKA_GENOME
+Apr-16 00:02:52.812 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:MERGE_STRELKA.*` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:MERGE_STRELKA_GENOME
+Apr-16 00:02:52.812 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:MERGE_STRELKA_GENOME` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:MERGE_STRELKA_GENOME
+Apr-16 00:02:52.814 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.814 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.880 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:error_retry` matches labels `process_medium,error_retry` for process with name NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_SOMATIC_ALL:BAM_VARIANT_CALLING_SOMATIC_STRELKA:STRELKA_SOMATIC
+Apr-16 00:02:52.880 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium,error_retry` for process with name NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_SOMATIC_ALL:BAM_VARIANT_CALLING_SOMATIC_STRELKA:STRELKA_SOMATIC
+Apr-16 00:02:52.880 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:STRELKA.*|MANTA.*` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_SOMATIC_ALL:BAM_VARIANT_CALLING_SOMATIC_STRELKA:STRELKA_SOMATIC
+Apr-16 00:02:52.881 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:STRELKA_.*` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_SOMATIC_ALL:BAM_VARIANT_CALLING_SOMATIC_STRELKA:STRELKA_SOMATIC
+Apr-16 00:02:52.883 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.883 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.904 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium` for process with name NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_SOMATIC_ALL:BAM_VARIANT_CALLING_SOMATIC_STRELKA:MERGE_STRELKA_INDELS
+Apr-16 00:02:52.905 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:GATK4_MERGEVCFS` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_SOMATIC_ALL:BAM_VARIANT_CALLING_SOMATIC_STRELKA:MERGE_STRELKA_INDELS
+Apr-16 00:02:52.906 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:MERGE_STRELKA.*` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_SOMATIC_ALL:BAM_VARIANT_CALLING_SOMATIC_STRELKA:MERGE_STRELKA_INDELS
+Apr-16 00:02:52.906 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:MERGE_STRELKA_INDELS` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_SOMATIC_ALL:BAM_VARIANT_CALLING_SOMATIC_STRELKA:MERGE_STRELKA_INDELS
+Apr-16 00:02:52.908 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.908 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.913 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium` for process with name NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_SOMATIC_ALL:BAM_VARIANT_CALLING_SOMATIC_STRELKA:MERGE_STRELKA_SNVS
+Apr-16 00:02:52.914 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:GATK4_MERGEVCFS` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_SOMATIC_ALL:BAM_VARIANT_CALLING_SOMATIC_STRELKA:MERGE_STRELKA_SNVS
+Apr-16 00:02:52.915 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:MERGE_STRELKA.*` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_SOMATIC_ALL:BAM_VARIANT_CALLING_SOMATIC_STRELKA:MERGE_STRELKA_SNVS
+Apr-16 00:02:52.915 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:MERGE_STRELKA_SNVS` matches process NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_SOMATIC_ALL:BAM_VARIANT_CALLING_SOMATIC_STRELKA:MERGE_STRELKA_SNVS
+Apr-16 00:02:52.917 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.917 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:52.989 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:BCFTOOLS_STATS
+Apr-16 00:02:52.989 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:BCFTOOLS_STATS
+Apr-16 00:02:52.989 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BCFTOOLS_STATS` matches process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:BCFTOOLS_STATS
+Apr-16 00:02:52.992 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:52.992 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:53.024 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT
+Apr-16 00:02:53.025 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT
+Apr-16 00:02:53.026 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:VCFTOOLS_.*` matches process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT
+Apr-16 00:02:53.026 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:VCFTOOLS_TSTV_COUNT` matches process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT
+Apr-16 00:02:53.033 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:53.033 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:53.082 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL
+Apr-16 00:02:53.083 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL
+Apr-16 00:02:53.084 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:VCFTOOLS_.*` matches process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL
+Apr-16 00:02:53.084 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:VCFTOOLS_TSTV_QUAL` matches process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL
+Apr-16 00:02:53.091 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:53.091 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:53.145 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY
+Apr-16 00:02:53.145 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:UNZIP.*|UNTAR.*|TABIX.*|BUILD_INTERVALS|CREATE_INTERVALS_BED|VCFTOOLS|BCFTOOLS.*|SAMTOOLS_INDEX` matches process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY
+Apr-16 00:02:53.146 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:VCFTOOLS_.*` matches process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY
+Apr-16 00:02:53.146 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:VCFTOOLS_SUMMARY` matches process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY
+Apr-16 00:02:53.154 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:53.154 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:53.352 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_single` matches labels `process_single` for process with name NFCORE_SAREK:SAREK:MULTIQC
+Apr-16 00:02:53.353 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:MULTIQC` matches process NFCORE_SAREK:SAREK:MULTIQC
+Apr-16 00:02:53.356 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Apr-16 00:02:53.356 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Apr-16 00:02:53.375 [main] DEBUG nextflow.Session - Config process names validation disabled as requested
+Apr-16 00:02:53.376 [main] DEBUG nextflow.Session - Igniting dataflow network (176)
+Apr-16 00:02:53.386 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:PREPARE_GENOME:BWAMEM1_INDEX
+Apr-16 00:02:53.386 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:PREPARE_GENOME:BWAMEM2_INDEX
+Apr-16 00:02:53.386 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:PREPARE_GENOME:DRAGMAP_HASHTABLE
+Apr-16 00:02:53.386 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:PREPARE_GENOME:GATK4_CREATESEQUENCEDICTIONARY
+Apr-16 00:02:53.386 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:PREPARE_GENOME:MSISENSORPRO_SCAN
+Apr-16 00:02:53.386 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:PREPARE_GENOME:SAMTOOLS_FAIDX
+Apr-16 00:02:53.386 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:PREPARE_GENOME:TABIX_BCFTOOLS_ANNOTATIONS
+Apr-16 00:02:53.386 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:PREPARE_GENOME:TABIX_DBSNP
+Apr-16 00:02:53.386 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:PREPARE_GENOME:TABIX_GERMLINE_RESOURCE
+Apr-16 00:02:53.386 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:PREPARE_GENOME:TABIX_KNOWN_SNPS
+Apr-16 00:02:53.386 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:PREPARE_GENOME:TABIX_KNOWN_INDELS
+Apr-16 00:02:53.386 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:PREPARE_GENOME:TABIX_PON
+Apr-16 00:02:53.387 [PathVisitor-3] DEBUG nextflow.plugin.PluginUpdater - Installing plugin nf-amazon version: 2.9.2
+Apr-16 00:02:53.387 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:PREPARE_INTERVALS:CREATE_INTERVALS_BED
+Apr-16 00:02:53.387 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:PREPARE_INTERVALS:GATK4_INTERVALLISTTOBED
+Apr-16 00:02:53.387 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:PREPARE_INTERVALS:TABIX_BGZIPTABIX_INTERVAL_SPLIT
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:PREPARE_INTERVALS:TABIX_BGZIPTABIX_INTERVAL_COMBINED
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:SPRING_DECOMPRESS_TO_FQ_PAIR
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:SPRING_DECOMPRESS_TO_R1_FQ
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:SPRING_DECOMPRESS_TO_R2_FQ
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:SAMTOOLS_VIEW_MAP_MAP
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:SAMTOOLS_VIEW_UNMAP_UNMAP
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:SAMTOOLS_VIEW_UNMAP_MAP
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:SAMTOOLS_VIEW_MAP_UNMAP
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:SAMTOOLS_MERGE_UNMAP
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:COLLATE_FASTQ_UNMAP
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:COLLATE_FASTQ_MAP
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:CONVERT_FASTQ_INPUT:CAT_FASTQ
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:FASTQC
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM2_MEM
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:DRAGMAP_ALIGN
+Apr-16 00:02:53.388 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:SENTIEON_BWAMEM
+Apr-16 00:02:53.389 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:GATK4_MARKDUPLICATES
+Apr-16 00:02:53.389 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:SAMTOOLS_STATS
+Apr-16 00:02:53.389 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:MOSDEPTH
+Apr-16 00:02:53.389 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:CRAM_TO_BAM
+Apr-16 00:02:53.389 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:BAM_BASERECALIBRATOR:GATK4_BASERECALIBRATOR
+Apr-16 00:02:53.389 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:BAM_BASERECALIBRATOR:GATK4_GATHERBQSRREPORTS
+Apr-16 00:02:53.389 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:BAM_APPLYBQSR:GATK4_APPLYBQSR
+Apr-16 00:02:53.389 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:BAM_APPLYBQSR:CRAM_MERGE_INDEX_SAMTOOLS:MERGE_CRAM
+Apr-16 00:02:53.389 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:BAM_APPLYBQSR:CRAM_MERGE_INDEX_SAMTOOLS:INDEX_CRAM
+Apr-16 00:02:53.389 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:CRAM_TO_BAM_RECAL
+Apr-16 00:02:53.390 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:SAMTOOLS_STATS
+Apr-16 00:02:53.390 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:MOSDEPTH
+Apr-16 00:02:53.390 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:BAM_NGSCHECKMATE:BCFTOOLS_MPILEUP
+Apr-16 00:02:53.390 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:BAM_NGSCHECKMATE:NGSCHECKMATE_NCM
+Apr-16 00:02:53.390 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:STRELKA_SINGLE
+Apr-16 00:02:53.390 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:MERGE_STRELKA
+Apr-16 00:02:53.390 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:MERGE_STRELKA_GENOME
+Apr-16 00:02:53.391 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_SOMATIC_ALL:BAM_VARIANT_CALLING_SOMATIC_STRELKA:STRELKA_SOMATIC
+Apr-16 00:02:53.391 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_SOMATIC_ALL:BAM_VARIANT_CALLING_SOMATIC_STRELKA:MERGE_STRELKA_INDELS
+Apr-16 00:02:53.391 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_SOMATIC_ALL:BAM_VARIANT_CALLING_SOMATIC_STRELKA:MERGE_STRELKA_SNVS
+Apr-16 00:02:53.391 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:BCFTOOLS_STATS
+Apr-16 00:02:53.391 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT
+Apr-16 00:02:53.391 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL
+Apr-16 00:02:53.391 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY
+Apr-16 00:02:53.391 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > NFCORE_SAREK:SAREK:MULTIQC
+Apr-16 00:02:53.393 [PathVisitor-3] INFO  org.pf4j.AbstractPluginManager - Plugin 'nf-amazon@2.9.2' resolved
+Apr-16 00:02:53.393 [PathVisitor-3] INFO  org.pf4j.AbstractPluginManager - Start plugin 'nf-amazon@2.9.2'
+Apr-16 00:02:53.398 [main] DEBUG nextflow.script.ScriptRunner - Parsed script files:
+  Script_f289bdfe26d7f1cf: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../modules/nf-core/fastqc/main.nf
+  Script_2b401a04ae31574b: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/cram_sampleqc/main.nf
+  Script_7abe1c051b661ed0: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/fastq_create_umi_consensus_fgbio/../../../modules/nf-core/fgbio/fastqtobam/main.nf
+  Script_9a1f744b4af07447: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/annotation_cache_initialisation/main.nf
+  Script_e6f540ffb2c944ec: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_tumor_only_mutect2/../../../modules/nf-core/gatk4/calculatecontamination/main.nf
+  Script_028a088a254cd6dd: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_freebayes/main.nf
+  Script_2719fbd471342244: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/cram_sampleqc/../../../subworkflows/nf-core/bam_ngscheckmate/main.nf
+  Script_2b733a645bfb6d5a: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/main.nf
+  Script_76c3210580c9fe21: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/vcf_annotate_all/main.nf
+  Script_8ff83fc63a22c8fb: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_indexcov/../../../modules/local/samtools/reindex_bam/main.nf
+  Script_223ca400878df5b0: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_genome/../../../modules/nf-core/untar/main.nf
+  Script_c80bb66b9dac5c97: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/vcf_annotate_all/../../nf-core/vcf_annotate_snpeff/../../../modules/nf-core/snpeff/snpeff/main.nf
+  Script_a2aa0d1ede76c3e4: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_mpileup/../../../modules/nf-core/cat/cat/main.nf
+  Script_0470df1d00c50fae: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_joint_calling_germline_gatk/../../../modules/nf-core/gatk4/applyvqsr/main.nf
+  Script_b8b71093ffc116f1: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/post_variantcalling/../vcf_concatenate_germline/main.nf
+  Script_1a83631ea747ef88: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/main.nf
+  Script_f34da7b33c26ef52: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_cnvkit/../../../modules/nf-core/cnvkit/export/main.nf
+  Script_9f122e32eac0f4c1: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_freebayes/../../../modules/nf-core/freebayes/main.nf
+  Script_824368743d45b72e: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_genome/main.nf
+  Script_b3af914e27a1ce02: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_sentieon_dedup/../../../modules/nf-core/sentieon/dedup/main.nf
+  Script_668d1f0d214380c6: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_genome/../../../modules/nf-core/samtools/faidx/main.nf
+  Script_02b13fce0ed21a2e: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_somatic_manta/../../../modules/nf-core/manta/somatic/main.nf
+  Script_a40ac2ab631fac5b: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_markduplicates_spark/../../../modules/nf-core/gatk4/estimatelibrarycomplexity/main.nf
+  Script_129045cbcec43290: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_indexcov/../../../modules/nf-core/goleft/indexcov/main.nf
+  Script_1f0a1eb4bf79a7fd: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_sentieon_dedup/main.nf
+  Script_b8abeeceaabc9922: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_deepvariant/main.nf
+  Script_0ce72e734ad77725: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/utils_nfcore_sarek_pipeline/../../nf-core/utils_nextflow_pipeline/main.nf
+  Script_64e8d3d443f4d86f: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_joint_calling_germline_sentieon/main.nf
+  Script_bf84ae935173146f: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/cram_sampleqc/../../../subworkflows/local/cram_qc_mosdepth_samtools/main.nf
+  Script_ee34bf515398c533: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/utils_nfcore_sarek_pipeline/../samplesheet_to_channel/main.nf
+  Script_5e3dda2ff6021e1a: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_tumor_only_mutect2/../../../modules/nf-core/gatk4/filtermutectcalls/main.nf
+  Script_819aadb1392fd995: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/vcf_annotate_all/../../nf-core/vcf_annotate_ensemblvep/../../../modules/nf-core/ensemblvep/vep/main.nf
+  Script_7a66424f9cfe9c28: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_convert_samtools/../../../modules/nf-core/cat/fastq/main.nf
+  Script_2b1c6a73b143b9f1: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_somatic_strelka/main.nf
+  Script_b6f6b85e4ee95525: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_baserecalibrator/../../../modules/nf-core/gatk4/gatherbqsrreports/main.nf
+  Script_057d3de35ec771e9: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_markduplicates_spark/main.nf
+  Script_d6715a92b793b124: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_genome/../../../modules/nf-core/bwamem2/index/main.nf
+  Script_e5fccee2ba9a7b56: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_applybqsr_spark/../cram_merge_index_samtools/../../../modules/nf-core/samtools/merge/main.nf
+  Script_ca1602e337ab4f2a: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_cnvkit/../../../modules/nf-core/cnvkit/genemetrics/main.nf
+  Script_b51e866816de7307: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/fastq_create_umi_consensus_fgbio/../../../modules/nf-core/samtools/bam2fq/main.nf
+  Script_e6188ba138d07431: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_baserecalibrator/main.nf
+  Script_5a1ee4df50ceb976: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/channel_markduplicates_create_csv/main.nf
+  Script_af1e34c37a4660bf: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/utils_nfcore_sarek_pipeline/main.nf
+  Script_d11b5c79ea543e09: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_tumor_only_controlfreec/main.nf
+  Script_12f1b0cba653bc40: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_somatic_ascat/main.nf
+  Script_319b72dc6ac6baa4: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_genome/../../../modules/nf-core/msisensorpro/scan/main.nf
+  Script_eda4c1615e5caaae: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_applybqsr/../cram_merge_index_samtools/main.nf
+  Script_1690db9662109ef7: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_sentieon_haplotyper/main.nf
+  Script_57ee94b0d1ea8856: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/channel_variant_calling_create_csv/main.nf
+  Script_3ff1656b1d66c1f2: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_applybqsr_spark/../cram_merge_index_samtools/../../../modules/nf-core/samtools/index/main.nf
+  Script_1dca684e20afa7cb: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_applybqsr/main.nf
+  Script_1d72d5d488f8c5ea: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/fastq_create_umi_consensus_fgbio/../../../modules/nf-core/fgbio/callmolecularconsensusreads/main.nf
+  Script_4cb94d2c5ce6310a: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_joint_calling_germline_sentieon/../../../modules/nf-core/sentieon/gvcftyper/main.nf
+  Script_b586a2201c19b6cb: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/fastq_create_umi_consensus_fgbio/../../../modules/nf-core/samblaster/main.nf
+  Script_a9e4dae695eeedc0: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_applybqsr/../../../modules/nf-core/gatk4/applybqsr/main.nf
+  Script_ee2021533d309cc4: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_baserecalibrator_spark/main.nf
+  Script_dcc0103cf6df5867: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/fastq_align_bwamem_mem2_dragmap_sentieon/../../../modules/nf-core/sentieon/bwamem/main.nf
+  Script_bc049ecb86093316: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_sentieon_dnascope/main.nf
+  Script_1a1ad9a55706351e: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_genome/../../../modules/nf-core/gatk4/createsequencedictionary/main.nf
+  Script_282984c0da057d55: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_sentieon_dnascope/../../../modules/nf-core/sentieon/dnascope/main.nf
+  Script_755c4bca437f6e1a: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_convert_samtools/main.nf
+  Script_7e1dbf17e4d60bc6: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_sentieon_dedup/../cram_qc_mosdepth_samtools/../../../modules/nf-core/mosdepth/main.nf
+  Script_525415b7be4c75ab: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_somatic_mutect2/../../../modules/nf-core/gatk4/getpileupsummaries/main.nf
+  Script_f956f6322a74991c: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_joint_calling_germline_gatk/../../../modules/nf-core/gatk4/genomicsdbimport/main.nf
+  Script_d0b56273bec7c219: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_single_strelka/main.nf
+  Script_5063435f9f6c42c1: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_somatic_controlfreec/main.nf
+  Script_5fd54cc278f5533b: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_mpileup/main.nf
+  Script_795a2a24ac2ccf20: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_reference_cnvkit/../../../modules/nf-core/cnvkit/reference/main.nf
+  Script_215a636da7ab24a2: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/utils_nfcore_sarek_pipeline/../../nf-core/utils_nfschema_plugin/main.nf
+  Script_0d2b067c028ec877: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_indexcov/main.nf
+  Script_22493c8980382660: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/post_variantcalling/../vcf_concatenate_germline/../../../modules/nf-core/bcftools/concat/main.nf
+  Script_ccf2b8f40d5f2d96: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_baserecalibrator_spark/../../../modules/nf-core/gatk4spark/baserecalibrator/main.nf
+  Script_9f6ce129b29ed4a5: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../modules/nf-core/fastp/main.nf
+  Script_1513213805431d5d: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_somatic_tiddit/../bam_variant_calling_single_tiddit/main.nf
+  Script_50a37d59281f26e1: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_markduplicates_spark/../../../modules/nf-core/gatk4spark/markduplicates/main.nf
+  Script_b020395cbce5d093: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/vcf_annotate_all/../../nf-core/vcf_annotate_snpeff/main.nf
+  Script_5ebb2c36f6b7f624: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_somatic_manta/main.nf
+  Script_19b54da666a96d27: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/fastq_create_umi_consensus_fgbio/../fastq_align_bwamem_mem2_dragmap_sentieon/main.nf
+  Script_c7ac4d9476aa2ba2: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_baserecalibrator/../../../modules/nf-core/gatk4/baserecalibrator/main.nf
+  Script_f546fa1a30569187: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_tumor_only_controlfreec/../../../modules/nf-core/controlfreec/assesssignificance/main.nf
+  Script_28f941a95f1d6b78: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_genome/../../../modules/nf-core/tabix/tabix/main.nf
+  Script_22665c4a579d54f9: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_cnvkit/../../../modules/nf-core/cnvkit/batch/main.nf
+  Script_5887836764e3f95a: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/vcf_qc_bcftools_vcftools/main.nf
+  Script_40c8af5fd1d6a65d: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_somatic_strelka/../../../modules/nf-core/strelka/somatic/main.nf
+  Script_2188acb123c22beb: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../vcf_variant_filtering_gatk/../../../modules/nf-core/gatk4/filtervarianttranches/main.nf
+  Script_4f4c1dcf01d7366a: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_joint_calling_germline_gatk/main.nf
+  Script_ce8725cd2a4af861: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_intervals/../../../modules/local/create_intervals_bed/main.nf
+  Script_3a490b10a1aee53b: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_somatic_ascat/../../../modules/nf-core/ascat/main.nf
+  Script_559f19a480fa4b06: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_mpileup/../../../modules/nf-core/samtools/mpileup/main.nf
+  Script_16efaba349dfbe4c: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_mpileup/../../../modules/nf-core/bcftools/mpileup/main.nf
+  Script_5db680c933e2ff12: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_tumor_only_mutect2/../../../modules/nf-core/gatk4/gatherpileupsummaries/main.nf
+  Script_b428227b4d50d6b9: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/post_variantcalling/../vcf_concatenate_germline/../../../modules/nf-core/tabix/bgziptabix/main.nf
+  Script_ea5171a3862b3145: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_intervals/../../../modules/nf-core/gatk4/intervallisttobed/main.nf
+  Script_65f7a9bfe841c9f1: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_haplotypecaller/main.nf
+  Script_4955288afd8ca61e: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../modules/nf-core/multiqc/main.nf
+  Script_35173eb261765cf2: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/download_cache_snpeff_vep/../../../modules/nf-core/snpeff/download/main.nf
+  Script_def39566b16f9c71: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_joint_calling_germline_gatk/../../../modules/nf-core/gatk4/genotypegvcfs/main.nf
+  Script_6fbcf8477f9d7d4c: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/utils_nfcore_sarek_pipeline/../../nf-core/utils_nfcore_pipeline/main.nf
+  Script_22afa208f7c54a51: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_joint_calling_germline_sentieon/../../../modules/nf-core/sentieon/varcal/main.nf
+  Script_a596d37d30e0bd03: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_tumor_only_mutect2/main.nf
+  Script_a1bcdb7a1cee0441: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_somatic_mutect2/../../../modules/nf-core/gatk4/mutect2/main.nf
+  Script_986822999eec5083: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_somatic_mutect2/../../../modules/nf-core/gatk4/mergemutectstats/main.nf
+  Script_07e778c9418e34ce: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/post_variantcalling/../vcf_concatenate_germline/../../../modules/local/add_info_to_vcf/main.nf
+  Script_76be394b89bf3625: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/vcf_qc_bcftools_vcftools/../../../modules/nf-core/vcftools/main.nf
+  Script_95fc895ef88c0a5e: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_joint_calling_germline_gatk/../../../modules/nf-core/gatk4/variantrecalibrator/main.nf
+  Script_9a0341bb8a253b1b: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_applybqsr_spark/main.nf
+  Script_398efd73d6615984: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/download_cache_snpeff_vep/main.nf
+  Script_dc37288a8ff6ff5e: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../vcf_variant_filtering_gatk/main.nf
+  Script_71644ff913245f63: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/vcf_annotate_all/../../nf-core/vcf_annotate_ensemblvep/main.nf
+  Script_cc95cdf301222818: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_tumor_only_controlfreec/../../../modules/nf-core/controlfreec/freec2bed/main.nf
+  Script_ec7f32831b7e4583: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_somatic_mutect2/../../../modules/nf-core/gatk4/learnreadorientationmodel/main.nf
+  Script_87d7e2a2e7393ec1: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_somatic_tiddit/../../../modules/nf-core/svdb/merge/main.nf
+  Script_27bfd85c6357625a: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_merge_index_samtools/main.nf
+  Script_106c897be00672c0: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/vcf_annotate_all/../vcf_annotate_bcftools/../../../modules/nf-core/bcftools/annotate/main.nf
+  Script_f57dc866f0b59998: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/main.nf
+  Script_bffad0bae920118f: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_joint_calling_germline_sentieon/../../../modules/nf-core/sentieon/applyvarcal/main.nf
+  Script_cf2ce48a700fff15: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_cnvkit/../../../modules/nf-core/cnvkit/call/main.nf
+  Script_777aa12702bc2e5e: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_sentieon_haplotyper/../../../modules/nf-core/sentieon/haplotyper/main.nf
+  Script_3db632c9775b8ab1: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/fastq_create_umi_consensus_fgbio/../../../modules/nf-core/fgbio/groupreadsbyumi/main.nf
+  Script_0efe1bd11f3c1ecf: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/fastq_create_umi_consensus_fgbio/../fastq_align_bwamem_mem2_dragmap_sentieon/../../../modules/nf-core/bwa/mem/main.nf
+  Script_9a898fc2ef2d97f0: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../../../modules/nf-core/msisensorpro/msisomatic/main.nf
+  Script_cd6b697b5cdaf206: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_convert_samtools/../../../modules/nf-core/samtools/view/main.nf
+  Script_f0dba0e4af952478: /root/.nextflow/assets/nf-core/sarek/main.nf
+  Script_a4bb05978cccb4df: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_cnvkit/main.nf
+  Script_3c537a6d105b66a5: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/post_variantcalling/main.nf
+  Script_069ae240da88d1f8: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../../../modules/nf-core/sentieon/dnamodelapply/main.nf
+  Script_47023b830d2a0f0f: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_single_tiddit/../../../modules/nf-core/tiddit/sv/main.nf
+  Script_ea1853a6d4a4e95a: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_tumor_only_lofreq/../../../modules/nf-core/lofreq/callparallel/main.nf
+  Script_d86efa1a3c45f294: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_markduplicates/../../../modules/nf-core/gatk4/markduplicates/main.nf
+  Script_b530bf25fb72e640: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_intervals/main.nf
+  Script_1613b97f11d35ecd: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_reference_cnvkit/main.nf
+  Script_49a410273a0d4342: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/fastq_align_bwamem_mem2_dragmap_sentieon/../../../modules/nf-core/bwamem2/mem/main.nf
+  Script_5fe56935cbbdbe39: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_somatic_mutect2/main.nf
+  Script_afe39ca239cc60ee: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_intervals/../../../modules/nf-core/gawk/main.nf
+  Script_896566c5c28b0384: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/fastq_create_umi_consensus_fgbio/main.nf
+  Script_7eed17253b08a17f: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_tumor_only_lofreq/main.nf
+  Script_8d1bad9e1fc84660: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_tumor_only_manta/main.nf
+  Script_d8e65b113c3b6186: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_genome/../../../modules/nf-core/bwa/index/main.nf
+  Script_66516be8545f71f2: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/channel_align_create_csv/main.nf
+  Script_981d89be108d933e: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_tumor_only_manta/../../../modules/nf-core/manta/tumoronly/main.nf
+  Script_83136d252c233538: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../modules/nf-core/spring/decompress/main.nf
+  Script_a19f9ce9b09443d5: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_tumor_only_controlfreec/../../../modules/nf-core/controlfreec/freec/main.nf
+  Script_2dd62d07716b998d: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../modules/nf-core/samtools/convert/main.nf
+  Script_889f56729c972eac: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_freebayes/../../../modules/nf-core/bcftools/sort/main.nf
+  Script_bc1034bcad96577b: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/channel_applybqsr_create_csv/main.nf
+  Script_a57b73412a5be98e: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../vcf_variant_filtering_gatk/../../../modules/nf-core/gatk4/cnnscorevariants/main.nf
+  Script_9c1a81a9ee2514ba: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_germline_manta/main.nf
+  Script_7a96355ab7d6f1a3: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_markduplicates/main.nf
+  Script_c91aa9a4bd1ae3f4: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/main.nf
+  Script_602945516a2dd366: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/fastq_align_bwamem_mem2_dragmap_sentieon/../../../modules/nf-core/dragmap/align/main.nf
+  Script_a22ce229b6cc00df: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_deepvariant/../../../modules/nf-core/deepvariant/rundeepvariant/main.nf
+  Script_0a849060da7056aa: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_tumor_only_controlfreec/../../../modules/nf-core/controlfreec/freec2circos/main.nf
+  Script_6df0dcc77a212b33: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_tumor_only_all/../bam_variant_calling_tumor_only_controlfreec/../../../modules/nf-core/controlfreec/makegraph2/main.nf
+  Script_81ec1f07ab213590: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_convert_samtools/../../../modules/nf-core/samtools/collatefastq/main.nf
+  Script_1bd098db325044b1: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/channel_baserecalibrator_create_csv/main.nf
+  Script_e2fb30b813036521: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_germline_manta/../../../modules/nf-core/manta/germline/main.nf
+  Script_d5cab7da0897d72e: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_somatic_all/../bam_variant_calling_somatic_tiddit/main.nf
+  Script_1c7d7a4569b86317: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_sentieon_dedup/../cram_qc_mosdepth_samtools/../../../modules/nf-core/samtools/stats/main.nf
+  Script_ce094188ad6cffa2: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_haplotypecaller/../../../modules/nf-core/gatk4/haplotypecaller/main.nf
+  Script_e7e4058441ead3e3: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_single_strelka/../../../modules/nf-core/strelka/germline/main.nf
+  Script_bf5fea05e615580c: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_genome/../../../modules/nf-core/dragmap/hashtable/main.nf
+  Script_6630dd73aedd8b51: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/download_cache_snpeff_vep/../../../modules/nf-core/ensemblvep/download/main.nf
+  Script_187f79be3eba8ea9: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/vcf_annotate_all/../vcf_annotate_bcftools/main.nf
+  Script_477105648dabdd41: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/vcf_qc_bcftools_vcftools/../../../modules/nf-core/bcftools/stats/main.nf
+  Script_185f79e4a174cc18: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/cram_sampleqc/../../../subworkflows/nf-core/bam_ngscheckmate/../../../modules/nf-core/ngscheckmate/ncm/main.nf
+  Script_ba3a5724e6a02fb3: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_reference_cnvkit/../../../modules/nf-core/cnvkit/antitarget/main.nf
+  Script_968436927447c3df: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_variant_calling_germline_all/../bam_variant_calling_haplotypecaller/../../../modules/nf-core/gatk4/mergevcfs/main.nf
+  Script_6e58dab2f6472f41: /root/.nextflow/assets/nf-core/sarek/./workflows/sarek/../../subworkflows/local/bam_applybqsr_spark/../../../modules/nf-core/gatk4spark/applybqsr/main.nf
+  Script_8b560cf26a0f6f39: /root/.nextflow/assets/nf-core/sarek/./subworkflows/local/prepare_genome/../../../modules/nf-core/unzip/main.nf
+Apr-16 00:02:53.398 [main] DEBUG nextflow.script.ScriptRunner - > Awaiting termination 
+Apr-16 00:02:53.398 [main] DEBUG nextflow.Session - Session await
+Apr-16 00:02:53.473 [PathVisitor-3] DEBUG nextflow.plugin.BasePlugin - Plugin started nf-amazon@2.9.2
+Apr-16 00:02:53.543 [Actor Thread 25] WARN  nextflow.Nextflow - FASTQ file(/nf-core/test-datasets/modules/data/genomics/homo_sapiens/illumina/fastq/test_1.fastq.gz): Cannot extract flowcell ID from @normal#21#998579#1/1
+Apr-16 00:02:53.553 [PathVisitor-3] DEBUG nextflow.file.FileHelper - > Added 'S3FileSystemProvider' to list of installed providers [s3]
+Apr-16 00:02:53.554 [PathVisitor-3] DEBUG nextflow.file.FileHelper - Started plugin 'nf-amazon' required to handle file: s3://ngi-igenomes/igenomes/Homo_sapiens/GATK/GRCh38/Annotation/Sentieon/SentieonDNAscopeModel1.1.model
+Apr-16 00:02:53.573 [PathVisitor-3] DEBUG nextflow.file.FileHelper - Creating a file system instance for provider: S3FileSystemProvider
+Apr-16 00:02:53.619 [PathVisitor-3] DEBUG nextflow.cloud.aws.config.AwsConfig - AWS S3 config properties: {max_error_retry=5}
+Apr-16 00:02:53.619 [Actor Thread 50] DEBUG nextflow.sort.BigSort - Sort completed -- entries: 1; slices: 1; internal sort time: 0.002 s; external sort time: 0.025 s; total time: 0.027 s
+Apr-16 00:02:53.619 [Actor Thread 4] DEBUG nextflow.sort.BigSort - Sort completed -- entries: 1; slices: 1; internal sort time: 0.002 s; external sort time: 0.025 s; total time: 0.027 s
+Apr-16 00:02:53.626 [Actor Thread 50] DEBUG nextflow.file.FileCollector - Saved collect-files list to: /home/admin01/lab/bioinformatics-webapp/backend/app/work/collect-file/e13d3cac2f7e5f1987817038c130e1ea
+Apr-16 00:02:53.626 [Actor Thread 4] DEBUG nextflow.file.FileCollector - Saved collect-files list to: /home/admin01/lab/bioinformatics-webapp/backend/app/work/collect-file/a3af30e013630e792bde467af8245352
+Apr-16 00:02:53.649 [Actor Thread 50] DEBUG nextflow.file.FileCollector - Deleting file collector temp dir: /tmp/nxf-11455264030501300301
+Apr-16 00:02:53.649 [Actor Thread 4] DEBUG nextflow.file.FileCollector - Deleting file collector temp dir: /tmp/nxf-11944051588663515651
+Apr-16 00:02:53.659 [Actor Thread 25] WARN  nextflow.Nextflow - FASTQ file(/nf-core/test-datasets/modules/data/genomics/homo_sapiens/illumina/fastq/test_1.fastq.gz): Cannot extract flowcell ID from @normal#21#998579#1/1
+Apr-16 00:02:55.665 [FileTransfer-1] DEBUG nextflow.file.FilePorter - Copying foreign file https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/genomics/homo_sapiens/genome/vcf/mills_and_1000G.indels.vcf.gz to work dir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/stage-3b55d465-1927-432e-a035-4ec4c66b04c3/b1/0f0e1c6ba24026502ff729716efc8d/mills_and_1000G.indels.vcf.gz
+Apr-16 00:02:55.749 [FileTransfer-2] DEBUG nextflow.file.FilePorter - Copying foreign file https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/genomics/sarscov2/illumina/vcf/test2.vcf.gz to work dir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/stage-3b55d465-1927-432e-a035-4ec4c66b04c3/42/463389707b707a26518be6ea41fe11/test2.vcf.gz
+Apr-16 00:02:55.750 [FileTransfer-3] DEBUG nextflow.file.FilePorter - Copying foreign file https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/genomics/homo_sapiens/genome/genome.fasta to work dir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/stage-3b55d465-1927-432e-a035-4ec4c66b04c3/be/4794cc7e175083f52fd79c85f739b6/genome.fasta
+Apr-16 00:02:55.751 [FileTransfer-4] DEBUG nextflow.file.FilePorter - Copying foreign file https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/genomics/homo_sapiens/genome/vcf/dbsnp_146.hg38.vcf.gz to work dir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/stage-3b55d465-1927-432e-a035-4ec4c66b04c3/fd/470d58eef47f7eab7711a1c6ee9be3/dbsnp_146.hg38.vcf.gz
+Apr-16 00:02:55.752 [FileTransfer-5] DEBUG nextflow.file.FilePorter - Copying foreign file https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/genomics/homo_sapiens/genome/genome.interval_list to work dir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/stage-3b55d465-1927-432e-a035-4ec4c66b04c3/06/217701e83180d9685f636e4767bcc2/genome.interval_list
+Apr-16 00:02:55.752 [FileTransfer-6] DEBUG nextflow.file.FilePorter - Copying foreign file https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/genomics/homo_sapiens/genome/vcf/gnomAD.r2.1.1.vcf.gz to work dir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/stage-3b55d465-1927-432e-a035-4ec4c66b04c3/99/08c090c16e7bf20ff9d02914f569d5/gnomAD.r2.1.1.vcf.gz
+Apr-16 00:02:55.907 [FileTransfer-7] DEBUG nextflow.file.FilePorter - Copying foreign file https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/genomics/homo_sapiens/illumina/fastq/test_1.fastq.gz to work dir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/stage-3b55d465-1927-432e-a035-4ec4c66b04c3/ee/9684ce6b836de09a51fda0c1ba20e8/test_1.fastq.gz
+Apr-16 00:02:55.909 [FileTransfer-8] DEBUG nextflow.file.FilePorter - Copying foreign file https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/genomics/homo_sapiens/illumina/fastq/test_2.fastq.gz to work dir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/stage-3b55d465-1927-432e-a035-4ec4c66b04c3/29/64b921205c2cceba8b5e056639f663/test_2.fastq.gz
+Apr-16 00:02:56.022 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:02:56.024 [Task submitter] INFO  nextflow.Session - [fa/c88657] Submitted process > NFCORE_SAREK:PREPARE_GENOME:BWAMEM1_INDEX (genome.fasta)
+Apr-16 00:02:56.037 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:02:56.038 [Task submitter] INFO  nextflow.Session - [3f/585f87] Submitted process > NFCORE_SAREK:PREPARE_INTERVALS:CREATE_INTERVALS_BED (genome.interval_list)
+Apr-16 00:02:56.048 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:02:56.048 [Task submitter] INFO  nextflow.Session - [98/d76dff] Submitted process > NFCORE_SAREK:PREPARE_INTERVALS:GATK4_INTERVALLISTTOBED (genome)
+Apr-16 00:02:57.594 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:02:57.595 [Task submitter] INFO  nextflow.Session - [10/a724c4] Submitted process > NFCORE_SAREK:SAREK:FASTQC (test-test_L2)
+Apr-16 00:02:57.606 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:02:57.606 [Task submitter] INFO  nextflow.Session - [b4/773fdb] Submitted process > NFCORE_SAREK:SAREK:FASTQC (test-test_L1)
+Apr-16 00:03:25.532 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 2; name: NFCORE_SAREK:PREPARE_INTERVALS:CREATE_INTERVALS_BED (genome.interval_list); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/3f/585f879dc3e0778e8cb206fc8d72c3]
+Apr-16 00:03:25.533 [Task monitor] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'TaskFinalizer' minSize=10; maxSize=144; workQueue=LinkedBlockingQueue[-1]; allowCoreThreadTimeout=false
+Apr-16 00:03:25.588 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:03:25.588 [Task submitter] INFO  nextflow.Session - [8e/1360f6] Submitted process > NFCORE_SAREK:PREPARE_INTERVALS:TABIX_BGZIPTABIX_INTERVAL_SPLIT (chr22_1-40001)
+Apr-16 00:03:33.890 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 8; name: NFCORE_SAREK:PREPARE_GENOME:BWAMEM1_INDEX (genome.fasta); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/fa/c88657d46c4694cf8ba769139dc9a0]
+Apr-16 00:03:35.820 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:03:35.822 [Task submitter] INFO  nextflow.Session - [11/7d8526] Submitted process > NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM (test-test_L2)
+Apr-16 00:03:35.831 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:03:35.831 [Task submitter] INFO  nextflow.Session - [29/6b8417] Submitted process > NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM (test-test_L1)
+Apr-16 00:03:35.954 [FileTransfer-9] DEBUG nextflow.file.FilePorter - Copying foreign file https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/genomics/homo_sapiens/genome/genome.fasta.fai to work dir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/stage-3b55d465-1927-432e-a035-4ec4c66b04c3/fb/437e9bd0e466cd60681a502fae4ba1/genome.fasta.fai
+Apr-16 00:03:55.782 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 15; name: NFCORE_SAREK:PREPARE_INTERVALS:TABIX_BGZIPTABIX_INTERVAL_SPLIT (chr22_1-40001); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/8e/1360f6a9e6d2aacf3acc0a34bda990]
+Apr-16 00:03:55.872 [TaskFinalizer-3] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:PREPARE_INTERVALS:TABIX_BGZIPTABIX_INTERVAL_SPLIT > Skipping output binding because one or more optional files are missing: fileoutparam<1:2>
+Apr-16 00:04:31.873 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 18; name: NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM (test-test_L1); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/29/6b8417d29bf86c923400a705068725]
+Apr-16 00:04:31.879 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 20; name: NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM (test-test_L2); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/11/7d8526e4c862e33003f45d0ee1db53]
+Apr-16 00:04:31.884 [TaskFinalizer-5] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM > Skipping output binding because one or more optional files are missing: fileoutparam<1:1>
+Apr-16 00:04:31.884 [TaskFinalizer-5] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM > Skipping output binding because one or more optional files are missing: fileoutparam<2:1>
+Apr-16 00:04:31.884 [TaskFinalizer-5] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM > Skipping output binding because one or more optional files are missing: fileoutparam<3:1>
+Apr-16 00:04:31.886 [TaskFinalizer-4] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM > Skipping output binding because one or more optional files are missing: fileoutparam<1:1>
+Apr-16 00:04:31.886 [TaskFinalizer-4] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM > Skipping output binding because one or more optional files are missing: fileoutparam<2:1>
+Apr-16 00:04:31.886 [TaskFinalizer-4] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP_SENTIEON:BWAMEM1_MEM > Skipping output binding because one or more optional files are missing: fileoutparam<3:1>
+Apr-16 00:04:32.350 [Actor Thread 17] DEBUG nextflow.extension.GroupTupleOp - GroupTuple dynamic size: key=[patient:test, sample:test, sex:XX, status:0, n_fastq:2, data_type:bam, id:test] size=2
+Apr-16 00:04:32.350 [Actor Thread 17] DEBUG nextflow.extension.GroupTupleOp - GroupTuple dynamic size: key=[patient:test, sample:test, sex:XX, status:0, n_fastq:2, data_type:bam, id:test] size=2
+Apr-16 00:04:32.589 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:04:32.590 [Task submitter] INFO  nextflow.Session - [22/cbb05c] Submitted process > NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:GATK4_MARKDUPLICATES (test)
+Apr-16 00:04:36.673 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 13; name: NFCORE_SAREK:SAREK:FASTQC (test-test_L1); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/b4/773fdb1ba877212146581051feb39d]
+Apr-16 00:04:36.692 [TaskFinalizer-6] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'PublishDir' minSize=10; maxSize=144; workQueue=LinkedBlockingQueue[-1]; allowCoreThreadTimeout=false
+Apr-16 00:04:36.951 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 14; name: NFCORE_SAREK:SAREK:FASTQC (test-test_L2); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/10/a724c4d127b769d02bd53aef55a785]
+Apr-16 00:05:06.208 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 1; name: NFCORE_SAREK:PREPARE_INTERVALS:GATK4_INTERVALLISTTOBED (genome); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/98/d76dff8938fcbd55bdc059dee78ef5]
+Apr-16 00:05:06.232 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:05:06.233 [Task submitter] INFO  nextflow.Session - [f1/5d2911] Submitted process > NFCORE_SAREK:PREPARE_INTERVALS:TABIX_BGZIPTABIX_INTERVAL_COMBINED (genome)
+Apr-16 00:05:07.066 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 25; name: NFCORE_SAREK:PREPARE_INTERVALS:TABIX_BGZIPTABIX_INTERVAL_COMBINED (genome); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/f1/5d29119988cd9a6fb89cb9620c7b11]
+Apr-16 00:05:07.072 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:PREPARE_INTERVALS:TABIX_BGZIPTABIX_INTERVAL_COMBINED > Skipping output binding because one or more optional files are missing: fileoutparam<1:2>
+Apr-16 00:07:05.956 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 24; name: NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:GATK4_MARKDUPLICATES (test); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/22/cbb05c4bc7c5475995adad5abe5261]
+Apr-16 00:07:05.963 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:GATK4_MARKDUPLICATES > Skipping output binding because one or more optional files are missing: fileoutparam<1:1>
+Apr-16 00:07:05.963 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:GATK4_MARKDUPLICATES > Skipping output binding because one or more optional files are missing: fileoutparam<3:1>
+Apr-16 00:07:06.039 [Actor Thread 32] DEBUG nextflow.sort.BigSort - Sort completed -- entries: 1; slices: 1; internal sort time: 0.0 s; external sort time: 0.001 s; total time: 0.001 s
+Apr-16 00:07:06.045 [Actor Thread 32] DEBUG nextflow.file.FileCollector - Saved collect-files list to: /home/admin01/lab/bioinformatics-webapp/backend/app/work/collect-file/341ed45f7932887da99acc2fa8444899
+Apr-16 00:07:06.047 [Actor Thread 32] DEBUG nextflow.file.FileCollector - Deleting file collector temp dir: /tmp/nxf-826561285192230849
+Apr-16 00:07:06.310 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:07:06.311 [Task submitter] INFO  nextflow.Session - [b0/d6a860] Submitted process > NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:SAMTOOLS_STATS (test)
+Apr-16 00:07:06.397 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:07:06.398 [Task submitter] INFO  nextflow.Session - [1a/442a6c] Submitted process > NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:MOSDEPTH (test)
+Apr-16 00:07:07.660 [FileTransfer-10] DEBUG nextflow.file.FilePorter - Copying foreign file https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/genomics/homo_sapiens/genome/genome.dict to work dir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/stage-3b55d465-1927-432e-a035-4ec4c66b04c3/43/57d66047b149dbe459aa135b4839e9/genome.dict
+Apr-16 00:07:07.661 [FileTransfer-1] DEBUG nextflow.file.FilePorter - Copying foreign file https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/genomics/homo_sapiens/genome/vcf/dbsnp_146.hg38.vcf.gz.tbi to work dir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/stage-3b55d465-1927-432e-a035-4ec4c66b04c3/65/c2c70789f215e771e4e74a654e62fa/dbsnp_146.hg38.vcf.gz.tbi
+Apr-16 00:07:07.661 [FileTransfer-2] DEBUG nextflow.file.FilePorter - Copying foreign file https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/genomics/homo_sapiens/genome/vcf/mills_and_1000G.indels.vcf.gz.tbi to work dir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/stage-3b55d465-1927-432e-a035-4ec4c66b04c3/2e/88b11674097781a8eb19273af8c376/mills_and_1000G.indels.vcf.gz.tbi
+Apr-16 00:07:07.850 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:07:07.850 [Task submitter] INFO  nextflow.Session - [0d/8bc038] Submitted process > NFCORE_SAREK:SAREK:BAM_BASERECALIBRATOR:GATK4_BASERECALIBRATOR (test)
+Apr-16 00:07:12.189 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 29; name: NFCORE_SAREK:SAREK:BAM_BASERECALIBRATOR:GATK4_BASERECALIBRATOR (test); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/0d/8bc038e36dbc42551a95fa52933455]
+Apr-16 00:07:12.194 [Actor Thread 23] DEBUG nextflow.extension.GroupTupleOp - GroupTuple dynamic size: key=[patient:test, sample:test, sex:XX, status:0, n_fastq:2, data_type:cram, id:test, num_intervals:1] size=1
+Apr-16 00:07:12.299 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:07:12.300 [Task submitter] INFO  nextflow.Session - [cf/8be1dc] Submitted process > NFCORE_SAREK:SAREK:BAM_APPLYBQSR:GATK4_APPLYBQSR (test)
+Apr-16 00:07:12.318 [Actor Thread 36] DEBUG nextflow.sort.BigSort - Sort completed -- entries: 1; slices: 1; internal sort time: 0.0 s; external sort time: 0.003 s; total time: 0.003 s
+Apr-16 00:07:12.604 [Actor Thread 36] DEBUG nextflow.file.FileCollector - Saved collect-files list to: /home/admin01/lab/bioinformatics-webapp/backend/app/work/collect-file/c8615314ac8c6605d7a36095b31a59f2
+Apr-16 00:07:12.731 [Actor Thread 36] DEBUG nextflow.file.FileCollector - Deleting file collector temp dir: /tmp/nxf-4851259611326518850
+Apr-16 00:07:17.982 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 30; name: NFCORE_SAREK:SAREK:BAM_APPLYBQSR:GATK4_APPLYBQSR (test); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/cf/8be1dcf0d153b98966d7fa17237d59]
+Apr-16 00:07:17.986 [TaskFinalizer-2] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:BAM_APPLYBQSR:GATK4_APPLYBQSR > Skipping output binding because one or more optional files are missing: fileoutparam<0:1>
+Apr-16 00:07:17.987 [Actor Thread 48] DEBUG nextflow.extension.GroupTupleOp - GroupTuple dynamic size: key=[patient:test, sample:test, sex:XX, status:0, n_fastq:2, data_type:cram, id:test, num_intervals:1] size=1
+Apr-16 00:07:18.006 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:07:18.006 [Task submitter] INFO  nextflow.Session - [6c/a0c4dd] Submitted process > NFCORE_SAREK:SAREK:BAM_APPLYBQSR:CRAM_MERGE_INDEX_SAMTOOLS:INDEX_CRAM (test)
+Apr-16 00:07:21.379 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 31; name: NFCORE_SAREK:SAREK:BAM_APPLYBQSR:CRAM_MERGE_INDEX_SAMTOOLS:INDEX_CRAM (test); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/6c/a0c4dd1c190baadf0a2a8c82a9b88c]
+Apr-16 00:07:21.383 [TaskFinalizer-3] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:BAM_APPLYBQSR:CRAM_MERGE_INDEX_SAMTOOLS:INDEX_CRAM > Skipping output binding because one or more optional files are missing: fileoutparam<0:1>
+Apr-16 00:07:21.383 [TaskFinalizer-3] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:BAM_APPLYBQSR:CRAM_MERGE_INDEX_SAMTOOLS:INDEX_CRAM > Skipping output binding because one or more optional files are missing: fileoutparam<1:1>
+Apr-16 00:07:21.394 [Actor Thread 32] DEBUG nextflow.sort.BigSort - Sort completed -- entries: 1; slices: 1; internal sort time: 0.0 s; external sort time: 0.001 s; total time: 0.001 s
+Apr-16 00:07:21.399 [Actor Thread 32] DEBUG nextflow.file.FileCollector - Saved collect-files list to: /home/admin01/lab/bioinformatics-webapp/backend/app/work/collect-file/a55881771009da7b9cf1dc9165cf68c4
+Apr-16 00:07:21.400 [Actor Thread 32] DEBUG nextflow.file.FileCollector - Deleting file collector temp dir: /tmp/nxf-12423623615587122273
+Apr-16 00:07:21.784 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:07:21.785 [Task submitter] INFO  nextflow.Session - [5b/191211] Submitted process > NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:SAMTOOLS_STATS (test)
+Apr-16 00:07:21.975 [FileTransfer-5] DEBUG nextflow.file.FilePorter - Copying foreign file https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/genomics/homo_sapiens/genome/chr21/germlineresources/SNP_GRCh38_hg38_wChr.bed to work dir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/stage-3b55d465-1927-432e-a035-4ec4c66b04c3/ea/ec317779c5da0ef24657fb9e530890/SNP_GRCh38_hg38_wChr.bed
+Apr-16 00:07:21.991 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:07:21.993 [Task submitter] INFO  nextflow.Session - [49/78b6bc] Submitted process > NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:STRELKA_SINGLE (test)
+Apr-16 00:07:22.030 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:07:22.031 [Task submitter] INFO  nextflow.Session - [cc/b50e56] Submitted process > NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:MOSDEPTH (test)
+Apr-16 00:07:22.700 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 33; name: NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:SAMTOOLS_STATS (test); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/5b/191211bf47b9d3d59d0126efac7472]
+Apr-16 00:07:23.127 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 26; name: NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:SAMTOOLS_STATS (test); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/b0/d6a860d4b9e53ea19e8976c8915767]
+Apr-16 00:07:41.599 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 27; name: NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:MOSDEPTH (test); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/1a/442a6cef7b09f6fa09899be1097adc]
+Apr-16 00:07:41.613 [TaskFinalizer-6] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:MOSDEPTH > Skipping output binding because one or more optional files are missing: fileoutparam<3:1>
+Apr-16 00:07:41.613 [TaskFinalizer-6] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:MOSDEPTH > Skipping output binding because one or more optional files are missing: fileoutparam<4:1>
+Apr-16 00:07:41.613 [TaskFinalizer-6] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:MOSDEPTH > Skipping output binding because one or more optional files are missing: fileoutparam<5:1>
+Apr-16 00:07:41.613 [TaskFinalizer-6] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:MOSDEPTH > Skipping output binding because one or more optional files are missing: fileoutparam<8:1>
+Apr-16 00:07:41.613 [TaskFinalizer-6] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:MOSDEPTH > Skipping output binding because one or more optional files are missing: fileoutparam<9:1>
+Apr-16 00:07:41.613 [TaskFinalizer-6] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:MOSDEPTH > Skipping output binding because one or more optional files are missing: fileoutparam<10:1>
+Apr-16 00:07:41.613 [TaskFinalizer-6] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:BAM_MARKDUPLICATES:CRAM_QC_MOSDEPTH_SAMTOOLS:MOSDEPTH > Skipping output binding because one or more optional files are missing: fileoutparam<11:1>
+Apr-16 00:07:41.637 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 34; name: NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:MOSDEPTH (test); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/cc/b50e56a68e2ff04da0144a1eb44b80]
+Apr-16 00:07:41.650 [TaskFinalizer-7] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:MOSDEPTH > Skipping output binding because one or more optional files are missing: fileoutparam<3:1>
+Apr-16 00:07:41.650 [TaskFinalizer-7] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:MOSDEPTH > Skipping output binding because one or more optional files are missing: fileoutparam<4:1>
+Apr-16 00:07:41.651 [TaskFinalizer-7] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:MOSDEPTH > Skipping output binding because one or more optional files are missing: fileoutparam<5:1>
+Apr-16 00:07:41.651 [TaskFinalizer-7] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:MOSDEPTH > Skipping output binding because one or more optional files are missing: fileoutparam<8:1>
+Apr-16 00:07:41.652 [TaskFinalizer-7] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:MOSDEPTH > Skipping output binding because one or more optional files are missing: fileoutparam<9:1>
+Apr-16 00:07:41.652 [TaskFinalizer-7] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:MOSDEPTH > Skipping output binding because one or more optional files are missing: fileoutparam<10:1>
+Apr-16 00:07:41.652 [TaskFinalizer-7] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:CRAM_SAMPLEQC:CRAM_QC_RECAL:MOSDEPTH > Skipping output binding because one or more optional files are missing: fileoutparam<11:1>
+Apr-16 00:07:51.029 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 36; name: NFCORE_SAREK:SAREK:BAM_VARIANT_CALLING_GERMLINE_ALL:BAM_VARIANT_CALLING_SINGLE_STRELKA:STRELKA_SINGLE (test); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/49/78b6bc907c58e5f0fcc632bee8ab89]
+Apr-16 00:07:51.048 [Actor Thread 43] DEBUG nextflow.sort.BigSort - Sort completed -- entries: 1; slices: 1; internal sort time: 0.0 s; external sort time: 0.0 s; total time: 0.0 s
+Apr-16 00:07:51.055 [Actor Thread 43] DEBUG nextflow.file.FileCollector - Saved collect-files list to: /home/admin01/lab/bioinformatics-webapp/backend/app/work/collect-file/09cc00ed125c22e99d0d6eba708493bc
+Apr-16 00:07:51.056 [Actor Thread 43] DEBUG nextflow.file.FileCollector - Deleting file collector temp dir: /tmp/nxf-9435206248152368517
+Apr-16 00:07:51.056 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:07:51.057 [Task submitter] INFO  nextflow.Session - [23/b1afc7] Submitted process > NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:BCFTOOLS_STATS (test)
+Apr-16 00:07:51.070 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:07:51.071 [Task submitter] INFO  nextflow.Session - [38/e25e2d] Submitted process > NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT (test)
+Apr-16 00:07:51.095 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:07:51.095 [Task submitter] INFO  nextflow.Session - [65/29b902] Submitted process > NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY (test)
+Apr-16 00:07:51.110 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:07:51.110 [Task submitter] INFO  nextflow.Session - [95/c1d309] Submitted process > NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL (test)
+Apr-16 00:07:51.431 [Task monitor] DEBUG n.processor.TaskPollingMonitor - !! executor local > tasks to be completed: 4 -- submitted tasks are shown below
+~> TaskHandler[id: 40; name: NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:BCFTOOLS_STATS (test); status: RUNNING; exit: -; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/23/b1afc73ec0a0c96d1ed7387bdbf79d]
+~> TaskHandler[id: 38; name: NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT (test); status: RUNNING; exit: -; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/38/e25e2db77d780a89c08ae925e38cdb]
+~> TaskHandler[id: 37; name: NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY (test); status: RUNNING; exit: -; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/65/29b90297b1d15d44ca43078926778d]
+~> TaskHandler[id: 39; name: NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL (test); status: RUNNING; exit: -; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/95/c1d309fc0574eb843f135708b1c519]
+Apr-16 00:08:07.620 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 39; name: NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL (test); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/95/c1d309fc0574eb843f135708b1c519]
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<0:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<1:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<2:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<3:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<4:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<5:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<6:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<7:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<8:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<9:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<10:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<11:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<12:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<13:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<14:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<15:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<16:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<17:1>
+Apr-16 00:08:07.666 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<19:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<20:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<21:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<22:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<23:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<24:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<25:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<26:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<27:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<28:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<29:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<30:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<31:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<32:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<33:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<34:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<35:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<36:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<37:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<38:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<39:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<40:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<41:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<42:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<43:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<44:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<45:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<46:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<47:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<48:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<49:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<50:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<51:1>
+Apr-16 00:08:07.667 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<52:1>
+Apr-16 00:08:07.668 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<53:1>
+Apr-16 00:08:07.668 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<54:1>
+Apr-16 00:08:07.668 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<55:1>
+Apr-16 00:08:07.668 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<56:1>
+Apr-16 00:08:07.668 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<57:1>
+Apr-16 00:08:07.668 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<58:1>
+Apr-16 00:08:07.668 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<59:1>
+Apr-16 00:08:07.668 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<60:1>
+Apr-16 00:08:07.668 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_QUAL > Skipping output binding because one or more optional files are missing: fileoutparam<61:1>
+Apr-16 00:08:08.078 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 37; name: NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY (test); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/65/29b90297b1d15d44ca43078926778d]
+Apr-16 00:08:08.097 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 38; name: NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT (test); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/38/e25e2db77d780a89c08ae925e38cdb]
+Apr-16 00:08:08.129 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<0:1>
+Apr-16 00:08:08.129 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<1:1>
+Apr-16 00:08:08.129 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<2:1>
+Apr-16 00:08:08.129 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<3:1>
+Apr-16 00:08:08.129 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<4:1>
+Apr-16 00:08:08.129 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<5:1>
+Apr-16 00:08:08.129 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<6:1>
+Apr-16 00:08:08.130 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<7:1>
+Apr-16 00:08:08.130 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<8:1>
+Apr-16 00:08:08.130 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<9:1>
+Apr-16 00:08:08.130 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<10:1>
+Apr-16 00:08:08.130 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<11:1>
+Apr-16 00:08:08.130 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<12:1>
+Apr-16 00:08:08.130 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<13:1>
+Apr-16 00:08:08.130 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<14:1>
+Apr-16 00:08:08.130 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<15:1>
+Apr-16 00:08:08.130 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<16:1>
+Apr-16 00:08:08.130 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<17:1>
+Apr-16 00:08:08.130 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<18:1>
+Apr-16 00:08:08.130 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<20:1>
+Apr-16 00:08:08.130 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<21:1>
+Apr-16 00:08:08.130 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<22:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<23:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<24:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<25:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<26:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<27:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<28:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<29:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<30:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<31:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<32:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<33:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<34:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<35:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<36:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<37:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<38:1>
+Apr-16 00:08:08.131 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<39:1>
+Apr-16 00:08:08.133 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<40:1>
+Apr-16 00:08:08.133 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<41:1>
+Apr-16 00:08:08.133 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<42:1>
+Apr-16 00:08:08.133 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<43:1>
+Apr-16 00:08:08.133 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<44:1>
+Apr-16 00:08:08.133 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<45:1>
+Apr-16 00:08:08.133 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<46:1>
+Apr-16 00:08:08.133 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<47:1>
+Apr-16 00:08:08.133 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<48:1>
+Apr-16 00:08:08.133 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<49:1>
+Apr-16 00:08:08.133 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<50:1>
+Apr-16 00:08:08.133 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<51:1>
+Apr-16 00:08:08.133 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<52:1>
+Apr-16 00:08:08.133 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<53:1>
+Apr-16 00:08:08.134 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<54:1>
+Apr-16 00:08:08.134 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<55:1>
+Apr-16 00:08:08.134 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<56:1>
+Apr-16 00:08:08.134 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<57:1>
+Apr-16 00:08:08.134 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<58:1>
+Apr-16 00:08:08.134 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<59:1>
+Apr-16 00:08:08.134 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<60:1>
+Apr-16 00:08:08.134 [TaskFinalizer-10] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_SUMMARY > Skipping output binding because one or more optional files are missing: fileoutparam<61:1>
+Apr-16 00:08:08.193 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<0:1>
+Apr-16 00:08:08.193 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<1:1>
+Apr-16 00:08:08.193 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<2:1>
+Apr-16 00:08:08.193 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<3:1>
+Apr-16 00:08:08.194 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<4:1>
+Apr-16 00:08:08.194 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<5:1>
+Apr-16 00:08:08.194 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<6:1>
+Apr-16 00:08:08.194 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<7:1>
+Apr-16 00:08:08.194 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<8:1>
+Apr-16 00:08:08.194 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<9:1>
+Apr-16 00:08:08.194 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<10:1>
+Apr-16 00:08:08.195 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<11:1>
+Apr-16 00:08:08.195 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<12:1>
+Apr-16 00:08:08.195 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<13:1>
+Apr-16 00:08:08.195 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<14:1>
+Apr-16 00:08:08.195 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<15:1>
+Apr-16 00:08:08.195 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<16:1>
+Apr-16 00:08:08.195 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<18:1>
+Apr-16 00:08:08.195 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<19:1>
+Apr-16 00:08:08.195 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<20:1>
+Apr-16 00:08:08.195 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<21:1>
+Apr-16 00:08:08.196 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<22:1>
+Apr-16 00:08:08.196 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<23:1>
+Apr-16 00:08:08.196 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<24:1>
+Apr-16 00:08:08.196 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<25:1>
+Apr-16 00:08:08.196 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<26:1>
+Apr-16 00:08:08.196 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<27:1>
+Apr-16 00:08:08.196 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<28:1>
+Apr-16 00:08:08.196 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<29:1>
+Apr-16 00:08:08.196 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<30:1>
+Apr-16 00:08:08.196 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<31:1>
+Apr-16 00:08:08.196 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<32:1>
+Apr-16 00:08:08.196 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<33:1>
+Apr-16 00:08:08.196 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<34:1>
+Apr-16 00:08:08.196 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<35:1>
+Apr-16 00:08:08.197 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<36:1>
+Apr-16 00:08:08.197 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<37:1>
+Apr-16 00:08:08.197 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<38:1>
+Apr-16 00:08:08.197 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<39:1>
+Apr-16 00:08:08.197 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<40:1>
+Apr-16 00:08:08.197 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<41:1>
+Apr-16 00:08:08.197 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<42:1>
+Apr-16 00:08:08.197 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<43:1>
+Apr-16 00:08:08.197 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<44:1>
+Apr-16 00:08:08.197 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<45:1>
+Apr-16 00:08:08.197 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<46:1>
+Apr-16 00:08:08.197 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<47:1>
+Apr-16 00:08:08.197 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<48:1>
+Apr-16 00:08:08.197 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<49:1>
+Apr-16 00:08:08.197 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<50:1>
+Apr-16 00:08:08.198 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<51:1>
+Apr-16 00:08:08.198 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<52:1>
+Apr-16 00:08:08.198 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<53:1>
+Apr-16 00:08:08.198 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<54:1>
+Apr-16 00:08:08.198 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<55:1>
+Apr-16 00:08:08.198 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<56:1>
+Apr-16 00:08:08.198 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<57:1>
+Apr-16 00:08:08.198 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<58:1>
+Apr-16 00:08:08.198 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<59:1>
+Apr-16 00:08:08.198 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<60:1>
+Apr-16 00:08:08.198 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:VCFTOOLS_TSTV_COUNT > Skipping output binding because one or more optional files are missing: fileoutparam<61:1>
+Apr-16 00:08:33.956 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 40; name: NFCORE_SAREK:SAREK:VCF_QC_BCFTOOLS_VCFTOOLS:BCFTOOLS_STATS (test); status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/23/b1afc73ec0a0c96d1ed7387bdbf79d]
+Apr-16 00:08:33.985 [Actor Thread 39] DEBUG nextflow.sort.BigSort - Sort completed -- entries: 12; slices: 1; internal sort time: 0.008 s; external sort time: 0.004 s; total time: 0.012 s
+Apr-16 00:08:33.991 [Actor Thread 39] DEBUG nextflow.file.FileCollector - Saved collect-files list to: /home/admin01/lab/bioinformatics-webapp/backend/app/work/collect-file/c7f13d5382a259cfae63420bcea209f2
+Apr-16 00:08:33.993 [Actor Thread 39] DEBUG nextflow.file.FileCollector - Deleting file collector temp dir: /tmp/nxf-9196505771329933044
+Apr-16 00:08:34.484 [Actor Thread 23] DEBUG nextflow.util.HashBuilder - Hash asset file sha-256: /root/.nextflow/assets/nf-core/sarek/assets/multiqc_config.yml
+Apr-16 00:08:34.532 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Apr-16 00:08:34.532 [Task submitter] INFO  nextflow.Session - [a2/f9cc63] Submitted process > NFCORE_SAREK:SAREK:MULTIQC
+Apr-16 00:10:26.895 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 41; name: NFCORE_SAREK:SAREK:MULTIQC; status: COMPLETED; exit: 0; error: -; workDir: /home/admin01/lab/bioinformatics-webapp/backend/app/work/a2/f9cc63a17e035010ff1c6ad449cf51]
+Apr-16 00:10:26.909 [main] DEBUG nextflow.Session - Session await > all processes finished
+Apr-16 00:10:26.995 [Task monitor] DEBUG n.processor.TaskPollingMonitor - <<< barrier arrives (monitor: local) - terminating tasks monitor poll loop
+Apr-16 00:10:26.995 [main] DEBUG nextflow.Session - Session await > all barriers passed
+Apr-16 00:10:27.005 [main] DEBUG nextflow.util.ThreadPoolManager - Thread pool 'TaskFinalizer' shutdown completed (hard=false)
+Apr-16 00:10:27.234 [main] DEBUG nextflow.util.ThreadPoolManager - Thread pool 'PublishDir' shutdown completed (hard=false)
+Apr-16 00:10:27.245 [main] INFO  nextflow.Nextflow - -[0;35m[nf-core/sarek][0;32m Pipeline completed successfully[0m-
+Apr-16 00:10:27.256 [main] DEBUG n.trace.WorkflowStatsObserver - Workflow completed > WorkflowStats[succeededCount=23; failedCount=0; ignoredCount=0; cachedCount=0; pendingCount=0; submittedCount=0; runningCount=0; retriesCount=0; abortedCount=0; succeedDuration=4m 8s; failedDuration=0ms; cachedDuration=0ms;loadCpus=0; loadMemory=0; peakRunning=6; peakCpus=19; peakMemory=51 GB; ]
+Apr-16 00:10:27.256 [main] DEBUG nextflow.trace.TraceFileObserver - Workflow completed -- saving trace file
+Apr-16 00:10:27.259 [main] DEBUG nextflow.trace.ReportObserver - Workflow completed -- rendering execution report
+Apr-16 00:10:27.837 [main] DEBUG nextflow.trace.TimelineObserver - Workflow completed -- rendering execution timeline
+Apr-16 00:10:28.259 [main] DEBUG nextflow.cache.CacheDB - Closing CacheDB done
+Apr-16 00:10:28.285 [main] INFO  org.pf4j.AbstractPluginManager - Stop plugin 'nf-amazon@2.9.2'
+Apr-16 00:10:28.286 [main] DEBUG nextflow.plugin.BasePlugin - Plugin stopped nf-amazon
+Apr-16 00:10:28.286 [main] INFO  org.pf4j.AbstractPluginManager - Stop plugin 'nf-prov@1.2.2'
+Apr-16 00:10:28.286 [main] DEBUG nextflow.plugin.BasePlugin - Plugin stopped nf-prov
+Apr-16 00:10:28.286 [main] INFO  org.pf4j.AbstractPluginManager - Stop plugin 'nf-schema@2.2.1'
+Apr-16 00:10:28.286 [main] DEBUG nextflow.plugin.BasePlugin - Plugin stopped nf-schema
+Apr-16 00:10:28.287 [main] DEBUG nextflow.util.ThreadPoolManager - Thread pool 'FileTransfer' shutdown completed (hard=false)
+Apr-16 00:10:28.288 [main] DEBUG nextflow.script.ScriptRunner - > Execution complete -- Goodbye

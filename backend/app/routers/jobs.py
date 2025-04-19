@@ -55,35 +55,29 @@ async def stage_pipeline_job(
     logger.info(f"Received staging request for Sarek pipeline with {len(input_data.samples)} samples.")
 
     # --- Validate Input and Generate Samplesheet ---
-    # paths_map contains validated absolute Path objects or None
     paths_map: Dict[str, Optional[Path]]
     validation_errors: List[str]
+    # Use the reverted validation function that writes host paths to CSV
+    # This now includes the lane field
     paths_map, validation_errors = validate_pipeline_input(input_data)
 
-    # Check if samplesheet CSV was created successfully
     input_csv_path = paths_map.get("input_csv")
     if not input_csv_path and not any("At least one sample" in e for e in validation_errors):
-        # If CSV path is missing but not because there were no samples, it indicates a CSV creation error
         if "Internal server error: Could not create samplesheet." not in validation_errors:
              validation_errors.append("Failed to generate samplesheet from provided sample data.")
 
-    # If validation errors exist (including CSV failure), raise HTTP 400
     if validation_errors:
-        # If CSV creation failed, clean up the temporary file if it exists
         if input_csv_path and input_csv_path.exists():
              try:
                  os.remove(input_csv_path)
                  logger.info(f"Cleaned up temporary CSV file due to validation errors: {input_csv_path}")
              except OSError as e:
                  logger.warning(f"Could not clean up temporary CSV file {input_csv_path}: {e}")
-
         error_message = "Validation errors:\n" + "\n".join(f"- {error}" for error in validation_errors)
         logger.warning(f"Validation errors staging job: {error_message}")
         raise HTTPException(status_code=400, detail=error_message)
 
-    # Ensure input_csv_path is definitely a Path object if validation passed
     if not isinstance(input_csv_path, Path):
-         # This case should ideally not happen if validation passes, but as a safeguard:
          logger.error("Validation passed but input_csv_path is not a Path object. Aborting staging.")
          raise HTTPException(status_code=500, detail="Internal server error during job staging preparation.")
 
@@ -93,33 +87,38 @@ async def stage_pipeline_job(
     try:
         staged_job_id = f"staged_{uuid.uuid4()}"
 
-        # Store original filenames provided by the user for display/metadata
         input_filenames = {
             "intervals_file": input_data.intervals_file,
             "dbsnp": input_data.dbsnp,
             "known_indels": input_data.known_indels,
             "pon": input_data.pon
         }
+        # Include lane in the sample info being stored
+        sample_info_list = [s.model_dump() for s in input_data.samples]
 
-        # Store sample information as provided by the user
-        sample_info_list = [s.model_dump() for s in input_data.samples] # Use model_dump for Pydantic v2
+        # Convert tools list to comma-separated string for storage in Redis
+        tools_str = ",".join(input_data.tools) if input_data.tools else None
 
-        # Store absolute paths (as strings) and parameters needed for the task execution
+        # Store absolute HOST paths (as strings) and parameters needed for the task execution
+        # These paths come directly from paths_map which contains validated host paths now
         job_details = {
             # --- Paths ---
-            "input_csv_path": str(input_csv_path), # Validated CSV path
+            "input_csv_path": str(input_csv_path), # Validated CSV path (temp file on host)
             "intervals_path": str(paths_map["intervals"]) if paths_map.get("intervals") else None,
             "dbsnp_path": str(paths_map["dbsnp"]) if paths_map.get("dbsnp") else None,
             "known_indels_path": str(paths_map["known_indels"]) if paths_map.get("known_indels") else None,
             "pon_path": str(paths_map["pon"]) if paths_map.get("pon") else None,
-            "outdir_base_path": str(RESULTS_DIR), # Base directory for results
+            "outdir_base_path": str(RESULTS_DIR), # Base directory for results (host path)
 
             # --- Sarek Parameters ---
             "genome": input_data.genome,
-            "tools": input_data.tools or SAREK_DEFAULT_TOOLS, # Use default if not provided
-            "step": input_data.step or SAREK_DEFAULT_STEP,
-            "profile": input_data.profile or SAREK_DEFAULT_PROFILE,
-            "aligner": input_data.aligner or SAREK_DEFAULT_ALIGNER, # Use default if not provided
+            # *** Store the comma-separated string ***
+            "tools": tools_str,
+            # *****************************************
+            # Use defaults only if the user didn't provide a value
+            "step": input_data.step if input_data.step is not None else SAREK_DEFAULT_STEP,
+            "profile": input_data.profile if input_data.profile is not None else SAREK_DEFAULT_PROFILE,
+            "aligner": input_data.aligner if input_data.aligner is not None else SAREK_DEFAULT_ALIGNER,
 
             # --- Sarek Flags ---
             "joint_germline": input_data.joint_germline or False,
@@ -127,15 +126,15 @@ async def stage_pipeline_job(
             "trim_fastq": input_data.trim_fastq or False,
             "skip_qc": input_data.skip_qc or False,
             "skip_annotation": input_data.skip_annotation or False,
+            "skip_baserecalibrator": input_data.skip_baserecalibrator or False,
 
             # --- Metadata ---
             "description": input_data.description or f"Sarek run ({len(input_data.samples)} samples, Genome: {input_data.genome})",
             "staged_at": time.time(),
-            "input_filenames": input_filenames, # Original filenames from user input
-            "sample_info": sample_info_list # Sample details from user input
+            "input_filenames": input_filenames, # Original relative filenames from user input
+            "sample_info": sample_info_list # Sample details from user input (now includes lane)
         }
 
-        # Store as bytes in Redis hash
         redis_conn.hset(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'), json.dumps(job_details).encode('utf-8'))
         logger.info(f"Staged Sarek job '{staged_job_id}' with {len(input_data.samples)} samples.")
 
@@ -143,7 +142,6 @@ async def stage_pipeline_job(
 
     except redis.exceptions.RedisError as e:
         logger.error(f"Redis error staging job: {e}")
-        # Clean up temporary CSV if staging fails after validation
         if input_csv_path and input_csv_path.exists():
              try:
                  os.remove(input_csv_path)
@@ -153,7 +151,6 @@ async def stage_pipeline_job(
         raise HTTPException(status_code=503, detail="Service unavailable: Could not stage job due to storage error.")
     except Exception as e:
          logger.exception(f"Unexpected error during job staging for input: {input_data}")
-         # Clean up temporary CSV on any unexpected error
          if input_csv_path and input_csv_path.exists():
              try:
                  os.remove(input_csv_path)
@@ -175,9 +172,8 @@ async def start_job(
     Returns 202 Accepted with the new RQ job ID.
     """
     logger.info(f"Attempting to start job from staged ID: {staged_job_id}")
-    job_details = None # Initialize job_details
+    job_details = None
     try:
-        # Fetch the staged job details (bytes)
         job_details_bytes = redis_conn.hget(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
         if not job_details_bytes:
             logger.warning(f"Start job request failed: Staged job ID '{staged_job_id}' not found.")
@@ -187,126 +183,121 @@ async def start_job(
             job_details = json.loads(job_details_bytes.decode('utf-8'))
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
             logger.error(f"Corrupted staged job data for {staged_job_id}: {e}. Removing entry.")
-            redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8')) # Attempt cleanup
+            redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
             raise HTTPException(status_code=500, detail="Corrupted staged job data found. Please try staging again.")
 
-        # --- Validate required keys in fetched details ---
-        required_keys = [
-            "input_csv_path", "outdir_base_path", "genome", "tools",
-            "step", "profile", "aligner" # Add aligner
-            # Boolean flags are optional in the task signature, defaults handled there
-        ]
-        if not all(key in job_details for key in required_keys):
-            missing_keys = [key for key in required_keys if key not in job_details]
+        # --- Validate required keys (use defaults if needed during enqueue) ---
+        required_base_keys = ["input_csv_path", "outdir_base_path", "genome"]
+        if not all(key in job_details for key in required_base_keys):
+            missing_keys = [key for key in required_base_keys if key not in job_details]
             logger.error(f"Corrupted staged job data for {staged_job_id}: Missing required keys: {missing_keys}. Data: {job_details}")
-            redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8')) # Attempt cleanup
+            redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
             raise HTTPException(status_code=500, detail="Incomplete staged job data found. Please try staging again.")
 
         # --- Prepare arguments for the RQ task (run_pipeline_task) ---
-        # Ensure the order matches the task function's signature definition
+        # Pass the comma-separated string 'tools' value directly. Task handles default.
         job_args = (
             job_details["input_csv_path"],
             job_details["outdir_base_path"],
             job_details["genome"],
-            job_details["tools"],
-            job_details["step"],
-            job_details["profile"],
-            job_details.get("intervals_path"), # Optional
-            job_details.get("dbsnp_path"),     # Optional
-            job_details.get("known_indels_path"), # Optional
-            job_details.get("pon_path"),        # Optional
-            job_details.get("aligner"),         # Optional (but required key checked above)
-            job_details.get("joint_germline", False), # Optional
-            job_details.get("wes", False),            # Optional
-            job_details.get("trim_fastq", False),     # Optional
-            job_details.get("skip_qc", False),        # Optional
-            job_details.get("skip_annotation", False) # Optional
+            job_details.get("tools"), # Pass stored comma-separated string or None
+            job_details.get("step", SAREK_DEFAULT_STEP), # Use default if not set in staging
+            job_details.get("profile", SAREK_DEFAULT_PROFILE),
+            job_details.get("intervals_path"), # Will be None if not provided
+            job_details.get("dbsnp_path"),     # Will be None if not provided
+            job_details.get("known_indels_path"), # Will be None if not provided
+            job_details.get("pon_path"),       # Will be None if not provided
+            job_details.get("aligner", SAREK_DEFAULT_ALIGNER),
+            job_details.get("joint_germline", False),
+            job_details.get("wes", False),
+            job_details.get("trim_fastq", False),
+            job_details.get("skip_qc", False),
+            job_details.get("skip_annotation", False),
+            job_details.get("skip_baserecalibrator", False),
+            # *** ADDED is_rerun argument ***
+            job_details.get("is_rerun", False),
+            # *******************************
         )
 
-        # --- Prepare Metadata for the RQ Job ---
-        # Include parameters and sample info for easier retrieval later
-        job_meta = {
-            "input_params": job_details.get("input_filenames", {}), # Original user filenames
-            "sarek_params": { # Store actual Sarek params used
-                 "genome": job_details["genome"],
-                 "tools": job_details["tools"],
-                 "step": job_details["step"],
-                 "profile": job_details["profile"],
-                 "aligner": job_details["aligner"],
-                 "joint_germline": job_details.get("joint_germline", False),
-                 "wes": job_details.get("wes", False),
-                 "trim_fastq": job_details.get("trim_fastq", False),
-                 "skip_qc": job_details.get("skip_qc", False),
-                 "skip_annotation": job_details.get("skip_annotation", False),
-            },
-            "sample_info": job_details.get("sample_info", []), # User-provided sample info
-            "staged_job_id_origin": staged_job_id,
-            # Task will add resource usage, errors, results path later
-        }
-        job_description = job_details.get("description", f"Sarek run ({len(job_details.get('sample_info', []))} samples)")
-
-        # Enqueue the job to RQ
-        job = queue.enqueue(
-            f=run_pipeline_task,
-            args=job_args,
-            meta=job_meta,
-            job_id_prefix="sarek_", # Keep prefix
-            job_timeout=DEFAULT_JOB_TIMEOUT,
-            result_ttl=DEFAULT_RESULT_TTL,
-            failure_ttl=DEFAULT_FAILURE_TTL,
-            description=job_description
-        )
-        logger.info(f"Successfully enqueued RQ job {job.id} from staged job {staged_job_id}")
-
-        # --- Remove the staged job entry AFTER successful enqueueing ---
+        # --- Enqueue the job to RQ ---
         try:
-            delete_count = redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
-            if delete_count == 1:
-                logger.info(f"Removed staged job entry {staged_job_id} after enqueueing.")
-            else:
-                 logger.warning(f"Staged job entry {staged_job_id} was not found for removal after enqueueing (perhaps removed concurrently?).")
-        except redis.exceptions.RedisError as del_e:
-            # Log error but don't fail the request, job is already enqueued
-            logger.error(f"Failed to remove staged job entry {staged_job_id} after enqueueing: {del_e}")
+            # Use a new job ID for the RQ job, derived from the staged ID but distinct
+            rq_job_id = staged_job_id.replace("staged_", "running_")
+            if rq_job_id == staged_job_id: # Ensure it actually changed
+                rq_job_id = f"running_{uuid.uuid4()}" # Fallback to totally new ID
 
-        return JSONResponse(status_code=202, content={"message": "Job successfully enqueued.", "job_id": job.id})
+            # Check if this RQ job ID already exists (e.g., from a previous failed attempt to start)
+            try:
+                 existing_job = Job.fetch(rq_job_id, connection=redis_conn)
+                 if existing_job:
+                     logger.warning(f"RQ job {rq_job_id} already exists (Status: {existing_job.get_status()}). Generating new ID.")
+                     rq_job_id = f"running_{uuid.uuid4()}"
+            except NoSuchJobError:
+                pass # Job ID is available
 
-    except HTTPException as e:
-        # Re-raise HTTP exceptions (e.g., 404, 500 from checks)
-        # Clean up CSV if start fails after validation but before enqueueing
-        if job_details and job_details.get("input_csv_path"):
-            csv_path = Path(job_details["input_csv_path"])
-            if csv_path.exists():
-                try:
-                    os.remove(csv_path)
-                    logger.info(f"Cleaned up temporary CSV file due to start_job error: {csv_path}")
-                except OSError as remove_e:
-                    logger.warning(f"Could not clean up temporary CSV file {csv_path} after start_job error: {remove_e}")
-        raise e
+            # Store original staged parameters within the RQ job's meta for later reference (like rerun)
+            job_meta_to_store = {
+                 "staged_job_id_origin": staged_job_id,
+                 "input_params": job_details.get("input_filenames"),
+                 "sarek_params": {
+                     "genome": job_details.get("genome"),
+                     "tools": job_details.get("tools"), # Store the comma-separated string
+                     "step": job_details.get("step"),
+                     "profile": job_details.get("profile"),
+                     "aligner": job_details.get("aligner"),
+                     "joint_germline": job_details.get("joint_germline", False),
+                     "wes": job_details.get("wes", False),
+                     "trim_fastq": job_details.get("trim_fastq", False),
+                     "skip_qc": job_details.get("skip_qc", False),
+                     "skip_annotation": job_details.get("skip_annotation", False),
+                     "skip_baserecalibrator": job_details.get("skip_baserecalibrator", False),
+                 },
+                 "sample_info": job_details.get("sample_info"), # Includes lane
+                 "description": job_details.get("description"),
+                 # Store the input CSV path used, in case needed for debugging later
+                 "input_csv_path_used": job_details.get("input_csv_path"),
+                 # Store the is_rerun flag used for this specific execution
+                 "is_rerun_execution": job_details.get("is_rerun", False),
+            }
+
+
+            rq_job = queue.enqueue(
+                run_pipeline_task,
+                args=job_args,
+                job_timeout=DEFAULT_JOB_TIMEOUT,
+                result_ttl=DEFAULT_RESULT_TTL,
+                failure_ttl=DEFAULT_FAILURE_TTL,
+                job_id=rq_job_id,
+                meta=job_meta_to_store # Store the parameters in meta
+            )
+            logger.info(f"Successfully enqueued job {rq_job.id} to RQ queue.")
+        except Exception as e:
+            logger.error(f"Failed to enqueue job to RQ: {e}")
+            raise HTTPException(status_code=503, detail="Service unavailable: Could not enqueue job for execution.")
+
+        # --- Clean up staged job entry ---
+        try:
+            redis_conn.hdel(STAGED_JOBS_KEY, staged_job_id.encode('utf-8'))
+            logger.info(f"Removed staged job entry {staged_job_id} after successful enqueue.")
+        except redis.exceptions.RedisError as e:
+            logger.warning(f"Could not remove staged job entry {staged_job_id} after enqueue: {e}")
+            # Don't fail the request if cleanup fails
+
+        return JSONResponse(
+            status_code=202,
+            content={
+                "message": "Job enqueued for execution.",
+                "job_id": rq_job.id,
+                "status": "queued"
+            }
+        )
+
     except redis.exceptions.RedisError as e:
-        logger.error(f"Redis error during start job process for {staged_job_id}: {e}")
-         # Clean up CSV if Redis fails
-        if job_details and job_details.get("input_csv_path"):
-            csv_path = Path(job_details["input_csv_path"])
-            if csv_path.exists():
-                try:
-                    os.remove(csv_path)
-                    logger.info(f"Cleaned up temporary CSV file due to Redis error: {csv_path}")
-                except OSError as remove_e:
-                    logger.warning(f"Could not clean up temporary CSV file {csv_path} after Redis error: {remove_e}")
-        raise HTTPException(status_code=503, detail="Service unavailable: Could not access job storage.")
+        logger.error(f"Redis error starting job: {e}")
+        raise HTTPException(status_code=503, detail="Service unavailable: Could not start job due to storage error.")
     except Exception as e:
-        logger.exception(f"Unexpected error starting/enqueuing staged job {staged_job_id}.")
-        # Clean up CSV on any unexpected error
-        if job_details and job_details.get("input_csv_path"):
-            csv_path = Path(job_details["input_csv_path"])
-            if csv_path.exists():
-                try:
-                    os.remove(csv_path)
-                    logger.info(f"Cleaned up temporary CSV file due to unexpected error: {csv_path}")
-                except OSError as remove_e:
-                    logger.warning(f"Could not clean up temporary CSV file {csv_path} after error: {remove_e}")
-        raise HTTPException(status_code=500, detail="Internal server error: Could not start job.")
+        logger.exception(f"Unexpected error starting job {staged_job_id}")
+        raise HTTPException(status_code=500, detail="Internal server error during job start.")
 
 
 # --- Job Listing and Status Routes ---
@@ -330,13 +321,13 @@ async def get_jobs_list(
             try:
                 job_id = job_id_bytes.decode('utf-8')
                 details = json.loads(job_details_bytes.decode('utf-8'))
-                # Construct a dictionary similar to RQ job structure for consistency
-                # Extract relevant info for display from staged details
+                # Construct meta based on *stored* details
+                # Ensure sample_info includes lane if present in stored details
                 staged_meta = {
-                    "input_params": details.get("input_filenames", {}), # Original user filenames
-                    "sarek_params": { # Store actual Sarek params used
+                    "input_params": details.get("input_filenames", {}),
+                    "sarek_params": {
                          "genome": details.get("genome"),
-                         "tools": details.get("tools"),
+                         "tools": details.get("tools"), # Reflects stored value (comma-separated string or None)
                          "step": details.get("step"),
                          "profile": details.get("profile"),
                          "aligner": details.get("aligner"),
@@ -345,9 +336,10 @@ async def get_jobs_list(
                          "trim_fastq": details.get("trim_fastq", False),
                          "skip_qc": details.get("skip_qc", False),
                          "skip_annotation": details.get("skip_annotation", False),
+                         "skip_baserecalibrator": details.get("skip_baserecalibrator", False),
                     },
-                    "sample_info": details.get("sample_info", []),
-                    "staged_job_id_origin": job_id # Link back to self
+                    "sample_info": details.get("sample_info", []), # Should contain lane if stored correctly
+                    "staged_job_id_origin": job_id
                 }
                 all_jobs_dict[job_id] = {
                     "id": job_id,
@@ -358,7 +350,7 @@ async def get_jobs_list(
                     "ended_at": None,
                     "result": None,
                     "error": None,
-                    "meta": staged_meta, # Use constructed meta
+                    "meta": staged_meta,
                     "staged_at": details.get("staged_at"),
                     "resources": None
                 }
@@ -366,8 +358,6 @@ async def get_jobs_list(
                 logger.error(f"Error decoding/parsing staged job data for key {job_id_bytes}: {e}. Skipping entry.")
     except redis.exceptions.RedisError as e:
         logger.error(f"Redis error fetching staged jobs from '{STAGED_JOBS_KEY}': {e}")
-        # Decide if this is critical - perhaps return 503 or just log and continue?
-        # raise HTTPException(status_code=503, detail="Failed to retrieve staged jobs list from storage.")
 
     # 2. Get RQ Jobs from Relevant Registries
     registries_to_check = {
@@ -376,16 +366,22 @@ async def get_jobs_list(
         "finished": FinishedJobRegistry(queue=queue),
         "failed": FailedJobRegistry(queue=queue),
     }
-
     rq_job_ids_to_fetch = set()
     for status_name, registry_or_queue in registries_to_check.items():
         try:
             job_ids = []
-            limit = MAX_REGISTRY_JOBS if status_name in ["finished", "failed"] else -1 # Limit history
+            limit = MAX_REGISTRY_JOBS if status_name in ["finished", "failed"] else -1
             if isinstance(registry_or_queue, Queue):
                 job_ids = registry_or_queue.get_job_ids()
             elif isinstance(registry_or_queue, (StartedJobRegistry, FinishedJobRegistry, FailedJobRegistry)):
-                job_ids = registry_or_queue.get_job_ids(0, limit -1 if limit > 0 else limit)
+                # Fetch most recent MAX_REGISTRY_JOBS
+                total_count = registry_or_queue.count
+                start_index = max(0, total_count - limit) if limit > 0 else 0
+                end_index = total_count -1
+                if start_index <= end_index:
+                     job_ids = registry_or_queue.get_job_ids(start_index, end_index)
+                     job_ids.reverse() # Show newest first within the limit
+
             else:
                  logger.warning(f"Unsupported type for job fetching: {type(registry_or_queue)}")
                  continue
@@ -399,70 +395,89 @@ async def get_jobs_list(
     # Fetch all unique RQ job IDs found across registries
     if rq_job_ids_to_fetch:
         try:
-            # Ensure connection uses decode_responses=False for fetch_many
-            redis_conn_bytes = redis.Redis(host=redis_conn.connection_pool.connection_kwargs.get('host', 'localhost'),
-                                           port=redis_conn.connection_pool.connection_kwargs.get('port', 6379),
-                                           db=redis_conn.connection_pool.connection_kwargs.get('db', 0),
-                                           decode_responses=False) # Explicitly False for RQ fetch
-
+            # Use a separate connection for fetch_many that decodes responses=False
+            redis_conn_bytes = redis.Redis(
+                host=redis_conn.connection_pool.connection_kwargs.get('host', 'localhost'),
+                port=redis_conn.connection_pool.connection_kwargs.get('port', 6379),
+                db=redis_conn.connection_pool.connection_kwargs.get('db', 0),
+                decode_responses=False # Crucial for RQ job fetching
+            )
             fetched_jobs = Job.fetch_many(list(rq_job_ids_to_fetch), connection=redis_conn_bytes, serializer=queue.serializer)
 
             for job in fetched_jobs:
-                if job: # fetch_many can return None for missing jobs
-                    job.refresh() # Ensure meta and latest status are loaded
-                    current_status = job.get_status(refresh=False)
+                if job:
+                    job.refresh() # Fetch latest status and meta
+                    current_status = job.get_status(refresh=False) # Use cached status after refresh
                     error_summary = None
-                    job_meta = job.meta or {} # Ensure meta is a dict
+                    job_meta = job.meta or {} # Use fetched meta
 
                     if current_status == JobStatus.FAILED:
                          error_summary = job_meta.get('error_message', "Job failed processing")
                          stderr_snippet = job_meta.get('stderr_snippet')
+                         # Use exc_info if available and error_message is generic
                          if error_summary == "Job failed processing" and job.exc_info:
                              try: error_summary = job.exc_info.strip().split('\n')[-1]
-                             except Exception: pass
+                             except Exception: pass # Ignore errors parsing exc_info
                          if stderr_snippet: error_summary += f" (stderr: {stderr_snippet}...)"
 
-                    # Extract resource stats from meta for top-level access
-                    # Ensure meta keys exist before accessing
+                    # Extract resource info from meta
                     resources = {
                         "peak_memory_mb": job_meta.get("peak_memory_mb"),
                         "average_cpu_percent": job_meta.get("average_cpu_percent"),
                         "duration_seconds": job_meta.get("duration_seconds")
                     }
 
-                    # Don't overwrite a final state job with an earlier one if IDs clash
-                    if job.id not in all_jobs_dict or all_jobs_dict[job.id]['status'] == 'staged':
+                    # Add or update the job in our dictionary
+                    # Ensure we don't overwrite a running/finished job with a stale staged entry if IDs clash
+                    if job.id not in all_jobs_dict or all_jobs_dict[job.id].get('status') == 'staged':
                          all_jobs_dict[job.id] = {
                             "id": job.id,
                             "status": current_status,
-                            "description": job.description or f"RQ job {job.id[:12]}...",
+                            # Use description from meta if available, fallback to job.description or generic
+                            "description": job_meta.get("description") or job.description or f"RQ job {job.id[:12]}...",
                             "enqueued_at": dt_to_timestamp(job.enqueued_at),
                             "started_at": dt_to_timestamp(job.started_at),
                             "ended_at": dt_to_timestamp(job.ended_at),
-                            "result": job.result,
+                            "result": job.result, # Result directly from job object
                             "error": error_summary,
-                            "meta": job_meta, # Full meta, including input_params, sample_info etc.
-                            "staged_at": None,
-                            "resources": resources # Include extracted resources
+                            "meta": job_meta, # Use the full meta fetched
+                            "staged_at": None, # Not a staged job anymore
+                            "resources": resources if any(v is not None for v in resources.values()) else None
                         }
         except redis.exceptions.RedisError as e:
              logger.error(f"Redis error during Job.fetch_many: {e}")
-             raise HTTPException(status_code=503, detail="Failed to retrieve job details from storage.")
+             # Don't raise HTTPException here, return potentially partial list
         except Exception as e:
             logger.exception("Unexpected error fetching RQ job details.")
-            raise HTTPException(status_code=500, detail="Internal server error fetching job details.")
+            # Don't raise HTTPException here
 
-
-    # 3. Sort the Combined List by time (staged or enqueued) descending
+    # 3. Sort the Combined List
     try:
+        # Sort primarily by last update time (ended > started > enqueued > staged) descending
         all_jobs_list = sorted(
             all_jobs_dict.values(),
-            key=lambda j: j.get('staged_at') or j.get('enqueued_at') or 0,
+            key=lambda j: j.get('ended_at') or j.get('started_at') or j.get('enqueued_at') or j.get('staged_at') or 0,
             reverse=True
         )
     except Exception as e:
         logger.exception("Error sorting combined jobs list.")
-        all_jobs_list = list(all_jobs_dict.values()) # Fallback to unsorted
+        all_jobs_list = list(all_jobs_dict.values()) # Fallback to unsorted if error
+
+    # Limit the number of finished/failed jobs returned if MAX_REGISTRY_JOBS is set
+    if MAX_REGISTRY_JOBS > 0:
+        final_list = []
+        finished_failed_count = 0
+        for job_item in all_jobs_list:
+             status = job_item.get('status', '').lower()
+             is_terminal = status in ['finished', 'failed', 'stopped', 'canceled']
+             if is_terminal:
+                 if finished_failed_count < MAX_REGISTRY_JOBS:
+                     final_list.append(job_item)
+                     finished_failed_count += 1
+             else:
+                 final_list.append(job_item) # Always include non-terminal jobs
+        all_jobs_list = final_list
+
 
     return all_jobs_list
 
@@ -475,95 +490,141 @@ async def get_job_status(
 ):
     """
     Fetches the status, result/error, metadata, and resource usage for a specific RQ job ID.
-    Handles cases where the job might not be found in RQ.
+    Handles cases where the job might not be found in RQ (checks staged).
     """
-    logger.debug(f"Fetching status for RQ job ID: {job_id}")
+    logger.debug(f"Fetching status for job ID: {job_id}")
     try:
-        # Ensure connection uses decode_responses=False for fetch
-        redis_conn_bytes = redis.Redis(host=redis_conn.connection_pool.connection_kwargs.get('host', 'localhost'),
-                                       port=redis_conn.connection_pool.connection_kwargs.get('port', 6379),
-                                       db=redis_conn.connection_pool.connection_kwargs.get('db', 0),
-                                       decode_responses=False) # Explicitly False for RQ fetch
-        job = Job.fetch(job_id, connection=redis_conn_bytes, serializer=queue.serializer)
-        job.refresh()
-    except NoSuchJobError:
-        logger.warning(f"Job status request failed: RQ job ID '{job_id}' not found.")
-        # Check if it's a staged job ID (using the main redis_conn which decodes responses)
-        try:
-             # Use bytes for hexists check as well since key is bytes
-             if job_id.startswith("staged_") and redis_conn.hexists(STAGED_JOBS_KEY.encode('utf-8'), job_id.encode('utf-8')):
-                  logger.info(f"Job ID {job_id} corresponds to a currently staged job.")
-                  raise HTTPException(status_code=404, detail=f"Job '{job_id}' is staged but not running.")
-             else:
-                  raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found in active queues or recent history.")
-        except redis.exceptions.RedisError as e:
-            logger.error(f"Redis error checking staged status for {job_id}: {e}")
-            raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found (storage check failed).")
+        # --- Check if it's an RQ Job ID first ---
+        if not job_id.startswith("staged_"):
+            try:
+                redis_conn_bytes = redis.Redis(
+                    host=redis_conn.connection_pool.connection_kwargs.get('host', 'localhost'),
+                    port=redis_conn.connection_pool.connection_kwargs.get('port', 6379),
+                    db=redis_conn.connection_pool.connection_kwargs.get('db', 0),
+                    decode_responses=False # Required for RQ
+                )
+                job = Job.fetch(job_id, connection=redis_conn_bytes, serializer=queue.serializer)
+                job.refresh() # Get the latest status and meta
 
-    except redis.exceptions.RedisError as e:
-         logger.error(f"Redis error fetching RQ job {job_id}: {e}")
-         raise HTTPException(status_code=503, detail="Service unavailable: Could not connect to status backend.")
+                status = job.get_status(refresh=False)
+                result = None
+                meta_data = job.meta or {}
+                error_info_summary = None
+
+                try:
+                    if status == JobStatus.FINISHED:
+                        result = job.result
+                    elif status == JobStatus.FAILED:
+                        error_info_summary = meta_data.get('error_message', "Job failed processing")
+                        stderr_snippet = meta_data.get('stderr_snippet')
+                        if error_info_summary == "Job failed processing" and job.exc_info:
+                            try: error_info_summary = job.exc_info.strip().split('\n')[-1]
+                            except Exception: pass
+                        if stderr_snippet: error_info_summary += f" (stderr: {stderr_snippet}...)"
+                except Exception as e:
+                    logger.exception(f"Error accessing result/error info for job {job_id} (status: {status}).")
+                    error_info_summary = error_info_summary or "Could not retrieve job result/error details."
+
+                resource_stats = {
+                    "peak_memory_mb": meta_data.get("peak_memory_mb"),
+                    "average_cpu_percent": meta_data.get("average_cpu_percent"),
+                    "duration_seconds": meta_data.get("duration_seconds")
+                }
+
+                return JobStatusDetails(
+                    job_id=job.id,
+                    status=status,
+                    description=meta_data.get("description") or job.description, # Prefer meta description
+                    enqueued_at=dt_to_timestamp(job.enqueued_at),
+                    started_at=dt_to_timestamp(job.started_at),
+                    ended_at=dt_to_timestamp(job.ended_at),
+                    result=result,
+                    error=error_info_summary,
+                    meta=meta_data,
+                    resources=JobResourceInfo(**resource_stats) if any(v is not None for v in resource_stats.values()) else None
+                )
+
+            except NoSuchJobError:
+                logger.warning(f"RQ Job ID '{job_id}' not found.")
+                # Fall through to check staged jobs if it wasn't found in RQ
+            except redis.exceptions.RedisError as e:
+                logger.error(f"Redis error fetching RQ job {job_id}: {e}")
+                raise HTTPException(status_code=503, detail="Service unavailable: Could not connect to status backend.")
+            except Exception as e:
+                logger.exception(f"Unexpected error fetching or refreshing RQ job {job_id}.")
+                raise HTTPException(status_code=500, detail="Internal server error fetching job status.")
+
+
+        # --- Check if it's a Staged Job ID ---
+        if job_id.startswith("staged_"):
+            try:
+                 staged_details_bytes = redis_conn.hget(STAGED_JOBS_KEY, job_id.encode('utf-8'))
+                 if staged_details_bytes:
+                     logger.info(f"Job ID {job_id} corresponds to a currently staged job.")
+                     try:
+                         details = json.loads(staged_details_bytes.decode('utf-8'))
+                         # Construct meta including sample_info with lane
+                         staged_meta = {
+                             "input_params": details.get("input_filenames", {}),
+                             "sarek_params": {
+                                  "genome": details.get("genome"), "tools": details.get("tools"),
+                                  "step": details.get("step"), "profile": details.get("profile"),
+                                  "aligner": details.get("aligner"),
+                                  "joint_germline": details.get("joint_germline", False),
+                                  "wes": details.get("wes", False), "trim_fastq": details.get("trim_fastq", False),
+                                  "skip_qc": details.get("skip_qc", False),
+                                  "skip_annotation": details.get("skip_annotation", False),
+                                  "skip_baserecalibrator": details.get("skip_baserecalibrator", False),
+                             },
+                             "sample_info": details.get("sample_info", []), # Should contain lane
+                             "staged_job_id_origin": job_id,
+                             "description": details.get("description"),
+                         }
+                         return JobStatusDetails(
+                             job_id=job_id, status="staged",
+                             description=details.get("description"),
+                             enqueued_at=None, started_at=None, ended_at=None,
+                             result=None, error=None, meta=staged_meta, resources=None
+                         )
+                     except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as parse_err:
+                         logger.error(f"Error parsing staged job details for {job_id} in status check: {parse_err}")
+                         # Fall through to 404 if parsing fails
+                 else:
+                     logger.warning(f"Staged job ID '{job_id}' not found in Redis hash.")
+
+            except redis.exceptions.RedisError as e:
+                 logger.error(f"Redis error checking staged status for {job_id}: {e}")
+                 # Fall through to 404
+
+
+        # --- If not found in RQ or Staged ---
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
+
+    except HTTPException as http_exc:
+        raise http_exc # Re-raise FastAPI exceptions
     except Exception as e:
-        logger.exception(f"Unexpected error fetching or refreshing job {job_id}.")
-        raise HTTPException(status_code=500, detail="Internal server error fetching job status.")
-
-    # Process the fetched job data
-    status = job.get_status(refresh=False)
-    result = None
-    meta_data = job.meta or {}
-    error_info_summary = None
-
-    try:
-        if status == JobStatus.FINISHED:
-            result = job.result
-        elif status == JobStatus.FAILED:
-            error_info_summary = meta_data.get('error_message', "Job failed processing")
-            stderr_snippet = meta_data.get('stderr_snippet')
-            if error_info_summary == "Job failed processing" and job.exc_info:
-                 try: error_info_summary = job.exc_info.strip().split('\n')[-1]
-                 except Exception: pass
-            if stderr_snippet: error_info_summary += f" (stderr: {stderr_snippet}...)"
-    except Exception as e:
-        logger.exception(f"Error accessing result/error info for job {job_id} (status: {status}).")
-        error_info_summary = error_info_summary or "Could not retrieve job result/error details."
-
-    # Extract resource stats from meta
-    resource_stats = {
-        "peak_memory_mb": meta_data.get("peak_memory_mb"),
-        "average_cpu_percent": meta_data.get("average_cpu_percent"),
-        "duration_seconds": meta_data.get("duration_seconds")
-    }
-
-    # Return the JobStatusDetails structure
-    return JobStatusDetails(
-        job_id=job.id, # Use 'job_id' key as defined in the response model
-        status=status,
-        description=job.description,
-        enqueued_at=dt_to_timestamp(job.enqueued_at),
-        started_at=dt_to_timestamp(job.started_at),
-        ended_at=dt_to_timestamp(job.ended_at),
-        result=result,
-        error=error_info_summary,
-        meta=meta_data,
-        resources=JobResourceInfo(**resource_stats) # Create JobResourceInfo instance
-    )
+         logger.exception(f"Unexpected error in get_job_status for {job_id}.")
+         raise HTTPException(status_code=500, detail="Internal server error retrieving job status.")
 
 
 @router.post("/stop_job/{job_id}", status_code=200, summary="Cancel Running/Queued RQ Job")
 async def stop_job(
     job_id: str,
-    redis_conn: redis.Redis = Depends(get_redis_connection) # Needs bytes connection for send_stop_job_command
+    redis_conn: redis.Redis = Depends(get_redis_connection)
 ):
     """
     Sends a stop signal to a specific RQ job if it's running or queued.
+    Does NOT stop 'staged' jobs.
     """
+    if job_id.startswith("staged_"):
+        raise HTTPException(status_code=400, detail="Cannot stop a 'staged' job. Remove it instead.")
+
     logger.info(f"Received request to stop RQ job: {job_id}")
     try:
-         # Use bytes connection for fetching and sending command
         redis_conn_bytes = redis.Redis(host=redis_conn.connection_pool.connection_kwargs.get('host', 'localhost'),
                                        port=redis_conn.connection_pool.connection_kwargs.get('port', 6379),
                                        db=redis_conn.connection_pool.connection_kwargs.get('db', 0),
-                                       decode_responses=False) # Explicitly False
+                                       decode_responses=False)
 
         job = Job.fetch(job_id, connection=redis_conn_bytes)
         status = job.get_status(refresh=True)
@@ -575,7 +636,7 @@ async def stop_job(
         logger.info(f"Job {job_id} is in state {status}. Attempting to send stop signal.")
         message = f"Stop signal sent to job {job_id}."
         try:
-            send_stop_job_command(redis_conn_bytes, job.id) # Use bytes connection
+            send_stop_job_command(redis_conn_bytes, job.id)
             logger.info(f"Successfully sent stop signal command via RQ for job {job_id}.")
         except Exception as sig_err:
             logger.warning(f"Could not send stop signal command via RQ for job {job_id}. Worker may not stop immediately. Error: {sig_err}")
@@ -598,45 +659,32 @@ async def stop_job(
 async def remove_job(
     job_id: str,
     redis_conn: redis.Redis = Depends(get_redis_connection),
-    queue: Queue = Depends(get_pipeline_queue) # Needed for RQ job fetching/deleting
+    queue: Queue = Depends(get_pipeline_queue)
 ):
     """
     Removes a job's data from Redis. Handles both 'staged_*' IDs and RQ job IDs.
+    Also cleans up the temporary input CSV file if found in meta.
     """
     logger.info(f"Request received to remove job/data for ID: {job_id}")
+    csv_path_to_remove = None
 
     # --- Case 1: Handle Staged Jobs ---
     if job_id.startswith("staged_"):
         logger.info(f"Attempting to remove staged job '{job_id}' from hash '{STAGED_JOBS_KEY}'.")
         try:
-            # Fetch details first to get CSV path for cleanup
             job_details_bytes = redis_conn.hget(STAGED_JOBS_KEY, job_id.encode('utf-8'))
-            csv_path_to_remove = None
             if job_details_bytes:
                 try:
                     details = json.loads(job_details_bytes.decode('utf-8'))
                     csv_path_to_remove = details.get("input_csv_path")
                 except (json.JSONDecodeError, UnicodeDecodeError):
-                     logger.warning(f"Could not parse details for staged job {job_id} during removal, cannot clean up CSV.")
+                     logger.warning(f"Could not parse details for staged job {job_id} during removal, cannot identify CSV.")
 
-            # Remove from Redis hash
             num_deleted = redis_conn.hdel(STAGED_JOBS_KEY, job_id.encode('utf-8'))
 
             if num_deleted == 1:
                 logger.info(f"Successfully removed staged job entry: {job_id}")
-                # Clean up associated temporary CSV file
-                if csv_path_to_remove:
-                    try:
-                        csv_path = Path(csv_path_to_remove)
-                        if csv_path.exists() and csv_path.is_file() and csv_path.suffix == '.csv':
-                             os.remove(csv_path)
-                             logger.info(f"Cleaned up temporary CSV file for removed staged job: {csv_path}")
-                        else:
-                             logger.warning(f"Temporary CSV path {csv_path} not found or invalid for removal.")
-                    except OSError as e:
-                        logger.warning(f"Could not clean up temporary CSV file {csv_path_to_remove}: {e}")
-
-                return JSONResponse(status_code=200, content={"message": f"Staged job '{job_id}' removed.", "removed_id": job_id})
+                # Attempt cleanup outside the main try/except for Redis errors
             else:
                 logger.warning(f"Staged job '{job_id}' not found in hash for removal.")
                 raise HTTPException(status_code=404, detail=f"Staged job '{job_id}' not found.")
@@ -645,28 +693,30 @@ async def remove_job(
             logger.error(f"Redis error removing staged job {job_id}: {e}")
             raise HTTPException(status_code=503, detail="Service unavailable: Could not remove job due to storage error.")
         except HTTPException as e:
-            raise e # Re-raise the 404
+            raise e # Re-raise 404 etc.
         except Exception as e:
-            logger.exception(f"Unexpected error removing staged job {job_id}.")
+            logger.exception(f"Unexpected error during staged job removal check for {job_id}.")
             raise HTTPException(status_code=500, detail="Internal server error removing staged job.")
 
     # --- Case 2: Handle RQ Jobs ---
     else:
         logger.info(f"Attempting to remove RQ job '{job_id}' data.")
         try:
-            # Use bytes connection for fetch/delete
             redis_conn_bytes = redis.Redis(
                 host=redis_conn.connection_pool.connection_kwargs.get('host', 'localhost'),
                 port=redis_conn.connection_pool.connection_kwargs.get('port', 6379),
                 db=redis_conn.connection_pool.connection_kwargs.get('db', 0),
                 decode_responses=False,
-                socket_timeout=5,  # Add timeout
-                socket_connect_timeout=5  # Add connect timeout
+                socket_timeout=5,
+                socket_connect_timeout=5
             )
-            
-            # First check if job exists and get its status
+
             try:
                 job = Job.fetch(job_id, connection=redis_conn_bytes, serializer=queue.serializer)
+                # Get CSV path from meta before potentially deleting the job
+                if job and job.meta:
+                    csv_path_to_remove = job.meta.get("input_csv_path_used") or job.meta.get("input_csv_path")
+
             except NoSuchJobError:
                 logger.warning(f"RQ Job '{job_id}' not found for removal.")
                 raise HTTPException(status_code=404, detail=f"RQ Job '{job_id}' not found.")
@@ -675,172 +725,215 @@ async def remove_job(
                 raise HTTPException(status_code=500, detail=f"Could not fetch job {job_id} for removal")
 
             if not job:
-                raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
-                
-            # Get job status
-            try:
-                job_status = job.get_status()
-            except Exception as status_err:
-                logger.error(f"Error getting status for job {job_id}: {status_err}")
-                job_status = None
-            
-            # If job is running, try to stop it first
+                 raise HTTPException(status_code=404, detail=f"Job {job_id} not found") # Should be caught by NoSuchJobError
+
+            try: job_status = job.get_status()
+            except Exception as status_err: logger.error(f"Error getting status for job {job_id}: {status_err}"); job_status = None
+
             if job_status == 'started':
                 try:
+                    logger.info(f"Sending stop signal to running job {job_id} before removal")
                     send_stop_job_command(redis_conn_bytes, job.id)
-                    logger.info(f"Sent stop signal to running job {job_id} before removal")
-                    # Wait a bit for the job to stop
-                    time.sleep(1)
+                    time.sleep(1) # Brief pause, though stop is not guaranteed synchronous
                 except Exception as stop_err:
                     logger.warning(f"Could not stop running job {job_id} before removal: {stop_err}")
 
-            # Get CSV path from meta *before* deleting if possible
             try:
-                csv_path_to_remove = job.meta.get("input_csv_path") if job.meta else None
-            except Exception as meta_err:
-                logger.warning(f"Could not get CSV path from job meta: {meta_err}")
-                csv_path_to_remove = None
-
-            # Delete the job using the correct method for this RQ version
-            try:
-                # First remove from registries
-                for registry in [StartedJobRegistry(queue=queue), 
-                               FinishedJobRegistry(queue=queue), 
-                               FailedJobRegistry(queue=queue)]:
+                # Remove from all relevant registries
+                for registry_func in [queue.remove, StartedJobRegistry(queue=queue).remove, FinishedJobRegistry(queue=queue).remove, FailedJobRegistry(queue=queue).remove]:
                     try:
-                        registry.remove(job)
+                        registry_func(job, delete_job=False) # Remove from registry, don't delete the job data yet
+                    except InvalidJobOperation:
+                         logger.debug(f"Job {job_id} not in registry for removal.")
                     except Exception as reg_err:
-                        logger.warning(f"Error removing job {job_id} from registry: {reg_err}")
+                        logger.warning(f"Error removing job {job_id} from a registry: {reg_err}")
 
-                # Then delete the job itself
-                job.delete()
-                logger.info(f"Successfully removed RQ job {job_id}")
+                # Now delete the job data itself
+                job.delete(remove_from_registries=False) # Already removed from registries
+                logger.info(f"Successfully deleted RQ job data for {job_id}")
+
+            except InvalidJobOperation as e:
+                 # This might happen if trying to delete a job that's actively running and locked
+                 logger.warning(f"Invalid operation trying to remove RQ job {job_id}: {e}")
+                 raise HTTPException(status_code=409, detail=f"Cannot remove job '{job_id}': Invalid operation (job might be active or locked). Try stopping first.")
             except Exception as delete_err:
                 logger.error(f"Error deleting job {job_id}: {delete_err}")
                 raise HTTPException(status_code=500, detail=f"Could not delete job {job_id}")
 
-            # Clean up CSV file if it exists
-            if csv_path_to_remove and os.path.exists(csv_path_to_remove):
-                try:
-                    os.remove(csv_path_to_remove)
-                    logger.info(f"Removed associated CSV file: {csv_path_to_remove}")
-                except Exception as csv_err:
-                    logger.warning(f"Could not remove CSV file {csv_path_to_remove}: {csv_err}")
-
-            return JSONResponse(status_code=200, content={"message": f"Successfully removed job {job_id}"})
-
-        except HTTPException as e:
-            raise e
+        except HTTPException as e: raise e # Re-raise specific HTTP errors
         except redis.exceptions.RedisError as e:
             logger.error(f"Redis error removing RQ job {job_id}: {e}")
             raise HTTPException(status_code=503, detail="Service unavailable: Could not remove RQ job due to storage error.")
-        except InvalidJobOperation as e:
-            logger.warning(f"Invalid operation trying to remove RQ job {job_id} (possibly running?): {e}")
-            raise HTTPException(status_code=409, detail=f"Cannot remove job '{job_id}': Invalid operation (job might be active or locked).")
         except Exception as e:
-            logger.exception(f"Unexpected error removing RQ job {job_id}: {str(e)}")
+            logger.exception(f"Unexpected error during RQ job removal for {job_id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Internal server error removing RQ job: {str(e)}")
 
+    # --- Common Cleanup Logic ---
+    if csv_path_to_remove:
+        try:
+            csv_path = Path(csv_path_to_remove)
+            # Basic safety check: Ensure it's a CSV file in a plausible temp location or results subdir
+            if csv_path.exists() and csv_path.is_file() and csv_path.suffix == '.csv':
+                 # More safety: Check if it's within expected parent dirs (e.g., system temp or results base)
+                 # This is a basic check, adjust based on where temp files are actually created
+                 # temp_dir = Path(tempfile.gettempdir())
+                 # if csv_path.parent == temp_dir or RESULTS_DIR in csv_path.parents:
+                 os.remove(csv_path)
+                 logger.info(f"Cleaned up temporary CSV file for removed job {job_id}: {csv_path}")
+                 # else:
+                 #     logger.warning(f"Skipping removal of CSV file outside expected temp/results area: {csv_path}")
+            else:
+                 logger.warning(f"Temporary CSV path {csv_path} not found, invalid, or not a CSV for removal associated with job {job_id}.")
+        except OSError as e:
+            logger.warning(f"Could not clean up temporary CSV file {csv_path_to_remove} for job {job_id}: {e}")
+        except Exception as e:
+             logger.warning(f"Unexpected error during CSV cleanup for job {job_id}: {e}")
 
-# --- ADD /rerun_job endpoint ---
-@router.post("/rerun_job/{job_id}", status_code=200, summary="Re-stage Job")
+
+    return JSONResponse(status_code=200, content={"message": f"Successfully removed job {job_id}.", "removed_id": job_id})
+
+
+@router.post("/rerun_job/{job_id}", status_code=202, summary="Re-stage Failed/Finished Job")
 async def rerun_job(
     job_id: str,
     redis_conn: redis.Redis = Depends(get_redis_connection),
-    queue: Queue = Depends(get_pipeline_queue) # Needed for fetching RQ job details
+    queue: Queue = Depends(get_pipeline_queue)
 ):
     """
-    Retrieves parameters from a previously staged or completed/failed RQ job
-    and creates a new staged job entry using those parameters.
-    Returns the new staged job ID.
+    Re-stages a previously run (failed or finished) job using the parameters
+    stored in its RQ job meta. Creates a *new* staged job entry.
     """
-    logger.info(f"Re-staging request received for job ID: {job_id}")
-    original_job_details = {}
-    is_staged_origin = job_id.startswith("staged_")
+    if job_id.startswith("staged_"):
+        raise HTTPException(status_code=400, detail="Cannot re-run a job that is still 'staged'. Start it first.")
 
+    logger.info(f"Attempting to re-stage job based on RQ job: {job_id}")
     try:
-        # --- Fetch Original Job Details ---
-        if is_staged_origin:
-            # Fetch from staged jobs hash
-            details_bytes = redis_conn.hget(STAGED_JOBS_KEY, job_id.encode('utf-8'))
-            if not details_bytes:
-                raise HTTPException(status_code=404, detail=f"Staged job '{job_id}' not found to rerun.")
-            original_job_details = json.loads(details_bytes.decode('utf-8'))
-            logger.info(f"Found original details in staged job hash for {job_id}")
-        else:
-            # Fetch from RQ job metadata
-            try:
-                redis_conn_bytes = redis.Redis(host=redis_conn.connection_pool.connection_kwargs.get('host', 'localhost'),
-                                               port=redis_conn.connection_pool.connection_kwargs.get('port', 6379),
-                                               db=redis_conn.connection_pool.connection_kwargs.get('db', 0),
-                                               decode_responses=False)
-                job = Job.fetch(job_id, connection=redis_conn_bytes, serializer=queue.serializer)
-                job.refresh() # Load meta
-                if not job.meta:
-                     raise HTTPException(status_code=404, detail=f"RQ job '{job_id}' found, but has no metadata to rerun.")
-                # Reconstruct details from meta (might need adjustments based on what's stored)
-                original_job_details = {
-                    "input_filenames": job.meta.get("input_params", {}),
-                    "sample_info": job.meta.get("sample_info", []),
-                    "genome": job.meta.get("sarek_params", {}).get("genome"),
-                    "tools": job.meta.get("sarek_params", {}).get("tools"),
-                    "step": job.meta.get("sarek_params", {}).get("step"),
-                    "profile": job.meta.get("sarek_params", {}).get("profile"),
-                    "aligner": job.meta.get("sarek_params", {}).get("aligner"),
-                    "joint_germline": job.meta.get("sarek_params", {}).get("joint_germline"),
-                    "wes": job.meta.get("sarek_params", {}).get("wes"),
-                    "trim_fastq": job.meta.get("sarek_params", {}).get("trim_fastq"),
-                    "skip_qc": job.meta.get("sarek_params", {}).get("skip_qc"),
-                    "skip_annotation": job.meta.get("sarek_params", {}).get("skip_annotation"),
-                    "description": f"Rerun of {job_id} - {job.description or ''}".strip(),
-                    # We need the original *relative* file paths for validation
-                    "intervals_file": job.meta.get("input_params", {}).get("intervals_file"), # Corrected key
-                    "dbsnp": job.meta.get("input_params", {}).get("dbsnp"),
-                    "known_indels": job.meta.get("input_params", {}).get("known_indels"),
-                    "pon": job.meta.get("input_params", {}).get("pon"),
-                }
-                 # Basic check for essential info
-                if not original_job_details.get("genome") or not original_job_details.get("sample_info"):
-                    raise HTTPException(status_code=400, detail=f"Incomplete metadata for RQ job '{job_id}'. Cannot determine essential parameters (genome, samples) for rerun.")
-                logger.info(f"Reconstructed details from RQ job meta for {job_id}")
-
-            except NoSuchJobError:
-                 raise HTTPException(status_code=404, detail=f"RQ job '{job_id}' not found to rerun.")
-
-        # --- Create PipelineInput for Validation ---
-        # Map the fetched details back to a Pydantic model instance
+        # Fetch the original RQ job details
+        redis_conn_bytes = redis.Redis(
+            host=redis_conn.connection_pool.connection_kwargs.get('host', 'localhost'),
+            port=redis_conn.connection_pool.connection_kwargs.get('port', 6379),
+            db=redis_conn.connection_pool.connection_kwargs.get('db', 0),
+            decode_responses=False
+        )
         try:
-            pipeline_input_for_validation = PipelineInput(
-                samples=[SampleInfo(**s) for s in original_job_details.get("sample_info", [])],
-                genome=original_job_details.get("genome", ""), # Must have genome
-                intervals_file=original_job_details.get("intervals_file"),
-                dbsnp=original_job_details.get("dbsnp"),
-                known_indels=original_job_details.get("known_indels"),
-                pon=original_job_details.get("pon"),
-                tools=original_job_details.get("tools"),
-                step=original_job_details.get("step"),
-                profile=original_job_details.get("profile"),
-                aligner=original_job_details.get("aligner"),
-                joint_germline=original_job_details.get("joint_germline", False),
-                wes=original_job_details.get("wes", False),
-                trim_fastq=original_job_details.get("trim_fastq", False),
-                skip_qc=original_job_details.get("skip_qc", False),
-                skip_annotation=original_job_details.get("skip_annotation", False),
-                description=f"Rerun of {job_id}" # Generate new description
-            )
-        except Exception as model_error:
-             logger.error(f"Error creating PipelineInput model from fetched details for {job_id}: {model_error}")
-             raise HTTPException(status_code=500, detail="Could not reconstruct job parameters for rerun.")
+             original_job = Job.fetch(job_id, connection=redis_conn_bytes, serializer=queue.serializer)
+        except NoSuchJobError:
+            logger.warning(f"Re-stage request failed: Original RQ job ID '{job_id}' not found.")
+            raise HTTPException(status_code=404, detail=f"Original job '{job_id}' not found to re-stage.")
 
-        # --- Re-validate and Stage ---
-        # Call the same staging logic as /run_pipeline
-        return await stage_pipeline_job(pipeline_input_for_validation, redis_conn)
+        if not original_job.meta:
+            logger.error(f"Cannot re-stage job {job_id}: Original job metadata is missing.")
+            raise HTTPException(status_code=400, detail=f"Cannot re-stage job {job_id}: Missing original parameters.")
 
-    except HTTPException as e:
-        raise e # Re-raise validation or not found errors
+        original_meta = original_job.meta
+        original_sarek_params = original_meta.get("sarek_params", {})
+        original_input_params = original_meta.get("input_params", {})
+        original_sample_info = original_meta.get("sample_info", [])
+        original_description = original_meta.get("description", f"Sarek run")
+
+        # --- Create a new temporary CSV for the re-run ---
+        # We need to recreate the samplesheet as the original temp one was likely deleted.
+        if not original_sample_info:
+             raise HTTPException(status_code=400, detail=f"Cannot re-stage job {job_id}: Original sample info missing from metadata.")
+
+        new_sample_rows_for_csv = []
+        for sample_data in original_sample_info:
+             # Assume sample_data structure matches SampleInfo model (including lane)
+             new_sample_rows_for_csv.append([
+                 sample_data.get('patient'), sample_data.get('sample'), sample_data.get('sex'),
+                 sample_data.get('status'), sample_data.get('lane'),
+                 sample_data.get('fastq_1'), sample_data.get('fastq_2')
+             ])
+
+        new_temp_csv_file_path = None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', newline='', suffix='.csv', delete=False) as temp_csv:
+                csv_writer = csv.writer(temp_csv)
+                csv_writer.writerow(['patient', 'sample', 'sex', 'status', 'lane', 'fastq_1', 'fastq_2'])
+                csv_writer.writerows(new_sample_rows_for_csv)
+                new_temp_csv_file_path = temp_csv.name
+                logger.info(f"Created new temporary samplesheet for re-run: {new_temp_csv_file_path}")
+        except (OSError, csv.Error) as e:
+             logger.error(f"Failed to create new temporary samplesheet for re-run of {job_id}: {e}")
+             raise HTTPException(status_code=500, detail="Internal server error: Could not create samplesheet for re-run.")
+
+        # --- Create details for the new staged job ---
+        new_staged_job_id = f"staged_{uuid.uuid4()}"
+
+        # Reconstruct paths from original meta (these should be absolute host paths)
+        # Use original_input_params for filenames and reconstruct full paths if needed,
+        # but the task function expects full paths directly.
+        # Let's assume the original sarek_params and input_params hold enough info.
+        intervals_path = original_meta.get("intervals_path") or \
+                         (Path(DATA_DIR / original_input_params["intervals_file"]).as_posix() if original_input_params.get("intervals_file") else None)
+        dbsnp_path = original_meta.get("dbsnp_path") or \
+                     (Path(DATA_DIR / original_input_params["dbsnp"]).as_posix() if original_input_params.get("dbsnp") else None)
+        known_indels_path = original_meta.get("known_indels_path") or \
+                            (Path(DATA_DIR / original_input_params["known_indels"]).as_posix() if original_input_params.get("known_indels") else None)
+        pon_path = original_meta.get("pon_path") or \
+                   (Path(DATA_DIR / original_input_params["pon"]).as_posix() if original_input_params.get("pon") else None)
+
+        new_job_details = {
+            "input_csv_path": new_temp_csv_file_path, # Use the NEWLY created CSV path
+            "intervals_path": intervals_path,
+            "dbsnp_path": dbsnp_path,
+            "known_indels_path": known_indels_path,
+            "pon_path": pon_path,
+            "outdir_base_path": str(RESULTS_DIR),
+
+            "genome": original_sarek_params.get("genome", "GATK.GRCh38"), # Provide default if missing
+            "tools": original_sarek_params.get("tools"), # Comma-separated string or None
+            "step": original_sarek_params.get("step", SAREK_DEFAULT_STEP),
+            "profile": original_sarek_params.get("profile", SAREK_DEFAULT_PROFILE),
+            "aligner": original_sarek_params.get("aligner", SAREK_DEFAULT_ALIGNER),
+
+            "joint_germline": original_sarek_params.get("joint_germline", False),
+            "wes": original_sarek_params.get("wes", False),
+            "trim_fastq": original_sarek_params.get("trim_fastq", False),
+            "skip_qc": original_sarek_params.get("skip_qc", False),
+            "skip_annotation": original_sarek_params.get("skip_annotation", False),
+            "skip_baserecalibrator": original_sarek_params.get("skip_baserecalibrator", False),
+
+            "description": f"Re-run of job {job_id} ({original_description})",
+            "staged_at": time.time(),
+            "input_filenames": original_input_params, # Keep original input filenames for reference
+            "sample_info": original_sample_info, # Keep original sample details
+            "is_rerun": True, # Mark this specifically for the task execution
+            "original_job_id": job_id, # Reference the original job
+        }
+
+        # Store the new staged job
+        redis_conn.hset(STAGED_JOBS_KEY, new_staged_job_id.encode('utf-8'), json.dumps(new_job_details).encode('utf-8'))
+        logger.info(f"Created new staged job {new_staged_job_id} for re-run of {job_id}")
+
+        # Return the staged job ID - user needs to manually start it
+        return JSONResponse(
+            status_code=200, # Return 200 OK as staging is complete
+            content={
+                 "message": f"Job {job_id} re-staged successfully as {new_staged_job_id}. Please start the new job.",
+                 "staged_job_id": new_staged_job_id # Return the NEW staged ID
+            }
+        )
+        # Alternatively, automatically start the re-staged job:
+        # return await start_job(new_staged_job_id, redis_conn, queue)
+
     except redis.exceptions.RedisError as e:
-        logger.error(f"Redis error during rerun process for {job_id}: {e}")
-        raise HTTPException(status_code=503, detail="Service unavailable: Could not access job storage for rerun.")
+        logger.error(f"Redis error during job re-stage for {job_id}: {e}")
+        # Clean up new CSV if created before error
+        if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists():
+            try: os.remove(new_temp_csv_file_path)
+            except OSError: pass
+        raise HTTPException(status_code=503, detail="Service unavailable: Could not access job storage.")
+    except HTTPException as e:
+         # Clean up new CSV if created before error
+        if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists():
+            try: os.remove(new_temp_csv_file_path)
+            except OSError: pass
+        raise e # Re-raise FastAPI exceptions
     except Exception as e:
-        logger.exception(f"Unexpected error re-staging job {job_id}.")
-        raise HTTPException(status_code=500, detail="Internal server error attempting to re-stage job.")
+        logger.exception(f"Unexpected error during job re-stage for {job_id}: {e}")
+         # Clean up new CSV if created before error
+        if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists():
+            try: os.remove(new_temp_csv_file_path)
+            except OSError: pass
+        raise HTTPException(status_code=500, detail="Internal server error during job re-stage.")

@@ -34,7 +34,8 @@ interface RunItemProps {
 
 // Helper function to format parameters for display
 const formatParamValue = (value: string | number | boolean | null | undefined | any[] | Record<string, any>): string => {
-    if (value === true) return 'Yes'; if (value === false) return 'No';
+    if (value === true) return 'Yes'; 
+    if (value === false) return 'No';
     if (value === null || value === undefined) return 'N/A';
     if (typeof value === 'string' && value.trim() === '') return 'N/A';
     if (Array.isArray(value)) { return value.length > 0 ? value.join(', ') : 'N/A'; }
@@ -44,7 +45,15 @@ const formatParamValue = (value: string | number | boolean | null | undefined | 
 
 // Helper function to format keys (make more readable)
 const formatParamKey = (key: string): string => {
-    return key
+    const keyMap: Record<string, string> = {
+        'skip_baserecalibrator': 'Skip Base Recalibration',
+        'skip_qc': 'Skip QC',
+        'skip_annotation': 'Skip Annotation',
+        'wes': 'WES Mode',
+        'joint_germline': 'Joint Germline',
+        'trim_fastq': 'Trim FASTQ',
+    };
+    return keyMap[key] || key
         .replace(/_/g, ' ')
         .replace(/\b\w/g, l => l.toUpperCase());
 }

@@ -8,6 +8,9 @@ class SampleInfo(BaseModel):
     sample: str = Field(..., description="Sample identifier")
     sex: str = Field(..., description="Sex (e.g., XX, XY)")
     status: int = Field(..., description="Status (0 for normal, 1 for tumor)")
+    # *** ADD lane field ***
+    lane: str = Field(..., description="Lane identifier (e.g., L001)")
+    # ********************
     fastq_1: str = Field(..., description="Path to first FASTQ file relative to data dir")
     fastq_2: str = Field(..., description="Path to second FASTQ file relative to data dir")
 
@@ -25,7 +28,9 @@ class PipelineInput(BaseModel):
     pon: Optional[str] = Field(None, description="Path to Panel of Normals (PoN) VCF file (relative to data dir)")
 
     # Optional parameters (from Sarek docs / frontend form)
-    tools: Optional[str] = Field(None, description="Comma-separated list of tools (e.g., strelka,mutect2)")
+    # *** UPDATED: Accept list of strings for tools from frontend ***
+    tools: Optional[List[str]] = Field(None, description="List of tools (e.g., ['strelka', 'mutect2'])")
+    # ***************************************************************
     step: Optional[str] = Field(None, description="Pipeline step to start from (e.g., mapping, variant_calling)")
     profile: Optional[str] = Field(None, description="Nextflow profile (e.g., docker, singularity)")
     aligner: Optional[str] = Field(None, description="Aligner to use (e.g., bwa-mem, dragmap)")
@@ -36,11 +41,12 @@ class PipelineInput(BaseModel):
     trim_fastq: Optional[bool] = Field(False, description="Enable adapter trimming")
     skip_qc: Optional[bool] = Field(False, description="Skip QC steps")
     skip_annotation: Optional[bool] = Field(False, description="Skip annotation steps")
+    skip_baserecalibrator: Optional[bool] = Field(False, description="Skip base quality score recalibration")
 
     # Optional metadata (from frontend form)
     description: Optional[str] = Field(None, description="Optional description of the pipeline run")
 
-# --- ADD THIS MODEL ---
+# --- Existing Models ---
 class JobResourceInfo(BaseModel):
     peak_memory_mb: Optional[float] = None
     average_cpu_percent: Optional[float] = None
@@ -57,4 +63,4 @@ class JobStatusDetails(BaseModel):
     error: Optional[str] = Field(None, description="Error message if the job failed")
     meta: Dict[str, Any] = Field({}, description="Metadata associated with the job")
     resources: Optional[JobResourceInfo] = Field(None, description="Resource usage statistics")
-# --- END ADDED MODEL ---
+# --- END Existing Models ---

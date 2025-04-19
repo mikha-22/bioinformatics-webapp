@@ -1,32 +1,35 @@
 // frontend_app/next.config.ts
-import type { NextConfig } from "next";
-import path from 'path'; // Import the 'path' module
-
+/** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  // Add the webpack config block
-  webpack(config, { isServer }) { // Add options argument if needed, like isServer
-    // Define the alias
+  webpack(config) {
     config.resolve.alias = {
-      ...config.resolve.alias, // Preserve existing aliases
-      '@': path.resolve(__dirname), // Map '@' to the project root (frontend_app)
+      ...config.resolve.alias,
+      '@': require('path').resolve(__dirname),
     };
     return config;
   },
-  // Configure allowed origins for development
   async headers() {
     return [
       {
-        source: '/_next/:path*',
+        source: '/:path*',
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
             value: 'http://100.121.160.49:3000',
           },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, POST, PUT, DELETE, OPTIONS',
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'X-Requested-With, Content-Type, Authorization',
+          },
         ],
       },
     ];
   },
-} as NextConfig;
+};
 
 export default nextConfig;

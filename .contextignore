@@ -1,0 +1,106 @@
+# Directories to ignore
+.git/
+__pycache__/
+node_modules/
+venv/
+.venv/
+build/
+dist/
+target/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.next/
+.vercel/
+
+# Data, logs, and results directories
+bioinformatics/data/
+bioinformatics/logs/
+bioinformatics/results/
+tls/
+
+# Frontend build and cache
+frontend_app/.next/
+frontend_app/node_modules/
+frontend_app/out/
+frontend_app/.vercel/
+
+# Backend cache and data
+backend/app/__pycache__/
+backend/app/**/__pycache__/
+
+# Development files
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.dll
+*.dylib
+*.log
+*.env
+*.env.*
+.env.local
+.env.*.local
+
+# Package files
+package-lock.json
+yarn.lock
+poetry.lock
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker volumes and data
+docker/filebrowser.db
+docker/settings.json
+
+# Large documentation files
+*.pdf
+*.md
+
+# Previous context files
+project_context*.txt
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Nextflow specific
+.nextflow/
+.nextflow.log*
+work/
+nxf-tmp.*
+timeline*html
+report*html
+dag*html
+trace*txt
+.command.*
+.exitcode
+*.command.*
+*.exitcode
+**/work/
+**/.nextflow/
+**/nf_work/
+nextflow_work_vol/
+
+# Nextflow-specific patterns
+.nextflow/
+.nextflow.log*
+work/
+nxf-tmp.*
+timeline*html
+report*html
+dag*html
+trace*txt
+.command.*
+.exitcode
+*.command.*
+*.exitcode
+**/work/
+**/.nextflow/
+**/nf_work/
+nextflow_work_vol/ 

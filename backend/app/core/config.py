@@ -7,26 +7,39 @@ logger = logging.getLogger(__name__)
 
 # --- Path Definitions ---
 try:
+    # Keep project structure paths if needed elsewhere (e.g., finding scripts)
     APP_FILE_PATH = Path(__file__).resolve() # Path to this config.py file
     CORE_DIR = APP_FILE_PATH.parent
     BACKEND_APP_DIR = CORE_DIR.parent
     PROJECT_ROOT = BACKEND_APP_DIR.parents[1]
-    # REMOVED: FRONTEND_DIR = PROJECT_ROOT / "frontend"
-    # REMOVED: TEMPLATES_DIR = FRONTEND_DIR / "templates"
-    # REMOVED: STATIC_DIR = FRONTEND_DIR / "static"
-    BIOINFORMATICS_DIR = PROJECT_ROOT / "bioinformatics"
-    DATA_DIR = BIOINFORMATICS_DIR / "data"
-    RESULTS_DIR = BIOINFORMATICS_DIR / "results"
     DOCKER_DIR = PROJECT_ROOT / "docker"
-    # RENAMED: The actual script called by the task
     SAREK_PIPELINE_SCRIPT_PATH = BACKEND_APP_DIR / "sarek_pipeline.sh"
 
-    # Ensure essential dirs are logged
+    # --- *** OVERRIDE DATA and RESULTS paths for local execution *** ---
+    # Use the specified absolute host paths directly
+    DATA_DIR = Path("/home/admin01/work/mnt/nas/mikha_temp/data").resolve()
+    RESULTS_DIR = Path("/home/admin01/work/mnt/nas/mikha_temp/results").resolve()
+    # --- *** END OVERRIDE *** ---
+
+    # Log the paths being used
     logger.info(f"PROJECT_ROOT determined as: {PROJECT_ROOT}")
     logger.info(f"BACKEND_APP_DIR determined as: {BACKEND_APP_DIR}")
-    logger.info(f"DATA_DIR set to: {DATA_DIR}")
-    logger.info(f"RESULTS_DIR set to: {RESULTS_DIR}")
+    logger.info(f"DATA_DIR OVERRIDDEN TO: {DATA_DIR}")
+    logger.info(f"RESULTS_DIR OVERRIDDEN TO: {RESULTS_DIR}")
     logger.info(f"SAREK_PIPELINE_SCRIPT_PATH set to: {SAREK_PIPELINE_SCRIPT_PATH}")
+
+    # Optional: Check if these overridden directories exist at startup
+    if not DATA_DIR.is_dir():
+        logger.warning(f"Configured DATA_DIR does not exist or is not a directory: {DATA_DIR}")
+    if not RESULTS_DIR.is_dir():
+        logger.warning(f"Configured RESULTS_DIR does not exist or is not a directory: {RESULTS_DIR}")
+        # Optionally create it?
+        # try:
+        #     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+        #     logger.info(f"Created RESULTS_DIR: {RESULTS_DIR}")
+        # except OSError as e:
+        #     logger.error(f"Failed to create RESULTS_DIR {RESULTS_DIR}: {e}")
+
 
 except Exception as e:
     logger.exception("CRITICAL: Failed to calculate essential paths.", exc_info=True)
@@ -34,7 +47,8 @@ except Exception as e:
 
 
 # --- Redis/RQ Configuration ---
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+# Point to the Redis container name or IP accessible from the host
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost") # Use localhost if Redis is exposed on host port 6379
 REDIS_PORT = 6379
 REDIS_DB = 0
 PIPELINE_QUEUE_NAME = "pipeline_tasks"
