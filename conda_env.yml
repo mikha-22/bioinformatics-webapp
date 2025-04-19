@@ -1,0 +1,27 @@
+# File: conda_env.yml
+# Updated for local backend development (FastAPI + RQ Worker)
+
+name: bio-webapp-backend-dev # More specific name for local dev environment
+channels:
+  - conda-forge
+  - defaults # Keep defaults as a fallback channel
+dependencies:
+  # Core Python version
+  - python=3.11
+
+  # FastAPI and Web Server
+  - fastapi
+  - uvicorn
+  - httptools # Dependency for uvicorn[standard]
+  - websockets # Dependency for uvicorn[standard]
+  - python-multipart # For potential form data handling in FastAPI
+
+  # RQ and Redis
+  - rq
+  - redis-py # Python client for Redis (package name on conda-forge)
+
+  # Worker specific dependencies
+  - psutil # For resource monitoring in tasks
+
+  # Utility
+  - pip # Include pip for installing packages if needed

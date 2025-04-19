@@ -1,0 +1,22 @@
+# .dockerignore
+
+# Backend specific
+**/__pycache__
+*.pyc
+backend/venv
+backend/.venv
+
+# Frontend specific
+frontend_app/node_modules
+frontend_app/.next
+frontend_app/out
+frontend_app/.DS_Store
+frontend_app/*.log
+
+# General
+.git
+.vscode
+*.env*
+tls/
+*.pem
+docker/filebrowser.db

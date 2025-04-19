@@ -1,0 +1,49 @@
+# ./docker/Dockerfile.webapp
+# Use a specific Python version slim image
+ARG PYTHON_VERSION=3.11
+FROM python:${PYTHON_VERSION}-slim-bookworm AS python-base
+
+# Set environment variables for Python
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# --- OS Dependencies (Install only if necessary for webapp runtime) ---
+# RUN apt-get update && apt-get install -y --no-install-recommends some-package && rm -rf /var/lib/apt/lists/*
+
+# --- Create a non-root user for security ---
+ARG UID=1000
+ARG GID=1000
+RUN groupadd --gid ${GID} appuser && \
+    useradd --uid ${UID} --gid ${GID} --shell /bin/bash --create-home appuser
+
+# --- Install Python Dependencies ---
+# Copy requirements file first for layer caching
+COPY requirements_webapp.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements_webapp.txt
+
+# --- Copy Application Code ---
+# Copy backend structure needed by the webapp (routers, models, core, app.py etc)
+COPY ./backend /app/backend
+# REMOVED: Copy frontend files - No longer needed as frontend is separate Next.js app
+# COPY ./frontend /app/frontend
+# Copy the main entrypoint script
+COPY ./main.py /app/main.py
+# Ensure necessary __init__.py files exist if copying selectively
+
+# Change ownership to the non-root user
+RUN chown -R appuser:appuser /app
+
+# Switch to the non-root user
+USER appuser
+
+# Expose the port FastAPI will run on
+EXPOSE 8000
+
+# Define the command to start the FastAPI application
+# Adjust if your main.py or uvicorn command needs specific args or paths
+# Assumes main.py handles Uvicorn startup and TLS paths (if needed) correctly,
+# especially considering TLS certs are mounted via compose.
+CMD ["python", "main.py"]

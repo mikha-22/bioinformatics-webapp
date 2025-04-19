@@ -1,0 +1,124 @@
+name: Docker Build and Push Components to GHCR
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - '.gitignore'
+      - '.dockerignore'
+      - 'docs/**'
+      - 'tls/**'
+      - 'bioinformatics/**'
+      - '*.db'
+      - '*.srl'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - '.gitignore'
+      - '.dockerignore'
+      - 'docs/**'
+      - 'tls/**'
+      - 'bioinformatics/**'
+      - '*.db'
+      - '*.srl'
+  workflow_dispatch:
+    inputs:
+      build_frontend:
+        description: 'Build Frontend Image?'
+        required: true
+        type: boolean
+        default: true
+      build_webapp:
+        description: 'Build Webapp Image?'
+        required: true
+        type: boolean
+        default: true
+      build_worker:
+        description: 'Build Worker Image?'
+        required: true
+        type: boolean
+        default: true
+      build_filebrowser:
+        description: 'Build File Browser Image?'
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  build-and-push-components:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Build and push frontend image
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_frontend == 'true')
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend_app
+          file: ./docker/Dockerfile.frontend
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/mikha-22/bioinformatics-webapp/frontend:latest
+            ghcr.io/mikha-22/bioinformatics-webapp/frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push webapp image
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_webapp == 'true')
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.webapp
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/mikha-22/bioinformatics-webapp/webapp:latest
+            ghcr.io/mikha-22/bioinformatics-webapp/webapp:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push worker image
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_worker == 'true')
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.worker
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/mikha-22/bioinformatics-webapp/worker:latest
+            ghcr.io/mikha-22/bioinformatics-webapp/worker:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push filebrowser image
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_filebrowser == 'true')
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.filebrowser
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/mikha-22/bioinformatics-webapp/filebrowser:latest
+            ghcr.io/mikha-22/bioinformatics-webapp/filebrowser:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

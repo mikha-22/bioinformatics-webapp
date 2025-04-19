@@ -1,0 +1,151 @@
+# ./docker-compose-ghcr.yml
+version: '3.8'
+
+services:
+  ##################
+  # Frontend Application (Next.js)
+  ##################
+  frontend:
+    image: ghcr.io/mikha-22/bioinformatics-webapp/frontend:latest # Use pre-built image
+    container_name: bio_frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      # Point to the backend API service (internal Docker network)
+      - NEXT_PUBLIC_API_BASE_URL=http://webapp:8000
+      # Pass FileBrowser URL from host environment or use default
+      - NEXT_PUBLIC_FILEBROWSER_URL=${NEXT_PUBLIC_FILEBROWSER_URL:-http://localhost:8081}
+      - PORT=3000
+    # No volumes needed when running pre-built image
+    depends_on:
+      - webapp
+    restart: unless-stopped
+    networks:
+      - app-network
+    # user: "nextjs" # Image should handle user internally
+
+  ##################
+  # Web Application (FastAPI Backend)
+  ##################
+  webapp:
+    image: ghcr.io/mikha-22/bioinformatics-webapp/webapp:latest
+    container_name: bio_webapp
+    ports:
+      - "${WEBAPP_PORT:-8000}:8000"
+    volumes:
+      - ./tls:/app/tls
+      - ./backend:/app/backend:ro # Optional for dev override
+      # --- UPDATED Paths ---
+      - results_vol:/app/bioinformatics/results # Container path remains the same
+      - data_vol:/app/bioinformatics/data     # Container path remains the same
+      # -------------------
+      - ./docker/settings.json:/app/docker/settings.json
+    environment:
+      - REDIS_HOST=redis
+      - PYTHONUNBUFFERED=1
+    user: "${UID:-1000}:${GID:-1000}"
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  ##################
+  # RQ Worker
+  ##################
+  worker:
+    image: ghcr.io/mikha-22/bioinformatics-webapp/worker:latest
+    container_name: bio_worker
+    depends_on:
+      - redis
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # --- UPDATED Paths (Container paths remain the same) ---
+      - data_vol:/data
+      - results_vol:/results
+      # -----------------------------------------------------
+      - references_vol:/references
+      - nextflow_work_vol:/nf_work
+    environment:
+      - REDIS_HOST=redis
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+      - NXF_WORK=/nf_work
+    user: "${UID:-1000}:${GID:-1000}"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  ##################
+  # Redis
+  ##################
+  redis:
+    image: redis:7-alpine
+    container_name: bio_redis
+    volumes:
+      - redis_data_vol:/data
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  ##################
+  # File Browser
+  ##################
+  filebrowser:
+    image: ghcr.io/mikha-22/bioinformatics-webapp/filebrowser:latest
+    container_name: bio_filebrowser
+    ports:
+      - "${FILEBROWSER_PORT:-8081}:8080"
+    volumes:
+      # --- UPDATED Paths (Container paths remain the same) ---
+      - data_vol:/srv/data
+      - results_vol:/srv/results
+      # -----------------------------------------------------
+      - ./docker/filebrowser.db:/config/filebrowser.db
+      - ./docker/settings.json:/config/settings.json
+      - ./tls/server.crt:/config/server.crt
+      - ./tls/server.key:/config/server.key
+    user: "${UID:-1000}:${GID:-1000}"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+##################
+# Networks
+##################
+networks:
+  app-network:
+    driver: bridge
+
+##################
+# Volumes
+##################
+# Volume definitions remain the same, only device paths change
+volumes:
+  data_vol:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      # --- UPDATED Host Path ---
+      device: '/home/admin01/work/mnt/nas/mikha_temp/data'
+      # -----------------------
+  results_vol:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      # --- UPDATED Host Path ---
+      device: '/home/admin01/work/mnt/nas/mikha_temp/results'
+      # -----------------------
+  references_vol: # Assuming this path remains the same, adjust if needed
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/home/mikha/labs/bioinformatics-webapp/bioinformatics/references'
+  nextflow_work_vol:
+    # Define if needed
+  redis_data_vol:
+    # Docker managed volume

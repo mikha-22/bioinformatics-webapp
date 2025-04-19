@@ -1,0 +1,50 @@
+# ./docker/Dockerfile.frontend
+
+# Stage 1: Base Stage
+FROM node:20-bookworm-slim AS base
+ENV NODE_ENV=production
+WORKDIR /app
+ENV CYPRESS_INSTALL_BINARY=0
+
+# Stage 2: Dependencies Stage
+FROM base AS deps
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Stage 3: Builder Stage
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json package-lock.json* tsconfig.json next.config.ts postcss.config.mjs tailwind.config.ts ./
+COPY . .
+RUN rm -rf .next
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build
+
+# Stage 4: Production Runner Stage
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV CYPRESS_INSTALL_BINARY=0
+ENV PORT=3000
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs nextjs
+
+# --- COPY package-lock.json as well ---
+COPY --from=builder /app/package.json /app/package-lock.json* ./
+# --------------------------------------
+
+# Install ONLY production dependencies
+RUN npm ci --omit=dev
+
+# Copy necessary standalone/static files from builder stage
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+USER nextjs
+EXPOSE 3000
+CMD ["node", "server.js"]

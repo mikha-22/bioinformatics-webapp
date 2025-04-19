@@ -1,0 +1,75 @@
+# ./docker/Dockerfile.worker
+ARG PYTHON_VERSION=3.11
+FROM python:${PYTHON_VERSION}-slim-bookworm AS python-base
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# --- Install OS Dependencies ---
+# Install Java (for Nextflow), Docker CLI tools, and basic utilities
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    coreutils \
+    curl \
+    openjdk-17-jre-headless \
+    ca-certificates \
+    gnupg \
+    lsb-release \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Install Docker CLI ---
+# Based on official Docker install instructions for Debian
+RUN mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+      $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends docker-ce-cli && \
+    rm -rf /var/lib/apt/lists/*
+
+# --- Install Nextflow ---
+# Specify desired Nextflow version
+ENV NXF_VER=24.04.3
+RUN echo "Installing Nextflow..." && \
+    cd /usr/local/bin && \
+    curl -fsSL https://get.nextflow.io | bash && \
+    chmod +x nextflow && \
+    nextflow -v # Verify installation
+
+# --- Create a non-root user ---
+# Use the same UID/GID as webapp or define separately if needed
+ARG UID=1000
+ARG GID=1000
+RUN groupadd --gid ${GID} appuser && \
+    useradd --uid ${UID} --gid ${GID} --shell /bin/bash --create-home appuser
+
+# --- Install Python Dependencies ---
+COPY requirements_worker.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements_worker.txt
+
+# --- Copy necessary application code for the worker ---
+# Only copy what tasks.py needs (or mount via compose)
+# Make sure the path structure allows `from backend.app.tasks import ...`
+COPY ./backend/app/tasks.py /app/backend/app/tasks.py
+COPY ./backend/app/utils /app/backend/app/utils
+COPY ./backend/app/core/config.py /app/backend/app/core/config.py
+# Ensure parent directories and __init__.py files exist
+RUN mkdir -p /app/backend/app && \
+    touch /app/backend/__init__.py /app/backend/app/__init__.py
+
+# --- Environment Setup ---
+ENV PYTHONPATH=/app
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+
+# Change ownership
+RUN chown -R appuser:appuser /app /home/appuser
+
+# Switch to the non-root user
+USER appuser
+
+# Define the command to run the RQ worker, connecting to 'redis' host
+CMD ["rq", "worker", "pipeline_tasks", "--url", "redis://redis:6379/0"]
