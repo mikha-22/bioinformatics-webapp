@@ -56,6 +56,7 @@ docker run \
   -v "$(pwd)/docker/settings.json:/config/settings.json" \
   -v "$(pwd)/tls/server.crt:/config/server.crt" \
   -v "$(pwd)/tls/server.key:/config/server.key" \
+  -v "$(pwd)/filebrowser_custom_branding:/branding:ro" \
   --restart unless-stopped \
   ghcr.io/mikha-22/bioinformatics-webapp/filebrowser:latest
 
