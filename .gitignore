@@ -5,6 +5,8 @@ tls/
 .nextflow/
 .nextflow.log*
 work/
+nextflow
+nextflow/
 
 # CHANGED: Make results pattern specific to pipeline results
 /results/

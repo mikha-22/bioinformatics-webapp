@@ -1,3 +1,5 @@
+# AUTO DEPLOYMENT
+
 # PREREQUISITES
 install miniforge3 conda mamba
 
@@ -6,6 +8,12 @@ cd bioinfo-webapp
 mamba env create -f conda_env.yml -n sarek-webapp
 
 mamba activate sarek-webapp
+
+# MANUAL DPELOYMENT
+
+# GENERATE TLS FOR server.crt AND server.key IN ./tls/
+
+# GENERATE .env.local FOR THE frontend_app IN ./frontend_app/
 
 # RUN EACH OF THE COMPONENTS MANUALLY FOR TESTING AND DEVELOPMENT
 
