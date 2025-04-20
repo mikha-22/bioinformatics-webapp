@@ -1,0 +1,41 @@
+FROM debian:bookworm-slim AS builder
+
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    bash \
+    ca-certificates \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN echo "Installing File Browser..." && \
+    curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash
+
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+RUN mkdir -p /config /srv
+
+COPY --from=builder /usr/local/bin/filebrowser /usr/local/bin/filebrowser
+
+ARG UID=1000
+ARG GID=1000
+RUN groupadd --gid ${GID} appuser && \
+    useradd --uid ${UID} --gid ${GID} --shell /bin/bash --create-home appuser
+
+RUN chown -R appuser:appuser /home/appuser /config /srv
+
+USER appuser
+
+EXPOSE 8080
+
+CMD ["/usr/local/bin/filebrowser", \
+     "--port=8080", \
+     "--root=/srv", \
+     "--database=/config/filebrowser.db", \
+     "--config=/config/settings.json"]

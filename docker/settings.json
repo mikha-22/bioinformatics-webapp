@@ -5,8 +5,5 @@
     "root": "/srv",
     "noauth": true,
     "cert": "/config/server.crt",
-    "key": "/config/server.key",
-    "branding": {
-      "files": "/branding"
-    }
+    "key": "/config/server.key"
 }

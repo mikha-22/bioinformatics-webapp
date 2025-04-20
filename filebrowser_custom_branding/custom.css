@@ -1,215 +1,264 @@
-/* File: ./custom_branding/custom.css */
+/* custom.css for File Browser - BioPipeline UI Style (Corrected Layout - Icon Size/Color Update - Darker Folder Icon & Simplified Header Spacer Alignment) */
 
-/* Define the same CSS variables as your frontend app */
-:root {
-  --radius: 0.625rem; /* From your tailwind.config.ts */
-  --background: oklch(0.99 0.003 240);
-  --foreground: oklch(0.1 0.03 250);
-  --card: oklch(1 0 0); /* FileBrowser might not use 'card' directly */
-  --card-foreground: oklch(0.1 0.03 250);
-  --popover: oklch(1 0 0); /* FileBrowser might not use 'popover' directly */
-  --popover-foreground: oklch(0.1 0.03 250);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.90 0.02 255);
-  --secondary-foreground: oklch(0.15 0.03 255);
-  --muted: oklch(0.93 0.01 240);
-  --muted-foreground: oklch(0.40 0.03 250);
-  --accent: oklch(0.94 0.015 260);
-  --accent-foreground: oklch(0.15 0.03 255);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.88 0.005 240);
-  --input: oklch(0.88 0.005 240); /* Input background */
-  --ring: oklch(0.65 0.04 260);
+/* --- General & Body --- */
+body {
+  background-color: #e9ecef !important; /* Light gray background */
+  color: #495057;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-.dark { /* Define dark mode variables */
-  --background: oklch(0.1 0.01 240);
-  --foreground: oklch(0.96 0.005 240);
-  --card: oklch(0.15 0.015 240);
-  --card-foreground: oklch(0.96 0.005 240);
-  --popover: oklch(0.15 0.015 240);
-  --popover-foreground: oklch(0.96 0.005 240);
-  --primary: oklch(0.3 0.05 265.755);
-  --primary-foreground: oklch(0.99 0.005 250);
-  --secondary: oklch(0.25 0.03 255);
-  --secondary-foreground: oklch(0.96 0.005 240);
-  --muted: oklch(0.2 0.02 240);
-  --muted-foreground: oklch(0.60 0.02 240);
-  --accent: oklch(0.3 0.03 260);
-  --accent-foreground: oklch(0.96 0.005 240);
-  --destructive: oklch(0.65 0.19 22);
-  --destructive-foreground: oklch(0.96 0.005 240);
-  --border: oklch(0.25 0.01 240);
-  --input: oklch(0.25 0.01 240); /* Dark Input background */
-  --ring: oklch(0.5 0.03 260);
+/* --- Header Styling (Keep minimal from first version) --- */
+header {
+  background-color: #f8f9fa !important; /* Light gray header */
+  border-bottom: 1px solid #dee2e6 !important;
+  box-shadow: none !important;
+}
+/* Hide default Branding */
+header a.logo,
+header a[href='/'][aria-label='File Browser'],
+header button[aria-label="Menu"] {
+  display: none !important;
+}
+/* Basic styling for header buttons/search (can be refined) */
+header .actions .button { color: #495057 !important; }
+header input[type="search"] { border: 1px solid #ced4da !important; }
+
+
+/* --- Main Content Area (Parent of Listing) --- */
+#content {
+  padding: 15px !important; /* Space around the white box */
+  background-color: transparent !important; /* Make #content transparent if #listing is the white box */
 }
 
-/* Apply base styles */
-body, html {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: 'Geist Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  font-size: 14px; /* Adjust base font size if needed */
+/* --- Overall Listing Container (#listing) --- */
+#listing {
+  background-color: #ffffff !important; /* White background */
+  border: 1px solid #dee2e6 !important; /* Light gray border */
+  border-radius: 8px !important; /* Rounded corners */
+  padding: 0 !important; /* Remove padding, control internally */
+  margin: 0 !important;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  overflow: hidden; /* Prevents children breaking border-radius */
 }
 
-/* --- General Element Styling --- */
-
-/* Links */
-a {
-  color: var(--primary);
-  text-decoration: none;
+/* --- Breadcrumbs Styling --- */
+.breadcrumbs {
+  background-color: transparent !important; /* Inherit white from #listing */
+  padding: 12px 20px !important; /* Inner padding */
+  border-bottom: 1px solid #dee2e6 !important; /* Separator line */
 }
-a:hover {
-  text-decoration: underline;
-  color: oklch(from var(--primary) l calc(l + 0.1)); /* Lighten primary on hover */
+.breadcrumbs a {
+  color: #6c757d !important;
+  text-decoration: none !important;
 }
-
-/* Buttons - Target common FileBrowser button classes/elements */
-button, .button, .action {
-  background-color: var(--primary);
-  color: var(--primary-foreground);
-  border: 1px solid transparent;
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius);
-  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
-  cursor: pointer;
-  font-weight: 500; /* Medium weight like shadcn */
+.breadcrumbs a:hover {
+  color: #212529 !important;
 }
-button:hover, .button:hover, .action:hover {
-  background-color: oklch(from var(--primary) l calc(l - 0.05)); /* Darken primary slightly */
-}
-button:disabled, .button:disabled, .action:disabled {
-  background-color: var(--muted);
-  color: var(--muted-foreground);
-  cursor: not-allowed;
-  opacity: 0.7;
-}
-
-/* Secondary/Outline style buttons (often used for less important actions) */
-button. TBD, .button.TBD, .action.TBD { /* Replace TBD with actual classes if FileBrowser has them */
-    background-color: var(--secondary);
-    color: var(--secondary-foreground);
-    border-color: var(--border);
-}
- button.TBD:hover, .button.TBD:hover, .action.TBD:hover {
-     background-color: var(--accent);
-     border-color: var(--accent);
+.breadcrumbs i.material-icons {
+  font-size: 22px !important; /* Adjust size */
+  color: inherit !important; /* Inherit color from link */
+  vertical-align: middle; /* Align icon nicely */
 }
 
 
-/* Input fields */
-input[type="text"],
-input[type="search"],
-input[type="password"],
-textarea {
-  background-color: var(--input);
-  color: var(--foreground);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.5rem 0.75rem;
-  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+/* --- Listing Header Styling (SIMPLIFIED SPACER ALIGNMENT) --- */
+#listing .item.header {
+  background-color: transparent !important; /* Inherit white */
+  border-bottom: 1px solid #e9ecef !important; /* Slightly lighter border */
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  min-height: 40px; /* Match item row height approx */
+  align-items: center; /* Vertically center content */
+  box-sizing: border-box;
 }
-input[type="text"]:focus,
-input[type="search"]:focus,
-input[type="password"]:focus,
-textarea:focus {
-  outline: none;
-  border-color: var(--ring);
-  box-shadow: 0 0 0 2px oklch(from var(--ring) l calc(l + 0.1) a calc(a / 2)); /* Subtle ring effect */
+/* Header: Spacer div - Make it occupy the same space as item icon column */
+#listing .item.header > div:first-child {
+  /* Item icon space: 20px pad + 38px width + 14px pad = 72px */
+  width: 72px !important;
+  flex-shrink: 0 !important;
+  padding: 0 !important; /* No internal padding needed */
+  margin: 0 !important;
+  box-sizing: border-box;
 }
-input::placeholder, textarea::placeholder {
-  color: var(--muted-foreground);
-  opacity: 0.8;
-}
-
-/* --- FileBrowser Specific Areas (Inspect elements to confirm selectors) --- */
-
-/* Header/Action Bar */
-#header, .actionbar { /* Use inspector to find the correct ID/class */
-  background-color: var(--muted); /* Or var(--secondary) */
-  border-bottom: 1px solid var(--border);
-  padding: 0.5rem 1rem;
-  /* Adjust text color if needed */
-  color: var(--muted-foreground);
-}
-#header button, .actionbar button {
-    /* Style header buttons differently if needed */
-    background-color: var(--secondary);
-    color: var(--secondary-foreground);
-    border-color: var(--border);
-}
-#header button:hover, .actionbar button:hover {
-    background-color: var(--accent);
-    border-color: var(--accent);
+/* Header: Container for text columns */
+#listing .item.header > div:nth-child(2) {
+  display: flex !important;
+  flex-grow: 1 !important;
+  align-items: baseline !important; /* Align text */
+  padding: 0 20px 0 0 !important; /* T R B L - NO left padding here */
+  box-sizing: border-box;
 }
 
-/* Sidebar */
-#sidebar { /* Use inspector */
-  background-color: var(--card); /* Or var(--muted) */
-  border-right: 1px solid var(--border);
+/* Header Text (Base Style) */
+#listing .item.header p {
+  color: #495057 !important;
+  font-weight: bold !important;
+  font-size: 0.9em !important;
+  cursor: pointer !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  box-sizing: border-box;
+  /* Base vertical padding */
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
 }
-#sidebar a.active, #sidebar li.active > a { /* Style active sidebar links */
-    background-color: var(--accent);
-    color: var(--accent-foreground);
-    font-weight: 600;
-    border-radius: var(--radius);
+
+/* Header Column Sizing & Padding */
+#listing .item.header p.name {
+  flex-grow: 1; flex-shrink: 1; flex-basis: 0%;
+  margin-right: 10px !important;
+  justify-content: flex-start !important;
+  /* Match item row p.name effective left padding (5px) */
+  padding-left: 5px !important;
+  padding-right: 5px !important;
 }
- #sidebar a:hover {
-     background-color: var(--accent);
-     color: var(--accent-foreground);
-     border-radius: var(--radius);
- }
+#listing .item.header p.size {
+  flex-shrink: 0; flex-basis: 100px;
+  justify-content: flex-end !important;
+  padding-left: 5px !important;
+  padding-right: 5px !important;
+}
+#listing .item.header p.modified {
+  flex-shrink: 0; flex-basis: 150px;
+  justify-content: flex-end !important;
+  padding-left: 5px !important;
+  padding-right: 5px !important;
+}
+
+/* Header Sorting Arrows */
+#listing .item.header p i.material-icons {
+  font-size: 16px !important;
+  margin-left: 4px !important;
+  color: #6c757d !important;
+}
+#listing .item.header p.active { color: #212529 !important; }
+#listing .item.header p.active i.material-icons { color: #212529 !important; }
 
 
-/* File Listing Area */
-#listing, .listing { /* Use inspector */
-  /* Base styles if needed */
+/* --- Listing Item Row Styling (Reference Points) --- */
+
+/* Style the .item row itself as a flex container */
+#listing > div:not(.item.header) > div.item {
+  background-color: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid #f1f3f5 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  min-height: 44px !important;
+  box-sizing: border-box;
 }
-#listing .item, .listing .file { /* File/Folder rows */
-  border-bottom: 1px solid var(--border);
-  transition: background-color 0.1s ease-in-out;
+#listing > div:not(.item.header) > div.item:last-child { border-bottom: none !important; }
+#listing > div:not(.item.header) > div.item:hover { background-color: #f8f9fa !important; }
+#listing > div:not(.item.header) > div.item[aria-selected="true"],
+#listing > div:not(.item.header) > div.item[aria-selected="true"]:hover { background-color: #e9ecef !important; }
+
+/* Style the FIRST child div (contains the icon) */
+#listing > div:not(.item.header) > div.item > div:first-child {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 38px !important;
+    flex-shrink: 0 !important;
+    padding-left: 20px !important;
+    padding-right: 14px !important;
+    box-sizing: content-box !important; /* Keep content-box if needed for icon centering */
+    /* Total space: 20 + 38 + 14 = 72px */
 }
-#listing .item:hover, .listing .file:hover {
-  background-color: var(--accent);
+
+/* Style the SECOND child div (contains paragraphs) */
+#listing > div:not(.item.header) > div.item > div:nth-child(2) {
+    display: flex !important;
+    flex-grow: 1 !important;
+    align-items: baseline !important;
+    padding: 8px 20px 8px 0 !important; /* T R B L */
+    overflow: hidden !important;
+    box-sizing: border-box;
+     /* Container starts at 72px */
 }
-#listing .item.selected, .listing .file[aria-selected="true"] { /* Selected files */
-  background-color: oklch(from var(--primary) l calc(l + 0.4)); /* Lighter primary */
-  border-left: 3px solid var(--primary);
+
+/* Style the paragraphs WITHIN the second child div */
+#listing .item p {
+  color: #212529 !important;
+  font-size: 0.95em !important;
+  margin: 0 !important;
+  padding: 2px 5px !important; /* T R B L (5px left padding) */
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  box-sizing: border-box;
 }
-/* Style icons within the file list */
- #listing .item i, .listing .file i { /* Target icon elements */
-     color: var(--muted-foreground); /* Default icon color */
- }
- #listing .item:hover i, .listing .file:hover i {
-     color: var(--foreground); /* Icon color on hover */
- }
- #listing .item .name, .listing .file .name { /* Filename */
-     color: var(--foreground);
-     font-weight: 500;
- }
-  #listing .item:hover .name, .listing .file:hover .name {
-      color: var(--accent-foreground);
-  }
-  #listing .item.selected .name, .listing .file[aria-selected="true"] .name {
-      color: var(--primary);
-  }
+/* Paragraph column sizing */
+#listing .item p.name {
+  font-weight: 500 !important;
+  flex-grow: 1 !important; flex-shrink: 1 !important; flex-basis: 0% !important;
+  margin-right: 10px !important;
+  text-align: left !important;
+  /* Text starts at container (72px) + padding (5px) = 77px */
+}
+#listing .item p.size,
+#listing .item p.modified {
+   flex-shrink: 0 !important;
+   text-align: right !important;
+   color: #6c757d !important;
+}
+#listing .item p.size { flex-basis: 100px !important; }
+#listing .item p.modified { flex-basis: 150px !important; }
+
+/* --- Icon Styling (UPDATED FOLDER COLOR) --- */
+
+/* Default Icon Styles (Applies to all, including files) */
+#listing .item i.material-icons {
+  font-size: 24px !important;
+  color: #6c757d !important; /* Default/Fallback color */
+  margin-right: 0 !important;
+  width: auto !important;
+  text-align: center !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+/* Specific Folder Icon Color (DARKER) */
+#listing .item i.material-icons.folder,
+#listing .item.dir i.material-icons
+{
+  color: oklch(0.15 0.042 265.755) !important; /* Even Darker Purple/Blue */
+  color: #181329 !important; /* Fallback Hex Color */
+}
+
+/* --- End Icon Styling --- */
 
 
-/* --- Remove default File Browser Promos/Logos if desired --- */
-/* Inspect elements for promo/footer links and hide them */
-/* Example:
-a[href*="filebrowser.org"],
-.credits {
-    display: none !important;
+/* --- Existing Button Styling (Keep from first version) --- */
+.action.button--block,
+button.ok,
+input[type="submit"] {
+  background-color: #212529 !important;
+  color: #ffffff !important;
+  border: none !important;
+  padding: 10px 20px !important;
+  border-radius: 5px !important;
+  font-weight: bold !important;
+  box-shadow: none !important;
+  transition: background-color 0.2s ease;
 }
-*/
+.action.button--block:hover,
+button.ok:hover,
+input[type="submit"]:hover {
+  background-color: #343a40 !important;
+}
 
-/* --- Fine-tuning (Optional) --- */
-/* Adjust padding, margins, font sizes as needed */
-/* Example:
-#listing .item, .listing .file {
-    padding: 0.6rem 0.8rem;
+/* --- Existing Prompts/Modals Styling --- */
+#prompts { background-color: rgba(0, 0, 0, 0.6) !important; }
+#prompts .prompt {
+  background-color: #ffffff !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
 }
-*/
+#prompts .prompt h3 { color: #212529; }
+
+/* --- Remove Credits --- */
+.credits { display: none !important; }

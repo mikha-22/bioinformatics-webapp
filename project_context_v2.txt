@@ -147,6 +147,225 @@ docker/filebrowser.db
 - main page !1
 --- END FILE: ./CHANGELOG.MD ---
 
+--- START FILE: ./filebrowser_custom_branding/custom.css (Size: 6921 bytes) ---
+/* File: ./custom_branding/custom.css */
+
+/* Define the same CSS variables as your frontend app */
+:root {
+  --radius: 0.625rem; /* From your tailwind.config.ts */
+  --background: oklch(0.99 0.003 240);
+  --foreground: oklch(0.1 0.03 250);
+  --card: oklch(1 0 0); /* FileBrowser might not use 'card' directly */
+  --card-foreground: oklch(0.1 0.03 250);
+  --popover: oklch(1 0 0); /* FileBrowser might not use 'popover' directly */
+  --popover-foreground: oklch(0.1 0.03 250);
+  --primary: oklch(0.208 0.042 265.755);
+  --primary-foreground: oklch(0.984 0.003 247.858);
+  --secondary: oklch(0.90 0.02 255);
+  --secondary-foreground: oklch(0.15 0.03 255);
+  --muted: oklch(0.93 0.01 240);
+  --muted-foreground: oklch(0.40 0.03 250);
+  --accent: oklch(0.94 0.015 260);
+  --accent-foreground: oklch(0.15 0.03 255);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
+  --border: oklch(0.88 0.005 240);
+  --input: oklch(0.88 0.005 240); /* Input background */
+  --ring: oklch(0.65 0.04 260);
+}
+
+.dark { /* Define dark mode variables */
+  --background: oklch(0.1 0.01 240);
+  --foreground: oklch(0.96 0.005 240);
+  --card: oklch(0.15 0.015 240);
+  --card-foreground: oklch(0.96 0.005 240);
+  --popover: oklch(0.15 0.015 240);
+  --popover-foreground: oklch(0.96 0.005 240);
+  --primary: oklch(0.3 0.05 265.755);
+  --primary-foreground: oklch(0.99 0.005 250);
+  --secondary: oklch(0.25 0.03 255);
+  --secondary-foreground: oklch(0.96 0.005 240);
+  --muted: oklch(0.2 0.02 240);
+  --muted-foreground: oklch(0.60 0.02 240);
+  --accent: oklch(0.3 0.03 260);
+  --accent-foreground: oklch(0.96 0.005 240);
+  --destructive: oklch(0.65 0.19 22);
+  --destructive-foreground: oklch(0.96 0.005 240);
+  --border: oklch(0.25 0.01 240);
+  --input: oklch(0.25 0.01 240); /* Dark Input background */
+  --ring: oklch(0.5 0.03 260);
+}
+
+/* Apply base styles */
+body, html {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Geist Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px; /* Adjust base font size if needed */
+}
+
+/* --- General Element Styling --- */
+
+/* Links */
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+  color: oklch(from var(--primary) l calc(l + 0.1)); /* Lighten primary on hover */
+}
+
+/* Buttons - Target common FileBrowser button classes/elements */
+button, .button, .action {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid transparent;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius);
+  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+  cursor: pointer;
+  font-weight: 500; /* Medium weight like shadcn */
+}
+button:hover, .button:hover, .action:hover {
+  background-color: oklch(from var(--primary) l calc(l - 0.05)); /* Darken primary slightly */
+}
+button:disabled, .button:disabled, .action:disabled {
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Secondary/Outline style buttons (often used for less important actions) */
+button. TBD, .button.TBD, .action.TBD { /* Replace TBD with actual classes if FileBrowser has them */
+    background-color: var(--secondary);
+    color: var(--secondary-foreground);
+    border-color: var(--border);
+}
+ button.TBD:hover, .button.TBD:hover, .action.TBD:hover {
+     background-color: var(--accent);
+     border-color: var(--accent);
+}
+
+
+/* Input fields */
+input[type="text"],
+input[type="search"],
+input[type="password"],
+textarea {
+  background-color: var(--input);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+input[type="text"]:focus,
+input[type="search"]:focus,
+input[type="password"]:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px oklch(from var(--ring) l calc(l + 0.1) a calc(a / 2)); /* Subtle ring effect */
+}
+input::placeholder, textarea::placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.8;
+}
+
+/* --- FileBrowser Specific Areas (Inspect elements to confirm selectors) --- */
+
+/* Header/Action Bar */
+#header, .actionbar { /* Use inspector to find the correct ID/class */
+  background-color: var(--muted); /* Or var(--secondary) */
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 1rem;
+  /* Adjust text color if needed */
+  color: var(--muted-foreground);
+}
+#header button, .actionbar button {
+    /* Style header buttons differently if needed */
+    background-color: var(--secondary);
+    color: var(--secondary-foreground);
+    border-color: var(--border);
+}
+#header button:hover, .actionbar button:hover {
+    background-color: var(--accent);
+    border-color: var(--accent);
+}
+
+/* Sidebar */
+#sidebar { /* Use inspector */
+  background-color: var(--card); /* Or var(--muted) */
+  border-right: 1px solid var(--border);
+}
+#sidebar a.active, #sidebar li.active > a { /* Style active sidebar links */
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+    font-weight: 600;
+    border-radius: var(--radius);
+}
+ #sidebar a:hover {
+     background-color: var(--accent);
+     color: var(--accent-foreground);
+     border-radius: var(--radius);
+ }
+
+
+/* File Listing Area */
+#listing, .listing { /* Use inspector */
+  /* Base styles if needed */
+}
+#listing .item, .listing .file { /* File/Folder rows */
+  border-bottom: 1px solid var(--border);
+  transition: background-color 0.1s ease-in-out;
+}
+#listing .item:hover, .listing .file:hover {
+  background-color: var(--accent);
+}
+#listing .item.selected, .listing .file[aria-selected="true"] { /* Selected files */
+  background-color: oklch(from var(--primary) l calc(l + 0.4)); /* Lighter primary */
+  border-left: 3px solid var(--primary);
+}
+/* Style icons within the file list */
+ #listing .item i, .listing .file i { /* Target icon elements */
+     color: var(--muted-foreground); /* Default icon color */
+ }
+ #listing .item:hover i, .listing .file:hover i {
+     color: var(--foreground); /* Icon color on hover */
+ }
+ #listing .item .name, .listing .file .name { /* Filename */
+     color: var(--foreground);
+     font-weight: 500;
+ }
+  #listing .item:hover .name, .listing .file:hover .name {
+      color: var(--accent-foreground);
+  }
+  #listing .item.selected .name, .listing .file[aria-selected="true"] .name {
+      color: var(--primary);
+  }
+
+
+/* --- Remove default File Browser Promos/Logos if desired --- */
+/* Inspect elements for promo/footer links and hide them */
+/* Example:
+a[href*="filebrowser.org"],
+.credits {
+    display: none !important;
+}
+*/
+
+/* --- Fine-tuning (Optional) --- */
+/* Adjust padding, margins, font sizes as needed */
+/* Example:
+#listing .item, .listing .file {
+    padding: 0.6rem 0.8rem;
+}
+*/
+
+--- END FILE: ./filebrowser_custom_branding/custom.css ---
+
 --- START FILE: ./start_dev.sh (Size: 8567 bytes) ---
 #!/bin/bash
 
@@ -372,7 +591,7 @@ cleanup
 
 --- END FILE: ./start_dev.sh ---
 
---- START FILE: ./how-to-deploy.txt (Size: 1505 bytes) ---
+--- START FILE: ./how-to-deploy.txt (Size: 1562 bytes) ---
 # AUTO DEPLOYMENT
 
 # PREREQUISITES
@@ -431,6 +650,7 @@ docker run \
   -v "$(pwd)/docker/settings.json:/config/settings.json" \
   -v "$(pwd)/tls/server.crt:/config/server.crt" \
   -v "$(pwd)/tls/server.key:/config/server.key" \
+  -v "$(pwd)/filebrowser_custom_branding:/branding:ro" \
   --restart unless-stopped \
   ghcr.io/mikha-22/bioinformatics-webapp/filebrowser:latest
 
@@ -4549,8 +4769,8 @@ CMD ["python", "main.py"]
 
 --- END FILE: ./docker/Dockerfile.webapp ---
 
---- START FILE: ./docker-compose-localbuild.yml (Size: 4931 bytes) ---
-# ./docker-compose.yml
+--- START FILE: ./docker-compose-localbuild.yml (Size: 5598 bytes) ---
+# ./docker-compose-localbuild.yml
 version: '3.8'
 
 services:
@@ -4559,31 +4779,26 @@ services:
   ##################
   frontend:
     build:
-      context: .
+      context: ./frontend_app # Context needs to be specific to frontend
       dockerfile: ./docker/Dockerfile.frontend
-    container_name: bio_frontend
+    container_name: bio_frontend_local # Added _local suffix for clarity
     ports:
-      - "${FRONTEND_PORT:-3000}:3000" # Map host port 3000 (or env var) to container 3000
+      - "${FRONTEND_PORT:-3000}:3000"
     environment:
-      # Tell Next.js runtime it's production
       - NODE_ENV=production
-      # Point to the backend API service (internal Docker network)
-      - NEXT_PUBLIC_API_BASE_URL=http://webapp:8000
-      # Pass FileBrowser URL (can be external or internal depending on setup)
-      # Using host.docker.internal might work for local dev if FileBrowser is exposed on host
-      # Or use the external URL directly if that's how frontend accesses it
-      - NEXT_PUBLIC_FILEBROWSER_URL=${NEXT_PUBLIC_FILEBROWSER_URL:-http://localhost:8081} # Default to localhost:8081 if host env not set
-      # Explicitly set port for Next.js server inside container
+      # Use host.docker.internal for local development if webapp is also in docker
+      # Otherwise, use localhost if webapp runs directly on host
+      - NEXT_PUBLIC_API_BASE_URL=https://host.docker.internal:8000 # Assuming backend runs on host mapped port OR use service name if on same network
+      - NEXT_PUBLIC_FILEBROWSER_URL=https://localhost:8081 # Assuming filebrowser runs on host mapped port
       - PORT=3000
-    # No code volumes needed for standalone build generally
-    # volumes:
-      # - ./frontend_app:/app # Only for development with hot-reloading (requires different Dockerfile setup)
+    # volumes: # Usually not needed for production build, mount only if needed for dev
+      # - ./frontend_app:/app
     depends_on:
-      - webapp # Optional: Frontend might start before backend is fully ready, but should handle retries
+      - webapp # Optional dependency
     restart: unless-stopped
     networks:
       - app-network
-    # user: "nextjs" # Matches user in Dockerfile runner stage (optional, Docker handles it)
+    # user: "nextjs" # Optional, image should handle user
 
   ##################
   # Web Application (FastAPI Backend)
@@ -4592,18 +4807,16 @@ services:
     build:
       context: .
       dockerfile: ./docker/Dockerfile.webapp
-    container_name: bio_webapp
+    container_name: bio_webapp_local # Added _local suffix
     ports:
       - "${WEBAPP_PORT:-8000}:8000"
     volumes:
       - ./backend:/app/backend # Keep for dev convenience
       - ./main.py:/app/main.py # Keep for dev convenience
       - ./tls:/app/tls
-      # --- UPDATED Paths ---
       - results_vol:/app/bioinformatics/results # Container path remains the same
       - data_vol:/app/bioinformatics/data     # Container path remains the same
-      # -------------------
-      - ./docker/settings.json:/app/docker/settings.json
+      - ./docker/settings.json:/app/docker/settings.json:ro # Mount settings read-only
     environment:
       - REDIS_HOST=redis
       - PYTHONUNBUFFERED=1
@@ -4621,21 +4834,20 @@ services:
     build:
       context: .
       dockerfile: ./docker/Dockerfile.worker
-    container_name: bio_worker
+    container_name: bio_worker_local # Added _local suffix
     depends_on:
       - redis
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      # --- UPDATED Paths (Container paths remain the same) ---
-      - data_vol:/data
-      - results_vol:/results
-      # -----------------------------------------------------
-      - references_vol:/references
-      - nextflow_work_vol:/nf_work
+      - data_vol:/data # Internal mapping for worker data access
+      - results_vol:/results # Internal mapping for worker results access
+      - references_vol:/references # Assuming references are needed by Nextflow
+      - nextflow_work_vol:/nf_work # Nextflow work directory
+      - ./backend:/app/backend:ro # Mount backend code read-only if tasks.py imports utils/core
     environment:
       - REDIS_HOST=redis
       - PYTHONUNBUFFERED=1
-      - PYTHONPATH=/app
+      - PYTHONPATH=/app # Worker needs to import from backend/app
       - NXF_WORK=/nf_work
     user: "${UID:-1000}:${GID:-1000}"
     restart: unless-stopped
@@ -4647,7 +4859,7 @@ services:
   ##################
   redis:
     image: redis:7-alpine
-    container_name: bio_redis
+    container_name: bio_redis_local # Added _local suffix
     volumes:
       - redis_data_vol:/data
     restart: unless-stopped
@@ -4661,22 +4873,31 @@ services:
     build:
       context: .
       dockerfile: ./docker/Dockerfile.filebrowser
-    container_name: bio_filebrowser
+    container_name: bio_filebrowser_local # Added _local suffix
     ports:
       - "${FILEBROWSER_PORT:-8081}:8080"
     volumes:
-      # --- UPDATED Paths (Container paths remain the same) ---
-      - data_vol:/srv/data
-      - results_vol:/srv/results
-      # -----------------------------------------------------
-      - ./docker/filebrowser.db:/config/filebrowser.db
-      - ./docker/settings.json:/config/settings.json
-      - ./tls/server.crt:/config/server.crt
-      - ./tls/server.key:/config/server.key
-    user: "${UID:-1000}:${GID:-1000}"
+      # --- Mounts for FileBrowser data and config ---
+      - data_vol:/srv/data # Mount data volume to /srv/data
+      - results_vol:/srv/results # Mount results volume to /srv/results
+      - ./docker/filebrowser.db:/config/filebrowser.db # DB location
+      - ./docker/settings.json:/config/settings.json:ro # Settings file (read-only)
+      - ./tls/server.crt:/config/server.crt:ro # TLS cert (read-only)
+      - ./tls/server.key:/config/server.key:ro # TLS key (read-only)
+      # --- ADDED: Mount for custom branding ---
+      - ./custom_branding:/branding:ro # Mount local custom_branding to /branding in container (read-only)
+    user: "${UID:-1000}:${GID:-1000}" # Run as host user
     restart: unless-stopped
     networks:
       - app-network
+    # --- ADDED: Command override to enable branding ---
+    command: >
+      /usr/local/bin/filebrowser
+      --port=8080
+      --root=/srv
+      --database=/config/filebrowser.db
+      --config=/config/settings.json
+      --branding.files /branding # Point to the mounted branding directory
 
 ##################
 # Networks
@@ -4694,27 +4915,27 @@ volumes:
     driver_opts:
       type: 'none'
       o: 'bind'
-      # --- UPDATED Host Path ---
-      device: '/home/admin01/work/mnt/nas/mikha_temp/data'
-      # -----------------------
+      device: '/home/admin01/work/mnt/nas/mikha_temp/data' # Host path for data
   results_vol:
     driver: local
     driver_opts:
       type: 'none'
       o: 'bind'
-      # --- UPDATED Host Path ---
-      device: '/home/admin01/work/mnt/nas/mikha_temp/results'
-      # -----------------------
-  references_vol: # Assuming this path remains the same, adjust if needed
+      device: '/home/admin01/work/mnt/nas/mikha_temp/results' # Host path for results
+  references_vol: # Define host path for references if used by Nextflow/Sarek
     driver: local
     driver_opts:
       type: 'none'
       o: 'bind'
-      device: '/home/mikha/labs/bioinformatics-webapp/bioinformatics/references'
-  nextflow_work_vol:
-    # Define if needed
-  redis_data_vol:
-    # Docker managed volume
+      device: '/path/on/host/to/references' # <-- !!! UPDATE THIS PATH !!!
+  nextflow_work_vol: # Define host path for Nextflow work directory persistence
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/path/on/host/for/nf_work' # <-- !!! UPDATE THIS PATH or use Docker volume !!!
+  redis_data_vol: # Docker managed volume for Redis persistence
+    # No device needed, Docker manages this
 
 --- END FILE: ./docker-compose-localbuild.yml ---
 
