@@ -1,5 +1,0 @@
-patient,sample,sex,status,fastq_1,fastq_2
-patient1,sample1,XX,0,/data/samples/patient1/sample1_R1.fastq.gz,/data/samples/patient1/sample1_R2.fastq.gz
-patient1,sample2,XX,1,/data/samples/patient1/sample2_R1.fastq.gz,/data/samples/patient1/sample2_R2.fastq.gz
-patient2,sample1,XY,0,/data/samples/patient2/sample1_R1.fastq.gz,/data/samples/patient2/sample1_R2.fastq.gz
-patient2,sample2,XY,1,/data/samples/patient2/sample2_R1.fastq.gz,/data/samples/patient2/sample2_R2.fastq.gz 

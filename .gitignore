@@ -1,7 +1,11 @@
+# Sensitive files
+tls/
+
 # Nextflow specific
 .nextflow/
 .nextflow.log*
 work/
+
 # CHANGED: Make results pattern specific to pipeline results
 /results/
 nxf-tmp.*
@@ -46,11 +50,12 @@ dist/
 logs/
 log/
 
-# Local development
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Local development, ignore for now, frontend_app/.env.local sets certain variables for API URL and FileBrowser URL.
+
+# .env.local
+# .env.development.local
+# .env.test.local
+# .env.production.local
 
 # System files
 .DS_Store
