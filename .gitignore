@@ -51,6 +51,7 @@ dist/
 *.log
 logs/
 log/
+logs_dev/
 
 # Local development, ignore for now, frontend_app/.env.local sets certain variables for API URL and FileBrowser URL.
 
