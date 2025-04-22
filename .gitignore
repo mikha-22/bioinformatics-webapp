@@ -62,6 +62,3 @@ log/
 # System files
 .DS_Store
 Thumbs.db
-
-# Misc
-docker/filebrowser.db
