@@ -147,229 +147,11 @@ docker/filebrowser.db
 - main page !1
 --- END FILE: ./CHANGELOG.MD ---
 
---- START FILE: ./filebrowser_custom_branding/custom.css (Size: 6921 bytes) ---
-/* File: ./custom_branding/custom.css */
-
-/* Define the same CSS variables as your frontend app */
-:root {
-  --radius: 0.625rem; /* From your tailwind.config.ts */
-  --background: oklch(0.99 0.003 240);
-  --foreground: oklch(0.1 0.03 250);
-  --card: oklch(1 0 0); /* FileBrowser might not use 'card' directly */
-  --card-foreground: oklch(0.1 0.03 250);
-  --popover: oklch(1 0 0); /* FileBrowser might not use 'popover' directly */
-  --popover-foreground: oklch(0.1 0.03 250);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.90 0.02 255);
-  --secondary-foreground: oklch(0.15 0.03 255);
-  --muted: oklch(0.93 0.01 240);
-  --muted-foreground: oklch(0.40 0.03 250);
-  --accent: oklch(0.94 0.015 260);
-  --accent-foreground: oklch(0.15 0.03 255);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.88 0.005 240);
-  --input: oklch(0.88 0.005 240); /* Input background */
-  --ring: oklch(0.65 0.04 260);
-}
-
-.dark { /* Define dark mode variables */
-  --background: oklch(0.1 0.01 240);
-  --foreground: oklch(0.96 0.005 240);
-  --card: oklch(0.15 0.015 240);
-  --card-foreground: oklch(0.96 0.005 240);
-  --popover: oklch(0.15 0.015 240);
-  --popover-foreground: oklch(0.96 0.005 240);
-  --primary: oklch(0.3 0.05 265.755);
-  --primary-foreground: oklch(0.99 0.005 250);
-  --secondary: oklch(0.25 0.03 255);
-  --secondary-foreground: oklch(0.96 0.005 240);
-  --muted: oklch(0.2 0.02 240);
-  --muted-foreground: oklch(0.60 0.02 240);
-  --accent: oklch(0.3 0.03 260);
-  --accent-foreground: oklch(0.96 0.005 240);
-  --destructive: oklch(0.65 0.19 22);
-  --destructive-foreground: oklch(0.96 0.005 240);
-  --border: oklch(0.25 0.01 240);
-  --input: oklch(0.25 0.01 240); /* Dark Input background */
-  --ring: oklch(0.5 0.03 260);
-}
-
-/* Apply base styles */
-body, html {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: 'Geist Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  font-size: 14px; /* Adjust base font size if needed */
-}
-
-/* --- General Element Styling --- */
-
-/* Links */
-a {
-  color: var(--primary);
-  text-decoration: none;
-}
-a:hover {
-  text-decoration: underline;
-  color: oklch(from var(--primary) l calc(l + 0.1)); /* Lighten primary on hover */
-}
-
-/* Buttons - Target common FileBrowser button classes/elements */
-button, .button, .action {
-  background-color: var(--primary);
-  color: var(--primary-foreground);
-  border: 1px solid transparent;
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius);
-  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
-  cursor: pointer;
-  font-weight: 500; /* Medium weight like shadcn */
-}
-button:hover, .button:hover, .action:hover {
-  background-color: oklch(from var(--primary) l calc(l - 0.05)); /* Darken primary slightly */
-}
-button:disabled, .button:disabled, .action:disabled {
-  background-color: var(--muted);
-  color: var(--muted-foreground);
-  cursor: not-allowed;
-  opacity: 0.7;
-}
-
-/* Secondary/Outline style buttons (often used for less important actions) */
-button. TBD, .button.TBD, .action.TBD { /* Replace TBD with actual classes if FileBrowser has them */
-    background-color: var(--secondary);
-    color: var(--secondary-foreground);
-    border-color: var(--border);
-}
- button.TBD:hover, .button.TBD:hover, .action.TBD:hover {
-     background-color: var(--accent);
-     border-color: var(--accent);
-}
-
-
-/* Input fields */
-input[type="text"],
-input[type="search"],
-input[type="password"],
-textarea {
-  background-color: var(--input);
-  color: var(--foreground);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.5rem 0.75rem;
-  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-}
-input[type="text"]:focus,
-input[type="search"]:focus,
-input[type="password"]:focus,
-textarea:focus {
-  outline: none;
-  border-color: var(--ring);
-  box-shadow: 0 0 0 2px oklch(from var(--ring) l calc(l + 0.1) a calc(a / 2)); /* Subtle ring effect */
-}
-input::placeholder, textarea::placeholder {
-  color: var(--muted-foreground);
-  opacity: 0.8;
-}
-
-/* --- FileBrowser Specific Areas (Inspect elements to confirm selectors) --- */
-
-/* Header/Action Bar */
-#header, .actionbar { /* Use inspector to find the correct ID/class */
-  background-color: var(--muted); /* Or var(--secondary) */
-  border-bottom: 1px solid var(--border);
-  padding: 0.5rem 1rem;
-  /* Adjust text color if needed */
-  color: var(--muted-foreground);
-}
-#header button, .actionbar button {
-    /* Style header buttons differently if needed */
-    background-color: var(--secondary);
-    color: var(--secondary-foreground);
-    border-color: var(--border);
-}
-#header button:hover, .actionbar button:hover {
-    background-color: var(--accent);
-    border-color: var(--accent);
-}
-
-/* Sidebar */
-#sidebar { /* Use inspector */
-  background-color: var(--card); /* Or var(--muted) */
-  border-right: 1px solid var(--border);
-}
-#sidebar a.active, #sidebar li.active > a { /* Style active sidebar links */
-    background-color: var(--accent);
-    color: var(--accent-foreground);
-    font-weight: 600;
-    border-radius: var(--radius);
-}
- #sidebar a:hover {
-     background-color: var(--accent);
-     color: var(--accent-foreground);
-     border-radius: var(--radius);
- }
-
-
-/* File Listing Area */
-#listing, .listing { /* Use inspector */
-  /* Base styles if needed */
-}
-#listing .item, .listing .file { /* File/Folder rows */
-  border-bottom: 1px solid var(--border);
-  transition: background-color 0.1s ease-in-out;
-}
-#listing .item:hover, .listing .file:hover {
-  background-color: var(--accent);
-}
-#listing .item.selected, .listing .file[aria-selected="true"] { /* Selected files */
-  background-color: oklch(from var(--primary) l calc(l + 0.4)); /* Lighter primary */
-  border-left: 3px solid var(--primary);
-}
-/* Style icons within the file list */
- #listing .item i, .listing .file i { /* Target icon elements */
-     color: var(--muted-foreground); /* Default icon color */
- }
- #listing .item:hover i, .listing .file:hover i {
-     color: var(--foreground); /* Icon color on hover */
- }
- #listing .item .name, .listing .file .name { /* Filename */
-     color: var(--foreground);
-     font-weight: 500;
- }
-  #listing .item:hover .name, .listing .file:hover .name {
-      color: var(--accent-foreground);
-  }
-  #listing .item.selected .name, .listing .file[aria-selected="true"] .name {
-      color: var(--primary);
-  }
-
-
-/* --- Remove default File Browser Promos/Logos if desired --- */
-/* Inspect elements for promo/footer links and hide them */
-/* Example:
-a[href*="filebrowser.org"],
-.credits {
-    display: none !important;
-}
-*/
-
-/* --- Fine-tuning (Optional) --- */
-/* Adjust padding, margins, font sizes as needed */
-/* Example:
-#listing .item, .listing .file {
-    padding: 0.6rem 0.8rem;
-}
-*/
-
---- END FILE: ./filebrowser_custom_branding/custom.css ---
-
---- START FILE: ./start_dev.sh (Size: 8567 bytes) ---
+--- START FILE: ./start_dev.sh (Size: 11587 bytes) ---
 #!/bin/bash
 
 # Exit immediately if a command exits with a non-zero status during setup.
+# set -e # Commented out to allow checks after commands
 
 # --- Configuration ---
 REDIS_CONTAINER_NAME="bio_redis_local"
@@ -383,7 +165,10 @@ TLS_KEY="$TLS_DIR/server.key"
 TLS_CERT="$TLS_DIR/server.crt"
 LOGS_DIR="./logs_dev"
 
-# --- Content for .env.local ---
+# --- Content for frontend .env.local ---
+# Defines the environment variables needed by the Next.js app
+# NEXT_PUBLIC_API_BASE_URL points to the backend server
+# NEXT_PUBLIC_FILEBROWSER_URL points to the file browser server
 read -r -d '' FRONTEND_ENV_CONTENT << EOM
 NEXT_PUBLIC_API_BASE_URL=https://localhost:8000
 NEXT_PUBLIC_FILEBROWSER_URL=https://localhost:8081
@@ -406,8 +191,21 @@ log_warn() {
 
 log_error() {
   echo "[ERROR] $(date '+%Y-%m-%d %H:%M:%S') - $1" >&2
+  # Attempt cleanup before exiting on error
+  cleanup_on_error
   exit 1
 }
+
+# Function specifically for cleanup on script error
+cleanup_on_error() {
+  log_warn "--- Error detected, initiating cleanup ---"
+  kill_pid_file "$TAIL_PID_FILE" "Log Tail Process"
+  kill_pid_file "$FRONTEND_PID_FILE" "Frontend (npm run dev)"
+  kill_pid_file "$WORKER_PID_FILE" "RQ Worker"
+  kill_pid_file "$BACKEND_PID_FILE" "Backend (python main.py)"
+  log_warn "--- Cleanup due to error finished ---"
+}
+
 
 kill_pid_file() {
   local pid_file="$1"
@@ -429,13 +227,19 @@ kill_pid_file() {
       else
           log_info "$process_name PID file was empty."
       fi
-      rm "$pid_file"
+      rm "$pid_file" # Remove empty or stale pid file
     fi
+  elif [ -e "$pid_file" ]; then
+     # File exists but is empty or unreadable?
+     log_warn "PID file '$pid_file' for $process_name exists but could not read PID or process already stopped. Removing file."
+     rm "$pid_file"
+  # else
+  #   log_info "PID file '$pid_file' for $process_name not found." # Optional: Log if file doesn't exist at all
   fi
 }
 
 cleanup() {
-  log_info "--- Initiating Cleanup ---"
+  log_info "--- Initiating Cleanup (SIGINT/SIGTERM received) ---"
   kill_pid_file "$TAIL_PID_FILE" "Log Tail Process"
   kill_pid_file "$FRONTEND_PID_FILE" "Frontend (npm run dev)"
   kill_pid_file "$WORKER_PID_FILE" "RQ Worker"
@@ -499,9 +303,10 @@ else
             -sha256 -days 365 -nodes \
             -subj "/CN=localhost" || log_error "Failed to generate TLS certificate/key."
     log_info "TLS certificate and key generated successfully in '$TLS_DIR'."
-    sudo chown "$(id -u):$(id -g)" "$TLS_KEY" "$TLS_CERT"
+    sudo chown "$(id -u):$(id -g)" "$TLS_KEY" "$TLS_CERT" || log_warn "Failed to chown TLS files. Check sudo permissions."
 fi
 
+# Allow commands to fail without exiting the whole script from here on
 set +e
 
 # 3. Start Backend (in background, redirect logs)
@@ -509,18 +314,19 @@ log_info "Starting FastAPI backend -> $LOGS_DIR/backend.log"
 python -u main.py > "$LOGS_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 echo $BACKEND_PID > "$BACKEND_PID_FILE"
-sleep 3
+sleep 3 # Give backend a moment to start
+
+# Check if the backend process started successfully
 if ! ps -p $BACKEND_PID > /dev/null; then
     log_error "Backend process (PID: $BACKEND_PID stored in $BACKEND_PID_FILE) failed to start or crashed immediately. Check '$LOGS_DIR/backend.log'."
-elif ! curl --output /dev/null --silent --head --fail -k https://localhost:8000/health; then
-    log_warn "Backend process started (PID: $BACKEND_PID) but health check failed. It might still be initializing or encountered an error. Check '$LOGS_DIR/backend.log'."
 else
-    log_info "Backend started (PID: $BACKEND_PID) and responding to health check."
+    # Removed health check - just confirm process started
+    log_info "Backend process started (PID: $BACKEND_PID). Verify functionality by checking '$LOGS_DIR/backend.log' or accessing API endpoints (e.g., /docs)."
 fi
 
 # 4. Start RQ Worker (in background, redirect logs)
 log_info "Starting RQ worker -> $LOGS_DIR/worker.log"
-export PYTHONPATH="$PROJECT_ROOT"
+export PYTHONPATH="$PROJECT_ROOT" # Ensure tasks.py can be found
 rq worker "$QUEUE_NAME" --url "$REDIS_URL" > "$LOGS_DIR/worker.log" 2>&1 &
 WORKER_PID=$!
 echo $WORKER_PID > "$WORKER_PID_FILE"
@@ -528,41 +334,63 @@ sleep 2
 if ! ps -p $WORKER_PID > /dev/null; then
     log_error "RQ Worker process (PID: $WORKER_PID stored in $WORKER_PID_FILE) failed to start or crashed immediately. Check '$LOGS_DIR/worker.log'."
 else
-    if grep -q -E "Listening on|Registering birth" "$LOGS_DIR/worker.log"; then
+    # Check if the worker log contains startup messages indicating it's listening
+    if grep -q -E "Listening on|Registering birth|RQ Worker started" "$LOGS_DIR/worker.log" 2>/dev/null; then
         log_info "RQ Worker started (PID: $WORKER_PID) and appears to be listening."
     else
         log_warn "RQ Worker process started (PID: $WORKER_PID) but expected startup message not found in log yet. Check '$LOGS_DIR/worker.log'."
     fi
 fi
 
-# 5. Ensure Frontend .env.local exists
+# 5. Ensure Frontend .env.local exists with correct content
+# This step creates the file if it's missing, ensuring the frontend
+# has the correct API and FileBrowser URLs when it starts.
 log_info "Checking Frontend .env.local file at '$FRONTEND_ENV_FILE'..."
-if [ -f "$FRONTEND_ENV_FILE" ]; then
-    log_info "'$FRONTEND_ENV_FILE' already exists."
-else
-    if [ -d "$FRONTEND_DIR" ]; then
-        log_warn "'$FRONTEND_ENV_FILE' not found. Creating it..."
-        printf "%s\n" "$FRONTEND_ENV_CONTENT" > "$FRONTEND_ENV_FILE" || log_error "Failed to create '$FRONTEND_ENV_FILE'."
-        log_info "'$FRONTEND_ENV_FILE' created successfully."
+if [ -d "$FRONTEND_DIR" ]; then # Check if frontend directory exists first
+    if [ -f "$FRONTEND_ENV_FILE" ]; then
+        log_info "'$FRONTEND_ENV_FILE' already exists. Skipping creation."
+        # Optional: Check if content matches and warn/update if needed
+        # current_content=$(cat "$FRONTEND_ENV_FILE")
+        # expected_content=$(printf "%s\n" "$FRONTEND_ENV_CONTENT")
+        # if [ "$current_content" != "$expected_content" ]; then
+        #     log_warn "'$FRONTEND_ENV_FILE' exists but content differs. Consider updating it manually or deleting it to regenerate."
+        # fi
     else
-        log_warn "Frontend directory '$FRONTEND_DIR' not found. Cannot create '$FRONTEND_ENV_FILE'."
+        log_warn "'$FRONTEND_ENV_FILE' not found. Creating it..."
+        # Use printf for better portability and newline handling
+        printf "%s\n" "$FRONTEND_ENV_CONTENT" > "$FRONTEND_ENV_FILE" || log_error "Failed to create '$FRONTEND_ENV_FILE'."
+        log_info "'$FRONTEND_ENV_FILE' created successfully with development URLs."
     fi
+else
+    log_warn "Frontend directory '$FRONTEND_DIR' not found. Cannot create '$FRONTEND_ENV_FILE'."
 fi
 
 # 6. Start Frontend (in background, redirect logs)
 FRONTEND_NPM_PID=""
 if [ -d "$FRONTEND_DIR" ]; then
-  log_info "Starting Frontend dev server -> $LOGS_DIR/frontend.log"
+  log_info "Starting Frontend dev server (Next.js) -> $LOGS_DIR/frontend.log"
   cd "$FRONTEND_DIR"
+  # Run npm install if node_modules doesn't exist
+  if [ ! -d "node_modules" ]; then
+      log_info "Node modules not found in $FRONTEND_DIR. Running 'npm install'..."
+      if npm install >> "../$LOGS_DIR/frontend_npm_install.log" 2>&1; then
+          log_info "'npm install' completed successfully. See '$LOGS_DIR/frontend_npm_install.log'."
+      else
+          log_error "'npm install' failed. Check '$LOGS_DIR/frontend_npm_install.log'."
+      fi
+  fi
+  # Start the dev server
   npm run dev > "../$LOGS_DIR/frontend.log" 2>&1 &
   FRONTEND_NPM_PID=$!
   echo $FRONTEND_NPM_PID > "../$FRONTEND_PID_FILE"
-  cd "$PROJECT_ROOT"
-  sleep 5
+  cd "$PROJECT_ROOT" # Go back to project root
+  sleep 5 # Give Next.js some time to start
+
+  # Check if the process is running and responding
   if ! ps -p $FRONTEND_NPM_PID > /dev/null; then
       log_error "Frontend process (PID: $FRONTEND_NPM_PID stored in $FRONTEND_PID_FILE) failed to start or crashed immediately. Check '$LOGS_DIR/frontend.log'."
   elif ! curl --output /dev/null --silent --head --fail http://localhost:3000; then
-      log_warn "Frontend process started (PID: $FRONTEND_NPM_PID) but failed to respond at http://localhost:3000. Check '$LOGS_DIR/frontend.log'."
+      log_warn "Frontend process started (PID: $FRONTEND_NPM_PID) but failed to respond at http://localhost:3000. Check '$LOGS_DIR/frontend.log'. It might still be compiling."
   else
       log_info "Frontend started (PID: $FRONTEND_NPM_PID) and responding."
   fi
@@ -574,24 +402,30 @@ log_info "--------------------------------------"
 log_info "Development environment startup sequence complete."
 log_info "Tailing logs from '$LOGS_DIR/'. Press Ctrl+C to stop all components."
 log_info "Access Services:"
-log_info "  - Backend API: https://localhost:8000/health"
+log_info "  - Backend API: https://localhost:8000/docs (for API docs)"
 log_info "  - Frontend UI: http://localhost:3000"
 log_info "  - FileBrowser: https://localhost:8081"
 log_info "--------------------------------------"
 
+# Ensure log files exist before tailing to avoid errors if one didn't start
 touch "$LOGS_DIR/backend.log" "$LOGS_DIR/worker.log" "$LOGS_DIR/frontend.log" 2>/dev/null || true
+
+# Tail logs in the background
 tail -f "$LOGS_DIR"/*.log &
 TAIL_PID=$!
 echo $TAIL_PID > "$TAIL_PID_FILE"
 
+# Wait for the tail process specifically. Cleanup is handled by the trap.
 wait $TAIL_PID
 
+# This part might not be reached if Ctrl+C is handled by the trap correctly,
+# but it's a fallback in case tail ends unexpectedly.
 log_warn "Log tailing process ended unexpectedly. Cleaning up..."
 cleanup
 
 --- END FILE: ./start_dev.sh ---
 
---- START FILE: ./how-to-deploy.txt (Size: 1562 bytes) ---
+--- START FILE: ./how-to-deploy.txt (Size: 1559 bytes) ---
 # AUTO DEPLOYMENT
 
 # PREREQUISITES
@@ -650,7 +484,7 @@ docker run \
   -v "$(pwd)/docker/settings.json:/config/settings.json" \
   -v "$(pwd)/tls/server.crt:/config/server.crt" \
   -v "$(pwd)/tls/server.key:/config/server.key" \
-  -v "$(pwd)/filebrowser_custom_branding:/branding:ro" \
+  -v "$(pwd)/filebrowser_custom_branding:/branding" \
   --restart unless-stopped \
   ghcr.io/mikha-22/bioinformatics-webapp/filebrowser:latest
 
@@ -4617,7 +4451,47 @@ CMD ["rq", "worker", "pipeline_tasks", "--url", "redis://redis:6379/0"]
 
 --- END FILE: ./docker/Dockerfile.worker ---
 
---- START FILE: ./docker/Dockerfile.filebrowser (Size: 1025 bytes) ---
+--- START FILE: ./docker/Dockerfile.filebrowser (Size: 1255 bytes) ---
+# File: ./docker/Dockerfile.filebrowser
+
+# --- Build Stage ---
+FROM debian:bookworm-slim AS builder
+WORKDIR /build
+RUN apt-get update && apt-get install -y --no-install-recommends curl bash ca-certificates && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash
+
+# --- Final Stage ---
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+RUN mkdir -p /config /srv /branding
+COPY --from=builder /usr/local/bin/filebrowser /usr/local/bin/filebrowser
+
+ARG UID=1000
+ARG GID=1000
+RUN groupadd --gid ${GID} appuser && \
+    useradd --uid ${UID} --gid ${GID} --shell /bin/bash --create-home appuser
+RUN chown -R appuser:appuser /home/appuser /config /srv /branding
+
+USER appuser
+EXPOSE 8080
+
+CMD sh -c '\
+    /usr/local/bin/filebrowser config set --database /config/filebrowser.db --branding.files /branding && \
+    exec /usr/local/bin/filebrowser \
+        --port=8080 \
+        --root=/srv \
+        --database=/config/filebrowser.db \
+        --config=/config/settings.json \
+        --cert=/config/server.crt \
+        --key=/config/server.key \
+    '
+
+--- END FILE: ./docker/Dockerfile.filebrowser ---
+
+--- START FILE: ./docker/Dockerfile.filebrowser.backup (Size: 1025 bytes) ---
 FROM debian:bookworm-slim AS builder
 
 WORKDIR /build
@@ -4660,7 +4534,7 @@ CMD ["/usr/local/bin/filebrowser", \
      "--database=/config/filebrowser.db", \
      "--config=/config/settings.json"]
 
---- END FILE: ./docker/Dockerfile.filebrowser ---
+--- END FILE: ./docker/Dockerfile.filebrowser.backup ---
 
 --- START FILE: ./docker/Dockerfile.frontend (Size: 1350 bytes) ---
 # ./docker/Dockerfile.frontend
@@ -4939,23 +4813,23 @@ volumes:
 
 --- END FILE: ./docker-compose-localbuild.yml ---
 
---- START FILE: ./logs_dev/tail.pid (Size: 7 bytes) ---
-245796
+--- START FILE: ./logs_dev/tail.pid (Size: 6 bytes) ---
+35983
 
 --- END FILE: ./logs_dev/tail.pid ---
 
---- START FILE: ./logs_dev/frontend.pid (Size: 7 bytes) ---
-245684
+--- START FILE: ./logs_dev/frontend.pid (Size: 6 bytes) ---
+35896
 
 --- END FILE: ./logs_dev/frontend.pid ---
 
---- START FILE: ./logs_dev/backend.pid (Size: 7 bytes) ---
-245627
+--- START FILE: ./logs_dev/backend.pid (Size: 6 bytes) ---
+35875
 
 --- END FILE: ./logs_dev/backend.pid ---
 
---- START FILE: ./logs_dev/worker.pid (Size: 7 bytes) ---
-245655
+--- START FILE: ./logs_dev/worker.pid (Size: 6 bytes) ---
+35886
 
 --- END FILE: ./logs_dev/worker.pid ---
 
