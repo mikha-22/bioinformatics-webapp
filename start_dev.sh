@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Exit immediately if a command exits with a non-zero status during setup.
+# set -e # Commented out to allow checks after commands
 
 # --- Configuration ---
 REDIS_CONTAINER_NAME="bio_redis_local"
@@ -14,7 +15,10 @@ TLS_KEY="$TLS_DIR/server.key"
 TLS_CERT="$TLS_DIR/server.crt"
 LOGS_DIR="./logs_dev"
 
-# --- Content for .env.local ---
+# --- Content for frontend .env.local ---
+# Defines the environment variables needed by the Next.js app
+# NEXT_PUBLIC_API_BASE_URL points to the backend server
+# NEXT_PUBLIC_FILEBROWSER_URL points to the file browser server
 read -r -d '' FRONTEND_ENV_CONTENT << EOM
 NEXT_PUBLIC_API_BASE_URL=https://localhost:8000
 NEXT_PUBLIC_FILEBROWSER_URL=https://localhost:8081
@@ -37,8 +41,21 @@ log_warn() {
 
 log_error() {
   echo "[ERROR] $(date '+%Y-%m-%d %H:%M:%S') - $1" >&2
+  # Attempt cleanup before exiting on error
+  cleanup_on_error
   exit 1
 }
+
+# Function specifically for cleanup on script error
+cleanup_on_error() {
+  log_warn "--- Error detected, initiating cleanup ---"
+  kill_pid_file "$TAIL_PID_FILE" "Log Tail Process"
+  kill_pid_file "$FRONTEND_PID_FILE" "Frontend (npm run dev)"
+  kill_pid_file "$WORKER_PID_FILE" "RQ Worker"
+  kill_pid_file "$BACKEND_PID_FILE" "Backend (python main.py)"
+  log_warn "--- Cleanup due to error finished ---"
+}
+
 
 kill_pid_file() {
   local pid_file="$1"
@@ -60,13 +77,19 @@ kill_pid_file() {
       else
           log_info "$process_name PID file was empty."
       fi
-      rm "$pid_file"
+      rm "$pid_file" # Remove empty or stale pid file
     fi
+  elif [ -e "$pid_file" ]; then
+     # File exists but is empty or unreadable?
+     log_warn "PID file '$pid_file' for $process_name exists but could not read PID or process already stopped. Removing file."
+     rm "$pid_file"
+  # else
+  #   log_info "PID file '$pid_file' for $process_name not found." # Optional: Log if file doesn't exist at all
   fi
 }
 
 cleanup() {
-  log_info "--- Initiating Cleanup ---"
+  log_info "--- Initiating Cleanup (SIGINT/SIGTERM received) ---"
   kill_pid_file "$TAIL_PID_FILE" "Log Tail Process"
   kill_pid_file "$FRONTEND_PID_FILE" "Frontend (npm run dev)"
   kill_pid_file "$WORKER_PID_FILE" "RQ Worker"
@@ -130,9 +153,10 @@ else
             -sha256 -days 365 -nodes \
             -subj "/CN=localhost" || log_error "Failed to generate TLS certificate/key."
     log_info "TLS certificate and key generated successfully in '$TLS_DIR'."
-    sudo chown "$(id -u):$(id -g)" "$TLS_KEY" "$TLS_CERT"
+    sudo chown "$(id -u):$(id -g)" "$TLS_KEY" "$TLS_CERT" || log_warn "Failed to chown TLS files. Check sudo permissions."
 fi
 
+# Allow commands to fail without exiting the whole script from here on
 set +e
 
 # 3. Start Backend (in background, redirect logs)
@@ -140,18 +164,19 @@ log_info "Starting FastAPI backend -> $LOGS_DIR/backend.log"
 python -u main.py > "$LOGS_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 echo $BACKEND_PID > "$BACKEND_PID_FILE"
-sleep 3
+sleep 3 # Give backend a moment to start
+
+# Check if the backend process started successfully
 if ! ps -p $BACKEND_PID > /dev/null; then
     log_error "Backend process (PID: $BACKEND_PID stored in $BACKEND_PID_FILE) failed to start or crashed immediately. Check '$LOGS_DIR/backend.log'."
-elif ! curl --output /dev/null --silent --head --fail -k https://localhost:8000/health; then
-    log_warn "Backend process started (PID: $BACKEND_PID) but health check failed. It might still be initializing or encountered an error. Check '$LOGS_DIR/backend.log'."
 else
-    log_info "Backend started (PID: $BACKEND_PID) and responding to health check."
+    # Removed health check - just confirm process started
+    log_info "Backend process started (PID: $BACKEND_PID). Verify functionality by checking '$LOGS_DIR/backend.log' or accessing API endpoints (e.g., /docs)."
 fi
 
 # 4. Start RQ Worker (in background, redirect logs)
 log_info "Starting RQ worker -> $LOGS_DIR/worker.log"
-export PYTHONPATH="$PROJECT_ROOT"
+export PYTHONPATH="$PROJECT_ROOT" # Ensure tasks.py can be found
 rq worker "$QUEUE_NAME" --url "$REDIS_URL" > "$LOGS_DIR/worker.log" 2>&1 &
 WORKER_PID=$!
 echo $WORKER_PID > "$WORKER_PID_FILE"
@@ -159,41 +184,63 @@ sleep 2
 if ! ps -p $WORKER_PID > /dev/null; then
     log_error "RQ Worker process (PID: $WORKER_PID stored in $WORKER_PID_FILE) failed to start or crashed immediately. Check '$LOGS_DIR/worker.log'."
 else
-    if grep -q -E "Listening on|Registering birth" "$LOGS_DIR/worker.log"; then
+    # Check if the worker log contains startup messages indicating it's listening
+    if grep -q -E "Listening on|Registering birth|RQ Worker started" "$LOGS_DIR/worker.log" 2>/dev/null; then
         log_info "RQ Worker started (PID: $WORKER_PID) and appears to be listening."
     else
         log_warn "RQ Worker process started (PID: $WORKER_PID) but expected startup message not found in log yet. Check '$LOGS_DIR/worker.log'."
     fi
 fi
 
-# 5. Ensure Frontend .env.local exists
+# 5. Ensure Frontend .env.local exists with correct content
+# This step creates the file if it's missing, ensuring the frontend
+# has the correct API and FileBrowser URLs when it starts.
 log_info "Checking Frontend .env.local file at '$FRONTEND_ENV_FILE'..."
-if [ -f "$FRONTEND_ENV_FILE" ]; then
-    log_info "'$FRONTEND_ENV_FILE' already exists."
-else
-    if [ -d "$FRONTEND_DIR" ]; then
-        log_warn "'$FRONTEND_ENV_FILE' not found. Creating it..."
-        printf "%s\n" "$FRONTEND_ENV_CONTENT" > "$FRONTEND_ENV_FILE" || log_error "Failed to create '$FRONTEND_ENV_FILE'."
-        log_info "'$FRONTEND_ENV_FILE' created successfully."
+if [ -d "$FRONTEND_DIR" ]; then # Check if frontend directory exists first
+    if [ -f "$FRONTEND_ENV_FILE" ]; then
+        log_info "'$FRONTEND_ENV_FILE' already exists. Skipping creation."
+        # Optional: Check if content matches and warn/update if needed
+        # current_content=$(cat "$FRONTEND_ENV_FILE")
+        # expected_content=$(printf "%s\n" "$FRONTEND_ENV_CONTENT")
+        # if [ "$current_content" != "$expected_content" ]; then
+        #     log_warn "'$FRONTEND_ENV_FILE' exists but content differs. Consider updating it manually or deleting it to regenerate."
+        # fi
     else
-        log_warn "Frontend directory '$FRONTEND_DIR' not found. Cannot create '$FRONTEND_ENV_FILE'."
+        log_warn "'$FRONTEND_ENV_FILE' not found. Creating it..."
+        # Use printf for better portability and newline handling
+        printf "%s\n" "$FRONTEND_ENV_CONTENT" > "$FRONTEND_ENV_FILE" || log_error "Failed to create '$FRONTEND_ENV_FILE'."
+        log_info "'$FRONTEND_ENV_FILE' created successfully with development URLs."
     fi
+else
+    log_warn "Frontend directory '$FRONTEND_DIR' not found. Cannot create '$FRONTEND_ENV_FILE'."
 fi
 
 # 6. Start Frontend (in background, redirect logs)
 FRONTEND_NPM_PID=""
 if [ -d "$FRONTEND_DIR" ]; then
-  log_info "Starting Frontend dev server -> $LOGS_DIR/frontend.log"
+  log_info "Starting Frontend dev server (Next.js) -> $LOGS_DIR/frontend.log"
   cd "$FRONTEND_DIR"
+  # Run npm install if node_modules doesn't exist
+  if [ ! -d "node_modules" ]; then
+      log_info "Node modules not found in $FRONTEND_DIR. Running 'npm install'..."
+      if npm install >> "../$LOGS_DIR/frontend_npm_install.log" 2>&1; then
+          log_info "'npm install' completed successfully. See '$LOGS_DIR/frontend_npm_install.log'."
+      else
+          log_error "'npm install' failed. Check '$LOGS_DIR/frontend_npm_install.log'."
+      fi
+  fi
+  # Start the dev server
   npm run dev > "../$LOGS_DIR/frontend.log" 2>&1 &
   FRONTEND_NPM_PID=$!
   echo $FRONTEND_NPM_PID > "../$FRONTEND_PID_FILE"
-  cd "$PROJECT_ROOT"
-  sleep 5
+  cd "$PROJECT_ROOT" # Go back to project root
+  sleep 5 # Give Next.js some time to start
+
+  # Check if the process is running and responding
   if ! ps -p $FRONTEND_NPM_PID > /dev/null; then
       log_error "Frontend process (PID: $FRONTEND_NPM_PID stored in $FRONTEND_PID_FILE) failed to start or crashed immediately. Check '$LOGS_DIR/frontend.log'."
   elif ! curl --output /dev/null --silent --head --fail http://localhost:3000; then
-      log_warn "Frontend process started (PID: $FRONTEND_NPM_PID) but failed to respond at http://localhost:3000. Check '$LOGS_DIR/frontend.log'."
+      log_warn "Frontend process started (PID: $FRONTEND_NPM_PID) but failed to respond at http://localhost:3000. Check '$LOGS_DIR/frontend.log'. It might still be compiling."
   else
       log_info "Frontend started (PID: $FRONTEND_NPM_PID) and responding."
   fi
@@ -205,17 +252,23 @@ log_info "--------------------------------------"
 log_info "Development environment startup sequence complete."
 log_info "Tailing logs from '$LOGS_DIR/'. Press Ctrl+C to stop all components."
 log_info "Access Services:"
-log_info "  - Backend API: https://localhost:8000/health"
+log_info "  - Backend API: https://localhost:8000/docs (for API docs)"
 log_info "  - Frontend UI: http://localhost:3000"
 log_info "  - FileBrowser: https://localhost:8081"
 log_info "--------------------------------------"
 
+# Ensure log files exist before tailing to avoid errors if one didn't start
 touch "$LOGS_DIR/backend.log" "$LOGS_DIR/worker.log" "$LOGS_DIR/frontend.log" 2>/dev/null || true
+
+# Tail logs in the background
 tail -f "$LOGS_DIR"/*.log &
 TAIL_PID=$!
 echo $TAIL_PID > "$TAIL_PID_FILE"
 
+# Wait for the tail process specifically. Cleanup is handled by the trap.
 wait $TAIL_PID
 
+# This part might not be reached if Ctrl+C is handled by the trap correctly,
+# but it's a fallback in case tail ends unexpectedly.
 log_warn "Log tailing process ended unexpectedly. Cleaning up..."
 cleanup
