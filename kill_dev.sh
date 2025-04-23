@@ -1,17 +1,20 @@
 #!/bin/bash
 
-# kill_dev_scanner.sh v2
+# kill_dev.sh
 # Stops the development environment components by scanning for running processes.
-# Improved frontend killing. Does NOT rely on PID files.
+# Improved frontend killing (HTTPS proxy). Does NOT rely on PID files.
 
 # --- Configuration ---
 REDIS_CONTAINER_NAME="bio_redis_local"
 FILEBROWSER_CONTAINER_NAME="bio_filebrowser_local"
 FRONTEND_DIR_NAME="frontend_app" # Name of the frontend directory
-FRONTEND_PORT="3000" # Default Next.js dev port
+FRONTEND_HTTP_PORT="3000" # Original next dev port
+FRONTEND_HTTPS_PORT="3001" # Port the proxy listens on
 BACKEND_SCRIPT="main.py"
 WORKER_PATTERN="rq worker pipeline_tasks"
 TAIL_PATTERN="tail -f .*logs_dev/.*\.log"
+# *** UPDATED PROXY PATTERN to match start_dev.sh command ***
+PROXY_PATTERN="local-ssl-proxy.*--source ${FRONTEND_HTTPS_PORT}.*--target ${FRONTEND_HTTP_PORT}" # Pattern for proxy
 
 # --- Functions ---
 log_info() {
@@ -105,11 +108,6 @@ kill_process_by_port() {
     log_info "Searching for '$process_name' process listening on TCP port $port..."
 
     # Use lsof to find the PID listening on the port.
-    # -P: Inhibits conversion of port numbers to port names.
-    # -n: Inhibits conversion of network numbers to host names for network files.
-    # -sTCP:LISTEN : Only show processes listening on TCP
-    # -t: Output PIDs only
-    # Removed 2>/dev/null to see potential lsof errors
     pids=$(lsof -i tcp:"$port" -sTCP:LISTEN -P -n -t)
 
     if [ -z "$pids" ]; then
@@ -119,7 +117,7 @@ kill_process_by_port() {
 
     log_info "Found PID(s) listening on port $port: $pids"
 
-     # Iterate over found PIDs (lsof might return multiple if unlucky)
+     # Iterate over found PIDs
     for pid in $pids; do
         # Get command name for logging confirmation
         local cmd_name=$(ps -o comm= -p "$pid" || echo "UnknownCmd")
@@ -153,7 +151,7 @@ stop_docker_container() {
 }
 
 # --- Main Script ---
-log_info "--- Initiating Development Environment Shutdown (Scanner Mode v2) ---"
+log_info "--- Initiating Development Environment Shutdown (Scanner Mode) ---"
 
 # Stop background processes by finding them
 log_info "Stopping background processes..."
@@ -164,16 +162,15 @@ kill_process_by_pattern "python .*$BACKEND_SCRIPT" "Backend ($BACKEND_SCRIPT)"
 # 2. Stop RQ Worker
 kill_process_by_pattern "$WORKER_PATTERN" "RQ Worker"
 
-# 3. Stop Frontend (Prioritize Port, Fallback to Patterns)
-log_info "Attempting to stop Frontend (Next.js)..."
-if ! kill_process_by_port "$FRONTEND_PORT" "Frontend"; then
-    log_warn "Could not find/stop Frontend process using port $FRONTEND_PORT. Trying pattern matching..."
-    # Fallback patterns - Try killing Node processes associated with Next.js dev
-    # Be careful, these might be too broad if other Node apps are running.
-    kill_process_by_pattern "node .*node_modules/.bin/next dev" "Frontend (next dev)"
-    # Add more specific patterns if the above doesn't work, e.g., related to the frontend_app directory
-    # kill_process_by_pattern "node .*$FRONTEND_DIR_NAME/.*/server.js" "Frontend (Node Server)"
-fi
+# 3. Stop Frontend (Kill Proxy first, then underlying Next.js)
+log_info "Attempting to stop Frontend (Proxy and Next.js)..."
+# Kill the proxy process by pattern (using the updated pattern)
+kill_process_by_pattern "$PROXY_PATTERN" "Frontend HTTPS Proxy"
+# Kill the underlying Next.js dev server (which listens on HTTP) by port
+kill_process_by_port "$FRONTEND_HTTP_PORT" "Frontend (Next.js HTTP Server)"
+# Fallback pattern kill for next dev just in case port kill failed
+kill_process_by_pattern "node .*node_modules/.bin/next dev" "Frontend (next dev fallback)"
+
 
 # 4. Stop Log Tailing
 kill_process_by_pattern "$TAIL_PATTERN" "Log Tailing Process"
@@ -186,12 +183,20 @@ stop_docker_container "$REDIS_CONTAINER_NAME" "Redis Container"
 
 log_info "--- Development Environment Shutdown Complete ---"
 
-# Optional: Final check for the frontend port
-log_info "Performing final check for process on port $FRONTEND_PORT..."
-if lsof -i tcp:"$FRONTEND_PORT" -sTCP:LISTEN -P -n -t > /dev/null; then
-    log_warn "A process is still listening on port $FRONTEND_PORT after shutdown attempt."
+# Optional: Final check for the frontend ports
+log_info "Performing final check for processes on ports $FRONTEND_HTTPS_PORT (HTTPS) and $FRONTEND_HTTP_PORT (HTTP)..."
+https_proc=$(lsof -i tcp:"$FRONTEND_HTTPS_PORT" -sTCP:LISTEN -P -n -t)
+http_proc=$(lsof -i tcp:"$FRONTEND_HTTP_PORT" -sTCP:LISTEN -P -n -t)
+
+if [ -n "$https_proc" ]; then
+    log_warn "A process (PID: $https_proc) is STILL listening on HTTPS port $FRONTEND_HTTPS_PORT after shutdown attempt."
 else
-    log_info "Confirmed no process listening on port $FRONTEND_PORT."
+    log_info "Confirmed no process listening on HTTPS port $FRONTEND_HTTPS_PORT."
+fi
+if [ -n "$http_proc" ]; then
+    log_warn "A process (PID: $http_proc) is STILL listening on HTTP port $FRONTEND_HTTP_PORT after shutdown attempt."
+else
+    log_info "Confirmed no process listening on HTTP port $FRONTEND_HTTP_PORT."
 fi
 
 
