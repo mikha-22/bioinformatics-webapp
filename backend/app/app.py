@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .core import config
 # Import the routers defined in the routers sub-package
 # REMOVED: from .routers import pages
-from .routers import data, jobs # Keep data and jobs routers
+from .routers import data, jobs, profiles # <<< ADD profiles router import
 
 # --- Basic Logging Setup ---
 # Configure logging level, format, and date format.
@@ -29,6 +29,7 @@ tags_metadata = [
     # REMOVED: {"name": "HTML Pages", "description": "Routes serving the web interface pages."},
     {"name": "Data Access", "description": "API endpoints for retrieving file/result lists."},
     {"name": "Jobs Management", "description": "API endpoints for staging, starting, monitoring, and managing pipeline jobs."},
+    {"name": "Profiles Management", "description": "API endpoints for saving and loading pipeline configuration profiles."}, # <<< ADDED
     {"name": "Health Check", "description": "Basic application health status."},
 ]
 
@@ -36,7 +37,7 @@ tags_metadata = [
 app = FastAPI(
     title="Bioinformatics Webapp API", # Updated title
     description="Backend API for staging, running, and managing Sarek bioinformatics pipelines using FastAPI and RQ.", # Updated description
-    version="0.3.0", # Example version number update
+    version="0.4.0", # <<< Version Bump
     openapi_tags=tags_metadata # Assign the tags metadata
 )
 
@@ -68,7 +69,8 @@ logger.info(f"CORS middleware configured. Allowed origins: {allowed_origins}")
 # REMOVED: app.include_router(pages.router)
 app.include_router(data.router, prefix="/api") # Add prefix for data endpoints
 app.include_router(jobs.router, prefix="/api") # Add prefix for jobs endpoints
-logger.info("Included API routers: data, jobs (prefixed with /api).")
+app.include_router(profiles.router) # <<< ADD profiles router (already has /api/profiles prefix)
+logger.info("Included API routers: data, jobs, profiles (prefixed with /api).") # <<< Updated log message
 
 # --- Optional: Root endpoint for health check ---
 # Provides a simple endpoint to verify the application is running.

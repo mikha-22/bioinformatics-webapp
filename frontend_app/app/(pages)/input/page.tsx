@@ -1,13 +1,13 @@
 // File: frontend_app/app/(pages)/input/page.tsx
 "use client";
 
-import React from "react";
+import React, { useState } from "react"; // Import useState
 import { useForm, useFieldArray, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z, ZodType } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { PlusCircle, Loader2, Play } from "lucide-react";
+import { PlusCircle, Loader2, Play, Save } from "lucide-react"; // Import Save icon
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -24,9 +24,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import SampleInputGroup from "@/components/forms/SampleInputGroup"; // Keep this component as is (it has lane)
 import FileSelector from "@/components/forms/FileSelector";
+import ProfileLoader from "@/components/forms/ProfileLoader"; // <<< Import ProfileLoader
+import SaveProfileDialog from "@/components/forms/SaveProfileDialog"; // <<< Import SaveProfileDialog
 import * as api from "@/lib/api";
-// Import SampleInfo for the API payload, PipelineInput is now the correct type for the payload
-import { PipelineInput, SampleInfo as ApiSampleInfo } from "@/lib/types";
+// Import relevant types
+import { PipelineInput, SampleInfo as ApiSampleInfo, ProfileData } from "@/lib/types"; // <<< Import ProfileData
 import { cn } from "@/lib/utils";
 import { Control } from "react-hook-form";
 
@@ -77,7 +79,7 @@ const pipelineInputSchema = z.object({
   }),
   // Add suffix validation check for intervals file
   intervals_file: z.string().optional().refine(
-      (val) => !val || val.endsWith('.bed') || val.endsWith('.list') || val.endsWith('.interval_list'),
+      (val) => !val || val === "" || val.endsWith('.bed') || val.endsWith('.list') || val.endsWith('.interval_list'), // Allow empty string explicitly
       { message: "Intervals file must end with .bed, .list, or .interval_list" }
   ),
   dbsnp: z.string().optional(),
@@ -115,6 +117,8 @@ type PipelineFormValues = z.infer<typeof pipelineInputSchema>;
 export default function InputPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [isSaveProfileOpen, setIsSaveProfileOpen] = useState(false); // <<< State for save dialog
+  const [currentProfileName, setCurrentProfileName] = useState<string | null>(null); // <<< State for loaded profile name
 
   const form = useForm<PipelineFormValues>({
     resolver: zodResolver(pipelineInputSchema as ZodType<PipelineFormValues>),
@@ -125,10 +129,10 @@ export default function InputPage() {
       samples: [{ patient: "", sample: "", sex: undefined, status: undefined, lane: "", fastq_1: "", fastq_2: "" }],
       // ***************************************
       genome: "GATK.GRCh38",
-      intervals_file: undefined,
-      dbsnp: undefined,
-      known_indels: undefined,
-      pon: undefined,
+      intervals_file: "", // Use empty string for optional file inputs
+      dbsnp: "",
+      known_indels: "",
+      pon: "",
       tools: [],
       step: "mapping",
       profile: "docker",
@@ -154,6 +158,7 @@ export default function InputPage() {
         toast.success(`Job staged successfully: ${data.staged_job_id}`);
         queryClient.invalidateQueries({ queryKey: ['jobsList'] });
         form.reset();
+        setCurrentProfileName(null); // Reset loaded profile name on successful staging
         router.push('/jobs');
      },
      onError: (error) => {
@@ -171,6 +176,24 @@ export default function InputPage() {
      }
   });
 
+  // --- <<< NEW: Profile Save Mutation >>> ---
+   const saveProfileMutation = useMutation({
+       mutationFn: ({ name, data }: { name: string; data: ProfileData }) => api.saveProfile(name, data),
+       onSuccess: (data) => {
+           toast.success(`Profile '${data.profile_name}' saved successfully.`);
+           queryClient.invalidateQueries({ queryKey: ['profilesList'] }); // Refresh profile list
+           setCurrentProfileName(data.profile_name); // Set the newly saved profile as current
+           setIsSaveProfileOpen(false); // Close dialog on success
+           // Optionally reset dirty state after save:
+           // form.reset({}, { keepValues: true });
+       },
+       onError: (error: Error, variables) => {
+            toast.error(`Failed to save profile '${variables.name}': ${error.message}`);
+            // Keep dialog open on error
+       },
+   });
+  // --- <<< END NEW >>> ---
+
   function onSubmit(values: PipelineFormValues) {
      console.log("Form Values Submitted:", values);
       // Map form values to the API payload type (PipelineInput)
@@ -179,8 +202,8 @@ export default function InputPage() {
           samples: values.samples.map((s): ApiSampleInfo => ({ // Use ApiSampleInfo type here
                 patient: s.patient,
                 sample: s.sample,
-                sex: s.sex,
-                status: s.status,
+                sex: s.sex!, // Use non-null assertion if Zod ensures it's defined
+                status: s.status!, // Use non-null assertion if Zod ensures it's defined
                 // *** RE-ADDED lane to payload ***
                 lane: s.lane,
                 // *******************************
@@ -188,6 +211,7 @@ export default function InputPage() {
                 fastq_2: s.fastq_2,
           })),
           genome: values.genome,
+          // Send empty string as undefined for optional fields
           intervals_file: values.intervals_file || undefined,
           dbsnp: values.dbsnp || undefined,
           known_indels: values.known_indels || undefined,
@@ -217,7 +241,8 @@ export default function InputPage() {
                 : [...currentVal, tool];
             form.setValue("tools", newVal, { shouldValidate: true, shouldDirty: true });
         } else if (fieldName !== 'tools') {
-            if (fieldName in form.getValues()) {
+            // Check if fieldName is a valid key of PipelineFormValues
+             if (fieldName in form.getValues()) {
                  const currentVal = form.getValues(fieldName as keyof PipelineFormValues);
                  form.setValue(fieldName as keyof PipelineFormValues, !currentVal, { shouldValidate: true, shouldDirty: true });
             } else {
@@ -226,11 +251,63 @@ export default function InputPage() {
         }
     };
 
+  // --- <<< NEW: Handle Profile Load Callback >>> ---
+   const handleProfileLoaded = (name: string | null, data: ProfileData | null) => {
+       setCurrentProfileName(name);
+       // Optionally reset dirty state here if needed after load
+       // form.reset({}, { keepValues: true });
+   };
+  // --- <<< END NEW >>> ---
+
+   // --- <<< NEW: Handle Save Profile >>> ---
+   const handleSaveProfile = async (profileName: string) => {
+       const currentValues = form.getValues();
+       // Create the profile data object, excluding 'samples'
+       const profileData: ProfileData = {
+           genome: currentValues.genome,
+           intervals_file: currentValues.intervals_file || null, // Send empty as null
+           dbsnp: currentValues.dbsnp || null,
+           known_indels: currentValues.known_indels || null,
+           pon: currentValues.pon || null,
+           tools: currentValues.tools && currentValues.tools.length > 0 ? currentValues.tools : null,
+           step: currentValues.step,
+           profile: currentValues.profile,
+           aligner: currentValues.aligner,
+           joint_germline: currentValues.joint_germline,
+           wes: currentValues.wes,
+           trim_fastq: currentValues.trim_fastq,
+           skip_qc: currentValues.skip_qc,
+           skip_annotation: currentValues.skip_annotation,
+           skip_baserecalibrator: currentValues.skip_baserecalibrator,
+           description: currentValues.description || null,
+       };
+       console.log("Saving profile data:", profileData);
+       await saveProfileMutation.mutateAsync({ name: profileName, data: profileData });
+   };
+  // --- <<< END NEW >>> ---
+
   return (
     <FormProvider {...form}>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           <h1 className="text-3xl font-bold mb-6 ml-2">Stage New Sarek Run</h1>
+
+          {/* <<< NEW: Profile Loader Section >>> */}
+           <Card>
+             <CardHeader>
+                 <CardTitle className="text-primary">Load Configuration</CardTitle>
+                 <CardDescription>Load saved parameters or start from defaults.</CardDescription>
+             </CardHeader>
+             <CardContent>
+                 <ProfileLoader
+                     form={form}
+                     currentProfileName={currentProfileName}
+                     onProfileLoad={handleProfileLoaded}
+                 />
+             </CardContent>
+           </Card>
+          {/* <<< END NEW >>> */}
+
           {/* Samples Section */}
           <Card>
             <CardHeader>
@@ -250,8 +327,8 @@ export default function InputPage() {
                     // *** RE-ADDED lane to append ***
                     patient: "",
                     sample: "",
-                    sex: "XX", // Provide a default valid enum value
-                    status: 0, // Provide a default valid enum value
+                    sex: undefined, // Zod handles required error
+                    status: undefined, // Zod handles required error
                     lane: "", // Re-added
                     fastq_1: "",
                     fastq_2: ""
@@ -302,7 +379,7 @@ export default function InputPage() {
                             fileTypeLabel="Intervals"
                             fileType="intervals"
                             extensions={[".bed", ".list", ".interval_list"]}
-                            value={field.value}
+                            value={field.value || undefined} // Pass empty string as undefined
                             onChange={field.onChange}
                             placeholder="Select intervals file..."
                             allowNone
@@ -312,9 +389,9 @@ export default function InputPage() {
                     <FormMessage />
                 </FormItem>
                )} />
-              <FormField control={form.control} name="dbsnp" render={({ field }) => ( <FormItem> <FormLabel className="cursor-default">dbSNP (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="dbSNP" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value} onChange={field.onChange} placeholder="Select dbSNP file..." allowNone /> </FormControl> <FormDescription className="italic"> Known variants VCF for base recalibration (e.g., dbSNP). </FormDescription> <FormMessage /> </FormItem> )} />
-              <FormField control={form.control} name="known_indels" render={({ field }) => ( <FormItem> <FormLabel className="cursor-default">Known Indels (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="Known Indels" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value} onChange={field.onChange} placeholder="Select known indels file..." allowNone /> </FormControl> <FormDescription className="italic"> Known indels VCF for base recalibration (e.g., Mills, 1000G). </FormDescription> <FormMessage /> </FormItem> )} />
-              <FormField control={form.control} name="pon" render={({ field }) => ( <FormItem> <FormLabel className="cursor-default">Panel of Normals (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="Panel of Normals" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value} onChange={field.onChange} placeholder="Select Panel of Normals file..." allowNone /> </FormControl> <FormDescription className="italic"> Panel of Normals VCF for somatic variant calling. </FormDescription> <FormMessage /> </FormItem> )} />
+              <FormField control={form.control} name="dbsnp" render={({ field }) => ( <FormItem> <FormLabel className="cursor-default">dbSNP (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="dbSNP" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select dbSNP file..." allowNone /> </FormControl> <FormDescription className="italic"> Known variants VCF for base recalibration (e.g., dbSNP). </FormDescription> <FormMessage /> </FormItem> )} />
+              <FormField control={form.control} name="known_indels" render={({ field }) => ( <FormItem> <FormLabel className="cursor-default">Known Indels (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="Known Indels" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select known indels file..." allowNone /> </FormControl> <FormDescription className="italic"> Known indels VCF for base recalibration (e.g., Mills, 1000G). </FormDescription> <FormMessage /> </FormItem> )} />
+              <FormField control={form.control} name="pon" render={({ field }) => ( <FormItem> <FormLabel className="cursor-default">Panel of Normals (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="Panel of Normals" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select Panel of Normals file..." allowNone /> </FormControl> <FormDescription className="italic"> Panel of Normals VCF for somatic variant calling. </FormDescription> <FormMessage /> </FormItem> )} />
             </CardContent>
           </Card>
 
@@ -373,7 +450,7 @@ export default function InputPage() {
                   <div className="md:col-span-2 space-y-4">
                       {[
                           { name: 'joint_germline', label: 'Joint Germline Calling', description: 'Enable joint calling across samples (requires all samples Status=0).' },
-                          { name: 'wes', label: 'Whole Exome Sequencing (WES)', description: 'Check if data is WES/targeted. Requires an Intervals file.' },
+                          { name: 'wes', label: 'Whole Exome Sequencing (WES)', description: 'Check if data is WES/targeted. Recommended to provide the Intervals file.' },
                           { name: 'trim_fastq', label: 'Trim FASTQ', description: 'Enable adapter trimming using Trim Galore!.' },
                           { name: 'skip_qc', label: 'Skip QC', description: 'Skip quality control steps (FastQC, Samtools, etc.).' },
                           { name: 'skip_annotation', label: 'Skip Annotation', description: 'Skip variant annotation steps (VEP, snpEff).' },
@@ -429,22 +506,49 @@ export default function InputPage() {
                 </CardContent>
             </Card>
 
-          {/* Submit Button */}
-          <div className="flex justify-start ml-[1%]">
-            <Button
-               type="submit"
-               disabled={stageMutation.isPending}
-               className="border border-primary hover:underline cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              {stageMutation.isPending
-                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                : <Play className="mr-2 h-4 w-4" />
-              }
-              Stage Pipeline Run
-            </Button>
-          </div>
+          {/* Action Buttons - Stage and Save Profile */}
+           {/* <<< MODIFIED: Changed justify-between to justify-start, swapped button order >>> */}
+            <div className="flex justify-start items-center gap-4 px-[1%]">
+                 {/* Stage Button (Now first) */}
+                 <Button
+                    type="submit"
+                    disabled={stageMutation.isPending || saveProfileMutation.isPending} // Disable if staging or saving
+                    className="border border-primary hover:underline cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
+                 >
+                   {stageMutation.isPending
+                     ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                     : <Play className="mr-2 h-4 w-4" />
+                   }
+                   Stage Pipeline Run
+                 </Button>
+
+                 {/* Save Profile Button (Now second) */}
+                 <Button
+                     type="button"
+                     variant="outline"
+                     onClick={() => setIsSaveProfileOpen(true)}
+                     disabled={stageMutation.isPending || saveProfileMutation.isPending} // Disable if staging or saving
+                     className="cursor-pointer"
+                 >
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Profile
+                 </Button>
+             </div>
+            {/* <<< END MODIFICATION >>> */}
+
         </form>
       </Form>
+
+       {/* <<< NEW: Save Profile Dialog >>> */}
+        <SaveProfileDialog
+           isOpen={isSaveProfileOpen}
+           onOpenChange={setIsSaveProfileOpen}
+           onSave={handleSaveProfile}
+           isSaving={saveProfileMutation.isPending}
+           currentProfileName={currentProfileName}
+        />
+       {/* <<< END NEW >>> */}
+
     </FormProvider>
   );
 }

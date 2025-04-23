@@ -53,9 +53,7 @@ REDIS_PORT = 6379
 REDIS_DB = 0
 PIPELINE_QUEUE_NAME = "pipeline_tasks"
 STAGED_JOBS_KEY = "staged_pipeline_jobs" # Key for Redis Hash storing staged jobs
-# >>>>>>>>>> MAKE SURE THIS LINE EXISTS AND IS SAVED <<<<<<<<<<
-PIPELINE_PROFILES_KEY = "pipeline_profiles" # Key for storing profiles
-# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+PIPELINE_PROFILES_KEY = "pipeline_profiles" # <<< ADDED: Key for storing profiles
 
 logger.info(f"Using REDIS_HOST: {REDIS_HOST}")
 
