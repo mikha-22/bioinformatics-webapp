@@ -10,7 +10,6 @@ import { useRouter } from "next/navigation";
 import { PlusCircle, Loader2, Play, Save } from "lucide-react";
 import { toast } from "sonner";
 
-// ... (Keep other imports: Button, Card, Form components, etc.) ...
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -23,17 +22,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+// Import all sample group components
 import SampleInputGroup from "@/components/forms/SampleInputGroup";
 import BamCramSampleInputGroup from "@/components/forms/BamCramSampleInputGroup";
 import VcfSampleInputGroup from "@/components/forms/VcfSampleInputGroup";
+// ---
 import FileSelector from "@/components/forms/FileSelector";
 import ProfileLoader from "@/components/forms/ProfileLoader";
 import SaveProfileDialog from "@/components/forms/SaveProfileDialog";
 import * as api from "@/lib/api";
+// Import relevant types
 import { PipelineInput, SampleInfo as ApiSampleInfo, ProfileData } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Control } from "react-hook-form";
-
 
 // --- Define Zod Schema for Validation ---
 
@@ -54,20 +55,22 @@ const fastqSampleSchema = z.object({
     lane: z.string().min(1, "Lane is required").regex(laneRegex, "Lane must be in format L001"),
     fastq_1: z.string().min(1, "FASTQ R1 is required"),
     fastq_2: z.string().min(1, "FASTQ R2 is required"),
-    bam_cram: z.union([z.string().length(0), z.null(), z.undefined()]).optional(),
-    vcf: z.union([z.string().length(0), z.null(), z.undefined()]).optional(),
-    index: z.union([z.string().length(0), z.null(), z.undefined()]).optional(),
+    // Ensure other file types are null/undefined
+    bam_cram: z.union([z.string().length(0, "Cannot provide BAM/CRAM for FASTQ input"), z.null(), z.undefined()]).optional(),
+    vcf: z.union([z.string().length(0, "Cannot provide VCF for FASTQ input"), z.null(), z.undefined()]).optional(),
+    index: z.union([z.string().length(0, "Cannot provide Index for FASTQ input"), z.null(), z.undefined()]).optional(),
 });
 
 // Schema for BAM/CRAM samples
 const bamCramSampleSchema = z.object({
      ...baseSample,
     bam_cram: z.string().min(1, "BAM/CRAM file is required").refine(f => f.endsWith('.bam') || f.endsWith('.cram'), "Must be a .bam or .cram file"),
-    index: z.string().optional().nullable(),
-    lane: z.union([z.string().length(0), z.null(), z.undefined()]).optional(),
-    fastq_1: z.union([z.string().length(0), z.null(), z.undefined()]).optional(),
-    fastq_2: z.union([z.string().length(0), z.null(), z.undefined()]).optional(),
-    vcf: z.union([z.string().length(0), z.null(), z.undefined()]).optional(),
+    index: z.string().optional().nullable(), // Optional BAI/CRAI
+    // Ensure other file types are null/undefined
+    lane: z.union([z.string().length(0, "Lane not applicable for BAM/CRAM"), z.null(), z.undefined()]).optional(),
+    fastq_1: z.union([z.string().length(0, "FASTQ not applicable for BAM/CRAM"), z.null(), z.undefined()]).optional(),
+    fastq_2: z.union([z.string().length(0, "FASTQ not applicable for BAM/CRAM"), z.null(), z.undefined()]).optional(),
+    vcf: z.union([z.string().length(0, "Cannot provide VCF for BAM/CRAM input"), z.null(), z.undefined()]).optional(),
 }).refine(data => !(data.bam_cram?.endsWith('.cram') && !data.index), {
     message: "An index file (.crai) must be provided for CRAM input.", path: ["index"],
 });
@@ -76,11 +79,12 @@ const bamCramSampleSchema = z.object({
 const vcfSampleSchema = z.object({
      ...baseSample,
     vcf: z.string().min(1, "VCF file is required").refine(f => f.endsWith('.vcf') || f.endsWith('.vcf.gz'), "Must be a .vcf or .vcf.gz file"),
-    index: z.string().optional().nullable(),
-    lane: z.union([z.string().length(0), z.null(), z.undefined()]).optional(),
-    fastq_1: z.union([z.string().length(0), z.null(), z.undefined()]).optional(),
-    fastq_2: z.union([z.string().length(0), z.null(), z.undefined()]).optional(),
-    bam_cram: z.union([z.string().length(0), z.null(), z.undefined()]).optional(),
+    index: z.string().optional().nullable(), // Optional TBI/CSI
+    // Ensure other file types are null/undefined
+    lane: z.union([z.string().length(0, "Lane not applicable for VCF"), z.null(), z.undefined()]).optional(),
+    fastq_1: z.union([z.string().length(0, "FASTQ not applicable for VCF"), z.null(), z.undefined()]).optional(),
+    fastq_2: z.union([z.string().length(0, "FASTQ not applicable for VCF"), z.null(), z.undefined()]).optional(),
+    bam_cram: z.union([z.string().length(0, "Cannot provide BAM/CRAM for VCF input"), z.null(), z.undefined()]).optional(),
 }).refine(data => !(data.vcf?.endsWith('.vcf.gz') && !data.index), {
     message: "An index file (.tbi) must be provided for compressed VCF (.vcf.gz) input.", path: ["index"],
 });
@@ -254,7 +258,8 @@ export default function InputPage() {
     // Default values should align with one of the union types (fastq here)
     defaultValues: {
       input_type: 'fastq',
-      samples: [{ patient: "", sample: "", sex: undefined, status: undefined, lane: "", fastq_1: "", fastq_2: "" }],
+      // *** Default first sample lane to L001 ***
+      samples: [{ patient: "", sample: "", sex: undefined, status: undefined, lane: "L001", fastq_1: "", fastq_2: "" }],
       genome: "GATK.GRCh38",
       step: "mapping", // Default step for fastq
       intervals_file: "",
@@ -288,7 +293,8 @@ export default function InputPage() {
           // Reset samples to match the new input type's structure
           let defaultSample: Partial<ApiSampleInfo> = {};
           if (watchedInputType === 'fastq') {
-              defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, lane: "", fastq_1: "", fastq_2: "" };
+              // *** Set L001 default here too ***
+              defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, lane: "L001", fastq_1: "", fastq_2: "" };
           } else if (watchedInputType === 'bam_cram') {
               defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, bam_cram: "", index: "" };
           } else if (watchedInputType === 'vcf') {
@@ -303,7 +309,7 @@ export default function InputPage() {
               wes: currentValues.wes,
               skip_qc: currentValues.skip_qc,
               description: currentValues.description,
-              intervals_file: currentValues.intervals_file, // Keep optional files? Or reset? Resetting might be safer.
+              intervals_file: currentValues.intervals_file,
               dbsnp: currentValues.dbsnp,
               known_indels: currentValues.known_indels,
               pon: currentValues.pon,
@@ -487,7 +493,8 @@ export default function InputPage() {
     const addSample = () => {
         let defaultSample: Partial<ApiSampleInfo> = {};
          if (selectedInputType === 'fastq') {
-             defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, lane: "", fastq_1: "", fastq_2: "" };
+             // *** Set L001 default here too ***
+             defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, lane: "L001", fastq_1: "", fastq_2: "" };
          } else if (selectedInputType === 'bam_cram') {
              defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, bam_cram: "", index: "" };
          } else if (selectedInputType === 'vcf') {
