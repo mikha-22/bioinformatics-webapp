@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { useForm, useFieldArray, FormProvider, SubmitErrorHandler } from "react-hook-form";
+import { useForm, useFieldArray, FormProvider, SubmitErrorHandler, FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z, ZodType } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -314,6 +314,7 @@ export default function InputPage() {
         if (detail) { message = `Failed to stage job: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`; }
         else { message = `Failed to stage job: ${error.message}`; }
         toast.error(message, { duration: 10000 });
+        // Use formState.errors here too as fallback
         scrollToFirstError(form.formState.errors);
      }
   });
@@ -337,15 +338,11 @@ export default function InputPage() {
    const isBqsrEnabledForButton = !watchedSkipBqsr;
    const missingBqsrFilesForButton = !watchedDbsnp && !watchedKnownIndels;
    const isBqsrCheckFailedForButton = isBqsrRelevantForButton && isBqsrEnabledForButton && missingBqsrFilesForButton;
-
    const isSomaticToolSelected = watchedTools?.some(tool => SOMATIC_TOOLS.includes(tool)) ?? false;
    const hasTumorSample = watchedSamples?.some(sample => sample.status === 1) ?? false;
    const isSomaticTumorCheckFailedForButton = isSomaticToolSelected && !hasTumorSample && watchedStep !== 'annotation';
-
-   const isWesIntervalsCheckFailedForButton = watchedWes && (!watchedIntervalsFile || watchedIntervalsFile.trim() === ''); // Check if empty string too
-
+   const isWesIntervalsCheckFailedForButton = watchedWes && (!watchedIntervalsFile || watchedIntervalsFile.trim() === '');
    const isStagingDisabled = stageMutation.isPending || saveProfileMutation.isPending || isBqsrCheckFailedForButton || isSomaticTumorCheckFailedForButton || isWesIntervalsCheckFailedForButton;
-
    const getDisabledButtonTooltip = (): string | undefined => {
        if (isBqsrCheckFailedForButton) { return "BQSR requires dbSNP or Known Indels file unless skipped."; }
        if (isSomaticTumorCheckFailedForButton) { return "Selected somatic tool(s) require at least one Tumor sample (Status=1)."; }
@@ -369,41 +366,40 @@ export default function InputPage() {
   }
 
   // --- Scroll Function ---
-  const scrollToFirstError = (errors: typeof form.formState.errors) => {
+  const scrollToFirstError = (errors: FieldErrors<PipelineFormValues>) => {
         const errorKeys = Object.keys(errors);
         if (errorKeys.length > 0) {
             let firstErrorKey = errorKeys[0] as keyof PipelineFormValues | 'samples';
             let fieldName = firstErrorKey;
-            if (firstErrorKey === 'samples' && Array.isArray(errors.samples)) {
-                const firstSampleErrorIndex = errors.samples.findIndex(s => s && Object.keys(s).length > 0);
-                if (firstSampleErrorIndex !== -1) {
-                    const sampleErrors = errors.samples[firstSampleErrorIndex];
-                     if (sampleErrors) { const firstSampleFieldError = Object.keys(sampleErrors)[0]; fieldName = `samples.${firstSampleErrorIndex}.${firstSampleFieldError}`; }
-                }
-            } else if (firstErrorKey === 'samples' && typeof errors.samples?.root?.message === 'string') {
-                 // Handle root error on samples array (e.g., tumor required)
-                 // Try to scroll to the Samples card header or the first sample group
-                 const samplesCardHeader = formRef.current?.querySelector('#samples-card-header'); // Need to add this ID
-                 if (samplesCardHeader) {
-                     samplesCardHeader.scrollIntoView({ behavior: "smooth", block: "center" });
-                     return; // Exit after scrolling to card header
-                 } else {
-                      // Fallback to scrolling first sample group if header ID not found
-                     fieldName = `samples.0.patient`; // Or another field in the first sample
+             if (firstErrorKey === 'samples' && Array.isArray(errors.samples)) {
+                 const firstSampleErrorIndex = errors.samples.findIndex(s => s && Object.keys(s).length > 0);
+                 if (firstSampleErrorIndex !== -1) {
+                     const sampleErrors = errors.samples[firstSampleErrorIndex];
+                      if (sampleErrors) { const firstSampleFieldError = Object.keys(sampleErrors)[0]; fieldName = `samples.${firstSampleErrorIndex}.${firstSampleFieldError}`; }
                  }
-            }
+             } else if (firstErrorKey === 'samples' && typeof errors.samples?.root?.message === 'string') {
+                  const samplesCardHeader = formRef.current?.querySelector('#samples-card-header');
+                  if (samplesCardHeader) { samplesCardHeader.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+                  else { fieldName = `samples.0.patient`; }
+             }
             console.log(`Attempting to scroll to first error field: ${fieldName}`);
-            const element = formRef.current?.querySelector(`[name="${fieldName}"]`);
+            let element = formRef.current?.querySelector(`[name="${fieldName}"]`);
+            if (!element) {
+                 let selector = `#${errorPathParts.join('-')}-form-item`;
+                 element = formRef.current?.querySelector(selector);
+                 if (!element) { element = formRef.current?.querySelector(`label[for="${fieldName}"]`); }
+            }
             if (element) { element.scrollIntoView({ behavior: "smooth", block: "center" }); }
-            else { console.warn(`Could not find element with name: ${fieldName}. Scrolling form to top.`); formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }
+            else { console.warn(`Could not find element for error: ${fieldName}. Scrolling form to top.`); formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }
         }
     };
 
    // --- Error Handler ---
-   const onFormError: SubmitErrorHandler<PipelineFormValues> = (errors) => {
-       console.error("Form validation failed:", errors);
+   const onFormError: SubmitErrorHandler<PipelineFormValues> = (errorsArgument) => {
+       console.error("Form validation failed (errors arg):", errorsArgument);
+       console.error("Form validation failed (formState.errors):", form.formState.errors);
        toast.error("Please fix the validation errors before staging.", { duration: 5000 });
-       scrollToFirstError(errors);
+       scrollToFirstError(form.formState.errors);
    };
 
    // --- toggleCheckboxValue function ---
@@ -421,17 +417,13 @@ export default function InputPage() {
             else if (STEPS_FOR_INPUT_TYPE.bam_cram.includes(data.step as SarekStep)) loadedInputType = 'bam_cram';
             else if (data.step === 'annotation') loadedInputType = 'vcf';
 
-            // Check if input type needs to change *before* calling onProfileLoad
             const currentInputType = form.getValues('input_type');
             if (loadedInputType !== currentInputType) {
-                toast.info(`Profile '${name}' requires ${loadedInputType.toUpperCase()} input. Switching input type.`);
-                // Set the value directly here to trigger the useEffect hook in this component
-                form.setValue('input_type', loadedInputType, { shouldValidate: true });
+                 toast.info(`Profile '${name}' requires ${loadedInputType.toUpperCase()} input. Switching input type.`);
+                 form.setValue('input_type', loadedInputType, { shouldValidate: true });
             }
-
-            // Now call the callback to let ProfileLoader set the actual values
-            onProfileLoad(selectedName, profileData); // Pass selectedName and profileData
-
+            // Let ProfileLoader handle setting the values
+            // It has access to the form and the loaded data
        } else {
             form.reset();
             setSelectedInputType('fastq');
@@ -465,19 +457,16 @@ export default function InputPage() {
 
            {/* Input Config Card */}
            <Card>
-             <CardHeader> <CardTitle className="text-primary">Input Configuration</CardTitle> <CardDescription>Select the type of input data you have and load any saved configurations.</CardDescription> </CardHeader>
+             <CardHeader> <CardTitle>Input Configuration</CardTitle> <CardDescription>Select the type of input data you have and load any saved configurations.</CardDescription> </CardHeader>
              <CardContent className="space-y-6">
                  <FormField control={form.control} name="input_type" render={({ field }) => ( <FormItem> <FormLabel>Input Data Type</FormLabel> <Select onValueChange={field.onChange} value={field.value}> <FormControl> <SelectTrigger className="w-full sm:w-64"> <SelectValue placeholder="Select input data type..." /> </SelectTrigger> </FormControl> <SelectContent> <SelectItem value="fastq">Raw Reads (FASTQ)</SelectItem> <SelectItem value="bam_cram">Aligned Reads (BAM/CRAM)</SelectItem> <SelectItem value="vcf">Variant Calls (VCF)</SelectItem> </SelectContent> </Select> <FormDescription>Determines the required sample information and available starting steps.</FormDescription> <FormMessage /> </FormItem> )} />
                  <ProfileLoader form={form} currentProfileName={currentProfileName} onProfileLoad={handleProfileLoaded} currentInputType={selectedInputType} />
              </CardContent>
            </Card>
 
-          {/* Samples Card - Added ID to header */}
+          {/* Samples Card */}
           <Card>
-            <CardHeader id="samples-card-header"> {/* Added ID here */}
-                <CardTitle className="text-primary">Sample Information</CardTitle>
-                <CardDescription> {selectedInputType === 'fastq' && "Provide FASTQ file pairs and lane information."} {selectedInputType === 'bam_cram' && "Provide coordinate-sorted BAM or CRAM files (and index for CRAM)."} {selectedInputType === 'vcf' && "Provide VCF files (and index for compressed VCFs)."} {" Status 0 = Normal, 1 = Tumor. IDs cannot contain spaces."} </CardDescription>
-            </CardHeader>
+            <CardHeader id="samples-card-header"> <CardTitle>Sample Information</CardTitle> <CardDescription> {selectedInputType === 'fastq' && "Provide FASTQ file pairs and lane information."} {selectedInputType === 'bam_cram' && "Provide coordinate-sorted BAM or CRAM files (and index for CRAM)."} {selectedInputType === 'vcf' && "Provide VCF files (and index for compressed VCFs)."} {" Status 0 = Normal, 1 = Tumor. IDs cannot contain spaces."} </CardDescription> </CardHeader>
             <CardContent className="space-y-4">
               {fields.map((field, index) => {
                   if (selectedInputType === 'fastq') { return <SampleInputGroup key={field.id} index={index} remove={remove} control={form.control} />; }
@@ -490,9 +479,9 @@ export default function InputPage() {
             </CardContent>
           </Card>
 
-          {/* Reference Files Card - Updated descriptions */}
+          {/* Reference Files Card */}
           <Card>
-            <CardHeader> <CardTitle className="text-primary">Reference & Annotation Files</CardTitle> <CardDescription>Select the reference genome build and optional annotation files (relevance depends on starting step).</CardDescription> </CardHeader>
+            <CardHeader> <CardTitle>Reference & Annotation Files</CardTitle> <CardDescription>Select the reference genome build and optional annotation files (relevance depends on starting step).</CardDescription> </CardHeader>
             <CardContent className="space-y-4">
               <FormField control={form.control} name="genome" render={({ field }) => ( <FormItem> <FormLabel>Reference Genome Build <span className="text-destructive">*</span></FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select genome build" /> </SelectTrigger> </FormControl> <SelectContent> {SAREK_GENOMES.map(g => ( <SelectItem key={g.value} value={g.value}> {g.label} </SelectItem> ))} </SelectContent> </Select> <FormDescription className="italic"> Select the genome assembly key (e.g., GATK.GRCh38). </FormDescription> <FormMessage /> </FormItem> )} />
               <FormField control={form.control} name="intervals_file" render={({ field }) => ( <FormItem> <FormLabel> Intervals File <span className="text-muted-foreground text-xs"> (Optional)</span> </FormLabel> <FormControl> <FileSelector fileTypeLabel="Intervals" fileType="intervals" extensions={[".bed", ".list", ".interval_list"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select intervals file..." allowNone required={false} /> </FormControl> <FormDescription className="italic"> Target regions (e.g., for WES). Required if WES mode is checked below. </FormDescription> <FormMessage /> </FormItem> )} />
@@ -504,7 +493,7 @@ export default function InputPage() {
 
           {/* Parameters Card */}
           <Card>
-             <CardHeader> <CardTitle className="text-primary">Pipeline Parameters</CardTitle> <CardDescription>Configure Sarek workflow options. Availability depends on Input Type and Starting Step.</CardDescription> </CardHeader>
+             <CardHeader> <CardTitle>Pipeline Parameters</CardTitle> <CardDescription>Configure Sarek workflow options. Availability depends on Input Type and Starting Step.</CardDescription> </CardHeader>
              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <FormField control={form.control} name="step" render={({ field }) => ( <FormItem> <FormLabel>Starting Step <span className="text-destructive">*</span></FormLabel> <Select onValueChange={field.onChange} value={field.value} disabled={availableSteps.length <= 1} > <FormControl> <SelectTrigger> <SelectValue placeholder="Select starting step" /> </SelectTrigger> </FormControl> <SelectContent> {availableSteps.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)} </SelectContent> </Select> <FormDescription className="italic">Pipeline execution starting point.</FormDescription> <FormMessage /> </FormItem> )} />
                  <FormField control={form.control} name="profile" render={({ field }) => ( <FormItem> <FormLabel>Execution Profile</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select execution profile" /> </SelectTrigger> </FormControl> <SelectContent> {SAREK_PROFILES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)} </SelectContent> </Select> <FormDescription className="italic"> Container or environment system. </FormDescription> <FormMessage /> </FormItem> )} />
@@ -521,13 +510,11 @@ export default function InputPage() {
                   </div>
              </CardContent>
            </Card>
-
             {/* Metadata Card */}
-           <Card>
-                <CardHeader> <CardTitle className="text-primary">Metadata</CardTitle> </CardHeader>
+            <Card>
+                <CardHeader> <CardTitle>Metadata</CardTitle> </CardHeader>
                 <CardContent> <FormField control={form.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Run Description <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <Input placeholder="e.g., Initial somatic analysis for Cohort X" {...field} value={field.value ?? ''}/> </FormControl> <FormMessage /> </FormItem> )} /> </CardContent>
             </Card>
-
             {/* Action Buttons */}
             <div className="flex justify-start items-center gap-4 px-[1%]">
                  <TooltipProvider delayDuration={100}>
@@ -558,12 +545,10 @@ export default function InputPage() {
                         )}
                     </Tooltip>
                  </TooltipProvider>
-
                  <Button type="button" variant="outline" onClick={() => setIsSaveProfileOpen(true)} disabled={stageMutation.isPending || saveProfileMutation.isPending} className="cursor-pointer" > <Save className="mr-2 h-4 w-4" /> Save Profile </Button>
              </div>
         </form>
       </Form>
-
        <SaveProfileDialog isOpen={isSaveProfileOpen} onOpenChange={setIsSaveProfileOpen} onSave={handleSaveProfile} isSaving={saveProfileMutation.isPending} currentProfileName={currentProfileName} />
     </FormProvider>
   );
