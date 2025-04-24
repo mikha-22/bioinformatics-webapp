@@ -55,6 +55,7 @@ const fastqSampleSchema = z.object({
     index: z.union([z.string().length(0, "Cannot provide Index for FASTQ input"), z.null(), z.undefined()]).optional(),
 });
 
+// UPDATED BamCram Schema with Index Extension Check
 const bamCramSampleSchema = z.object({
      ...baseSample,
     bam_cram: z.string().min(1, "BAM/CRAM file is required").refine(f => f.endsWith('.bam') || f.endsWith('.cram'), "Must be a .bam or .cram file"),
@@ -63,10 +64,21 @@ const bamCramSampleSchema = z.object({
     fastq_1: z.union([z.string().length(0, "FASTQ not applicable for BAM/CRAM"), z.null(), z.undefined()]).optional(),
     fastq_2: z.union([z.string().length(0, "FASTQ not applicable for BAM/CRAM"), z.null(), z.undefined()]).optional(),
     vcf: z.union([z.string().length(0, "Cannot provide VCF for BAM/CRAM input"), z.null(), z.undefined()]).optional(),
-}).refine(data => !(data.bam_cram?.endsWith('.cram') && !data.index), {
+})
+.refine(data => !(data.bam_cram?.endsWith('.cram') && !data.index), {
     message: "An index file (.crai) must be provided for CRAM input.", path: ["index"],
+})
+// ADDED: Refinement for index extension matching main file
+.refine(data => {
+    if (!data.index || !data.bam_cram) return true; // Pass if no index or no main file
+    if (data.bam_cram.endsWith('.cram') && !data.index.endsWith('.crai')) return false; // Fail if CRAM and index not .crai
+    if (data.bam_cram.endsWith('.bam') && !data.index.endsWith('.bai')) return false; // Fail if BAM and index not .bai
+    return true; // Pass otherwise
+}, {
+    message: "Index extension mismatch: use .bai for .bam, .crai for .cram.", path: ["index"],
 });
 
+// UPDATED VCF Schema with Index Extension Check
 const vcfSampleSchema = z.object({
      ...baseSample,
     vcf: z.string().min(1, "VCF file is required").refine(f => f.endsWith('.vcf') || f.endsWith('.vcf.gz'), "Must be a .vcf or .vcf.gz file"),
@@ -75,10 +87,20 @@ const vcfSampleSchema = z.object({
     fastq_1: z.union([z.string().length(0, "FASTQ not applicable for VCF"), z.null(), z.undefined()]).optional(),
     fastq_2: z.union([z.string().length(0, "FASTQ not applicable for VCF"), z.null(), z.undefined()]).optional(),
     bam_cram: z.union([z.string().length(0, "Cannot provide BAM/CRAM for VCF input"), z.null(), z.undefined()]).optional(),
-}).refine(data => !(data.vcf?.endsWith('.vcf.gz') && !data.index), {
-    message: "An index file (.tbi) must be provided for compressed VCF (.vcf.gz) input.", path: ["index"],
+})
+.refine(data => !(data.vcf?.endsWith('.vcf.gz') && !data.index), {
+    message: "An index file (.tbi/.csi) must be provided for compressed VCF (.vcf.gz) input.", path: ["index"],
+})
+// ADDED: Refinement for index extension check
+.refine(data => {
+    if (!data.index) return true; // Pass if no index provided
+    return data.index.endsWith('.tbi') || data.index.endsWith('.csi'); // Check extension if index exists
+}, {
+    message: "Index file must end with .tbi or .csi.", path: ["index"],
 });
 
+
+// --- Constants ---
 const ALL_SAREK_STEPS = ["mapping", "markduplicates", "prepare_recalibration", "recalibrate", "variant_calling", "annotation"] as const;
 type SarekStep = typeof ALL_SAREK_STEPS[number];
 const SAREK_TOOLS = ["strelka", "mutect2", "freebayes", "mpileup", "vardict", "manta", "cnvkit"];
@@ -86,9 +108,10 @@ const SAREK_PROFILES = ["docker", "singularity", "conda", "podman"];
 const SAREK_GENOMES = [ { value: "GATK.GRCh38", label: "GRCh38 (GATK Bundle)" }, { value: "GATK.GRCh37", label: "GRCh37 (GATK Bundle)" }, { value: "hg38", label: "hg38 (UCSC)" }, { value: "hg19", label: "hg19 (UCSC)" }, ];
 const VALID_GENOME_VALUES = SAREK_GENOMES.map(g => g.value) as [string, ...string[]];
 const SAREK_ALIGNERS = ["bwa-mem", "dragmap"];
-const SOMATIC_TOOLS = ["mutect2", "strelka"]; // Define tools requiring tumor sample
+const SOMATIC_TOOLS = ["mutect2", "strelka"];
 const STEPS_FOR_INPUT_TYPE: Record<'fastq' | 'bam_cram' | 'vcf', SarekStep[]> = { fastq: ["mapping"], bam_cram: ["markduplicates", "prepare_recalibration", "recalibrate", "variant_calling"], vcf: ["annotation"], };
 
+// --- Base Schemas ---
 const fastqPipelineSchemaBase = z.object({
     input_type: z.literal('fastq'),
     samples: z.array(fastqSampleSchema).min(1, "At least one sample is required for FASTQ input."),
@@ -150,7 +173,7 @@ const vcfPipelineSchemaBase = z.object({
     description: z.string().optional(),
 });
 
-
+// --- Final Schema with Refinements ---
 const pipelineInputSchema = z.discriminatedUnion("input_type", [
     fastqPipelineSchemaBase,
     bamCramPipelineSchemaBase,
@@ -165,13 +188,11 @@ const pipelineInputSchema = z.discriminatedUnion("input_type", [
          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "dbSNP or Known Indels file required if BQSR not skipped.", path: ["dbsnp"] });
          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "dbSNP or Known Indels file required.", path: ["skip_baserecalibrator"] });
     }
-
     // WES and Intervals requirement
     if (data.wes && !data.intervals_file) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Intervals file is required when WES mode is enabled.", path: ["intervals_file"] });
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Intervals file is required.", path: ["wes"] });
     }
-
     // Somatic Tools and Tumor Sample Requirement
     if (data.step !== 'annotation') {
         const toolsToCheck = data.tools ?? [];
@@ -184,26 +205,10 @@ const pipelineInputSchema = z.discriminatedUnion("input_type", [
             }
         }
     }
-
     // Type/Step Specific Refinements
-    if (data.input_type === 'fastq') {
-        if (data.aligner && !SAREK_ALIGNERS.includes(data.aligner)) {
-             ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid aligner selected.", path: ["aligner"] });
-        }
-    }
-    if (data.input_type === 'bam_cram') {
-        if (data.trim_fastq) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "'Trim FASTQ' not applicable for BAM/CRAM input", path: ["trim_fastq"] }); }
-        if (data.aligner && data.aligner.length > 0) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Aligner not applicable for BAM/CRAM input", path: ["aligner"] }); }
-        if (data.skip_baserecalibrator && (data.step === 'variant_calling')) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "'Skip Base Recalibration' not applicable when starting at variant calling.", path: ["skip_baserecalibrator"] }); }
-    }
-    if (data.input_type === 'vcf') {
-         if (data.trim_fastq) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "'Trim FASTQ' not applicable for VCF input", path: ["trim_fastq"] }); }
-         if (data.aligner && data.aligner.length > 0) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Aligner not applicable for VCF input", path: ["aligner"] }); }
-         if (data.skip_baserecalibrator) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "'Skip Base Recalibration' not applicable for VCF input", path: ["skip_baserecalibrator"] }); }
-         if (data.tools.length > 0) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Variant calling tools not applicable for VCF input", path: ["tools"] }); }
-         if (data.skip_annotation) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "'Skip Annotation' not applicable when starting at annotation", path: ["skip_annotation"] }); }
-         if (data.joint_germline) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "'Joint Germline' not applicable when starting at annotation", path: ["joint_germline"] }); }
-     }
+    if (data.input_type === 'fastq') { if (data.aligner && !SAREK_ALIGNERS.includes(data.aligner)) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid aligner selected.", path: ["aligner"] }); } }
+    if (data.input_type === 'bam_cram') { if (data.trim_fastq) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "'Trim FASTQ' not applicable for BAM/CRAM input", path: ["trim_fastq"] }); } if (data.aligner && data.aligner.length > 0) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Aligner not applicable for BAM/CRAM input", path: ["aligner"] }); } if (data.skip_baserecalibrator && (data.step === 'variant_calling')) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "'Skip Base Recalibration' not applicable when starting at variant calling.", path: ["skip_baserecalibrator"] }); } }
+    if (data.input_type === 'vcf') { if (data.trim_fastq) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "'Trim FASTQ' not applicable for VCF input", path: ["trim_fastq"] }); } if (data.aligner && data.aligner.length > 0) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Aligner not applicable for VCF input", path: ["aligner"] }); } if (data.skip_baserecalibrator) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "'Skip Base Recalibration' not applicable for VCF input", path: ["skip_baserecalibrator"] }); } if (data.tools.length > 0) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Variant calling tools not applicable for VCF input", path: ["tools"] }); } if (data.skip_annotation) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "'Skip Annotation' not applicable when starting at annotation", path: ["skip_annotation"] }); } if (data.joint_germline) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "'Joint Germline' not applicable when starting at annotation", path: ["joint_germline"] }); } }
 });
 // --- End Zod Schema ---
 
@@ -327,7 +332,7 @@ export default function InputPage() {
    });
    // --- END Mutations ---
 
-   // --- Button Disabling Logic (MOVED HERE - AFTER MUTATIONS) ---
+   // --- Button Disabling Logic ---
    const isBqsrRelevantForButton = watchedInputType !== 'vcf' && watchedStep !== 'variant_calling' && watchedStep !== 'annotation';
    const isBqsrEnabledForButton = !watchedSkipBqsr;
    const missingBqsrFilesForButton = !watchedDbsnp && !watchedKnownIndels;
@@ -337,7 +342,7 @@ export default function InputPage() {
    const hasTumorSample = watchedSamples?.some(sample => sample.status === 1) ?? false;
    const isSomaticTumorCheckFailedForButton = isSomaticToolSelected && !hasTumorSample && watchedStep !== 'annotation';
 
-   const isWesIntervalsCheckFailedForButton = watchedWes && !watchedIntervalsFile;
+   const isWesIntervalsCheckFailedForButton = watchedWes && (!watchedIntervalsFile || watchedIntervalsFile.trim() === ''); // Check if empty string too
 
    const isStagingDisabled = stageMutation.isPending || saveProfileMutation.isPending || isBqsrCheckFailedForButton || isSomaticTumorCheckFailedForButton || isWesIntervalsCheckFailedForButton;
 
@@ -349,7 +354,6 @@ export default function InputPage() {
        return undefined;
    };
    // --- End Button Disable Logic ---
-
 
   // --- onSubmit function ---
   function onSubmit(values: PipelineFormValues) {
@@ -376,6 +380,17 @@ export default function InputPage() {
                     const sampleErrors = errors.samples[firstSampleErrorIndex];
                      if (sampleErrors) { const firstSampleFieldError = Object.keys(sampleErrors)[0]; fieldName = `samples.${firstSampleErrorIndex}.${firstSampleFieldError}`; }
                 }
+            } else if (firstErrorKey === 'samples' && typeof errors.samples?.root?.message === 'string') {
+                 // Handle root error on samples array (e.g., tumor required)
+                 // Try to scroll to the Samples card header or the first sample group
+                 const samplesCardHeader = formRef.current?.querySelector('#samples-card-header'); // Need to add this ID
+                 if (samplesCardHeader) {
+                     samplesCardHeader.scrollIntoView({ behavior: "smooth", block: "center" });
+                     return; // Exit after scrolling to card header
+                 } else {
+                      // Fallback to scrolling first sample group if header ID not found
+                     fieldName = `samples.0.patient`; // Or another field in the first sample
+                 }
             }
             console.log(`Attempting to scroll to first error field: ${fieldName}`);
             const element = formRef.current?.querySelector(`[name="${fieldName}"]`);
@@ -405,9 +420,18 @@ export default function InputPage() {
             if (data.step === 'mapping') loadedInputType = 'fastq';
             else if (STEPS_FOR_INPUT_TYPE.bam_cram.includes(data.step as SarekStep)) loadedInputType = 'bam_cram';
             else if (data.step === 'annotation') loadedInputType = 'vcf';
-            if (loadedInputType !== form.getValues('input_type')) { form.setValue('input_type', loadedInputType, { shouldValidate: true }); }
-            // ProfileLoader now handles setting values *after* this callback,
-            // allowing parent to update input type first if needed.
+
+            // Check if input type needs to change *before* calling onProfileLoad
+            const currentInputType = form.getValues('input_type');
+            if (loadedInputType !== currentInputType) {
+                toast.info(`Profile '${name}' requires ${loadedInputType.toUpperCase()} input. Switching input type.`);
+                // Set the value directly here to trigger the useEffect hook in this component
+                form.setValue('input_type', loadedInputType, { shouldValidate: true });
+            }
+
+            // Now call the callback to let ProfileLoader set the actual values
+            onProfileLoad(selectedName, profileData); // Pass selectedName and profileData
+
        } else {
             form.reset();
             setSelectedInputType('fastq');
@@ -448,9 +472,12 @@ export default function InputPage() {
              </CardContent>
            </Card>
 
-          {/* Samples Card */}
+          {/* Samples Card - Added ID to header */}
           <Card>
-            <CardHeader> <CardTitle className="text-primary">Sample Information</CardTitle> <CardDescription> {selectedInputType === 'fastq' && "Provide FASTQ file pairs and lane information."} {selectedInputType === 'bam_cram' && "Provide coordinate-sorted BAM or CRAM files (and index for CRAM)."} {selectedInputType === 'vcf' && "Provide VCF files (and index for compressed VCFs)."} {" Status 0 = Normal, 1 = Tumor. IDs cannot contain spaces."} </CardDescription> </CardHeader>
+            <CardHeader id="samples-card-header"> {/* Added ID here */}
+                <CardTitle className="text-primary">Sample Information</CardTitle>
+                <CardDescription> {selectedInputType === 'fastq' && "Provide FASTQ file pairs and lane information."} {selectedInputType === 'bam_cram' && "Provide coordinate-sorted BAM or CRAM files (and index for CRAM)."} {selectedInputType === 'vcf' && "Provide VCF files (and index for compressed VCFs)."} {" Status 0 = Normal, 1 = Tumor. IDs cannot contain spaces."} </CardDescription>
+            </CardHeader>
             <CardContent className="space-y-4">
               {fields.map((field, index) => {
                   if (selectedInputType === 'fastq') { return <SampleInputGroup key={field.id} index={index} remove={remove} control={form.control} />; }
@@ -463,15 +490,15 @@ export default function InputPage() {
             </CardContent>
           </Card>
 
-          {/* Reference Files Card */}
+          {/* Reference Files Card - Updated descriptions */}
           <Card>
             <CardHeader> <CardTitle className="text-primary">Reference & Annotation Files</CardTitle> <CardDescription>Select the reference genome build and optional annotation files (relevance depends on starting step).</CardDescription> </CardHeader>
             <CardContent className="space-y-4">
               <FormField control={form.control} name="genome" render={({ field }) => ( <FormItem> <FormLabel>Reference Genome Build <span className="text-destructive">*</span></FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select genome build" /> </SelectTrigger> </FormControl> <SelectContent> {SAREK_GENOMES.map(g => ( <SelectItem key={g.value} value={g.value}> {g.label} </SelectItem> ))} </SelectContent> </Select> <FormDescription className="italic"> Select the genome assembly key (e.g., GATK.GRCh38). </FormDescription> <FormMessage /> </FormItem> )} />
-              <FormField control={form.control} name="intervals_file" render={({ field }) => ( <FormItem> <FormLabel> Intervals File <span className="text-muted-foreground text-xs"> (Optional)</span> </FormLabel> <FormControl> <FileSelector fileTypeLabel="Intervals" fileType="intervals" extensions={[".bed", ".list", ".interval_list"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select intervals file..." allowNone required={false} /> </FormControl> <FormDescription className="italic"> Target regions (e.g., for WES). Required if WES mode is checked. </FormDescription> <FormMessage /> </FormItem> )} />
-              <FormField control={form.control} name="dbsnp" render={({ field }) => ( <FormItem> <FormLabel>dbSNP (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="dbSNP" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select dbSNP file..." allowNone /> </FormControl> <FormDescription className="italic"> Known variants VCF (Required for BQSR if not skipped). </FormDescription> <FormMessage /> </FormItem> )} />
-              <FormField control={form.control} name="known_indels" render={({ field }) => ( <FormItem> <FormLabel>Known Indels (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="Known Indels" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select known indels file..." allowNone /> </FormControl> <FormDescription className="italic"> Known indels VCF (Required for BQSR if not skipped). </FormDescription> <FormMessage /> </FormItem> )} />
-              <FormField control={form.control} name="pon" render={({ field }) => ( <FormItem> <FormLabel>Panel of Normals (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="Panel of Normals" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select Panel of Normals file..." allowNone /> </FormControl> <FormDescription className="italic"> Panel of Normals VCF (Recommended for Mutect2 somatic calling). </FormDescription> <FormMessage /> </FormItem> )} />
+              <FormField control={form.control} name="intervals_file" render={({ field }) => ( <FormItem> <FormLabel> Intervals File <span className="text-muted-foreground text-xs"> (Optional)</span> </FormLabel> <FormControl> <FileSelector fileTypeLabel="Intervals" fileType="intervals" extensions={[".bed", ".list", ".interval_list"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select intervals file..." allowNone required={false} /> </FormControl> <FormDescription className="italic"> Target regions (e.g., for WES). Required if WES mode is checked below. </FormDescription> <FormMessage /> </FormItem> )} />
+              <FormField control={form.control} name="dbsnp" render={({ field }) => ( <FormItem> <FormLabel>dbSNP (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="dbSNP" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select dbSNP file..." allowNone /> </FormControl> <FormDescription className="italic"> Known variants VCF. Required for Base Quality Score Recalibration (BQSR) if not skipped. </FormDescription> <FormMessage /> </FormItem> )} />
+              <FormField control={form.control} name="known_indels" render={({ field }) => ( <FormItem> <FormLabel>Known Indels (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="Known Indels" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select known indels file..." allowNone /> </FormControl> <FormDescription className="italic"> Known indels VCF. Required for Base Quality Score Recalibration (BQSR) if not skipped. </FormDescription> <FormMessage /> </FormItem> )} />
+              <FormField control={form.control} name="pon" render={({ field }) => ( <FormItem> <FormLabel>Panel of Normals (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="Panel of Normals" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select Panel of Normals file..." allowNone /> </FormControl> <FormDescription className="italic"> Panel of Normals VCF. Recommended for Mutect2 somatic variant calling. </FormDescription> <FormMessage /> </FormItem> )} />
             </CardContent>
           </Card>
 
