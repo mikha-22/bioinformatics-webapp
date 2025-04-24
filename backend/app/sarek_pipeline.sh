@@ -132,8 +132,31 @@ log "Successfully created results directory: ${results_dir}"
 # Use absolute path for nextflow executable found in the worker's PATH
 # Make sure this path matches the output of 'which nextflow' in your working environment
 NXF_EXECUTABLE="/usr/local/bin/nextflow"
-# Define config path variable - MAKE SURE THIS FILE EXISTS AND IS READABLE
-NEXTFLOW_CONFIG="/home/admin01/lab/temp/nextflow.config"
+
+# <<< UPDATED config path variable >>>
+NEXTFLOW_CONFIG="/home/admin01/labs/temp/nextflow_run/nextflow.config"
+log "Using Nextflow config: ${NEXTFLOW_CONFIG}"
+
+# <<< Define Nextflow Run Directory >>>
+NEXTFLOW_RUN_DIR="/home/admin01/labs/temp/nextflow_run"
+log "Using Nextflow run directory (for logs/work): ${NEXTFLOW_RUN_DIR}"
+
+# <<< Define Nextflow Work Directory and Log File paths >>>
+NEXTFLOW_WORK_DIR="${NEXTFLOW_RUN_DIR}/work"
+NEXTFLOW_LOG_FILE="${NEXTFLOW_RUN_DIR}/.nextflow.log"
+
+# <<< Ensure Nextflow Run Directory exists and is writable >>>
+log "Checking Nextflow run directory..."
+mkdir -p "$NEXTFLOW_RUN_DIR"
+if [ $? -ne 0 ]; then
+    log "ERROR: Failed to create Nextflow run directory: ${NEXTFLOW_RUN_DIR}. Check permissions." >&2
+    exit 1
+fi
+if [ ! -w "$NEXTFLOW_RUN_DIR" ]; then
+    log "ERROR: Nextflow run directory (${NEXTFLOW_RUN_DIR}) is not writable by user $(whoami)." >&2
+    exit 1
+fi
+log "Nextflow run directory check passed."
 
 # --- Build the Sarek Command ---
 log "Building Nextflow command..."
@@ -143,6 +166,13 @@ cmd+=" --input ${input_csv}"
 cmd+=" --outdir ${results_dir}"
 cmd+=" --genome ${genome}"
 cmd+=" -c ${NEXTFLOW_CONFIG}" # Use variable for config path
+
+# <<< EXPORT Nextflow environment variables >>>
+export NXF_WORK="${NEXTFLOW_WORK_DIR}"
+export NXF_LOG_FILE="${NEXTFLOW_LOG_FILE}"
+log "Setting NXF_WORK=${NXF_WORK}"
+log "Setting NXF_LOG_FILE=${NXF_LOG_FILE}"
+# <<< END EXPORT >>>
 
 # Add wes flag if true
 if [ "$wes_flag" = "true" ]; then
@@ -225,10 +255,12 @@ fi
 # --- DIAGNOSTIC BLOCK ---
 log "--- Worker Environment ---"
 log "User: $(whoami) (UID: $(id -u))"
-log "Current Directory: $(pwd)"
+log "Current Directory: $(pwd)" # This script runs from backend/app/
 log "PATH: $PATH"
 log "JAVA_HOME: ${JAVA_HOME:-<not set>}" # Check if JAVA_HOME is explicitly set
 log "NXF_HOME: $NXF_HOME"
+log "NXF_WORK (Explicit): $NXF_WORK" # <<< Added
+log "NXF_LOG_FILE (Explicit): $NXF_LOG_FILE" # <<< Added
 log "NXF_VER used in script: $(${NXF_EXECUTABLE} -v | head -n 1 || echo '<failed>') " # Show resolved NF version
 log "--- Sanity Checks ---"
 log "Checking Java..."
@@ -273,12 +305,15 @@ log "$cmd"
 # Log the command to a file as well for easier debugging
 echo "Timestamp: $(date)" > "${results_dir}/pipeline_command.log"
 echo "Executing User: $(whoami) (UID: $(id -u))" >> "${results_dir}/pipeline_command.log"
-echo "Working Directory: $(pwd)" >> "${results_dir}/pipeline_command.log"
+echo "Working Directory (of script): $(pwd)" >> "${results_dir}/pipeline_command.log"
+echo "NXF_WORK: ${NXF_WORK}" >> "${results_dir}/pipeline_command.log"
+echo "NXF_LOG_FILE: ${NXF_LOG_FILE}" >> "${results_dir}/pipeline_command.log"
 echo "Command: ${cmd}" >> "${results_dir}/pipeline_command.log"
 echo "---------------------" >> "${results_dir}/pipeline_command.log"
 
 # *** MODIFIED EXECUTION LINE ***
 # Execute directly, merging stdout/stderr, let Python capture it
+# Environment variables NXF_WORK and NXF_LOG_FILE are already exported
 $cmd 2>&1
 
 exit_code=$? # Get exit code directly from the nextflow command
