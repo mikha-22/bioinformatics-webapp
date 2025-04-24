@@ -8,18 +8,22 @@ class SampleInfo(BaseModel):
     sample: str = Field(..., description="Sample identifier")
     sex: str = Field(..., description="Sex (e.g., XX, XY)")
     status: int = Field(..., description="Status (0 for normal, 1 for tumor)")
-    # *** ADD lane field ***
-    lane: str = Field(..., description="Lane identifier (e.g., L001)")
-    # ********************
-    fastq_1: str = Field(..., description="Path to first FASTQ file relative to data dir")
-    fastq_2: str = Field(..., description="Path to second FASTQ file relative to data dir")
+    lane: Optional[str] = Field(None, description="Lane identifier (e.g., L001) - Required only for FASTQ input") # Made optional at model level
+    fastq_1: Optional[str] = Field(None, description="Path to first FASTQ file relative to data dir") # Made optional
+    fastq_2: Optional[str] = Field(None, description="Path to second FASTQ file relative to data dir") # Made optional
+    bam_cram: Optional[str] = Field(None, description="Path to BAM or CRAM file relative to data dir") # Added for BAM/CRAM input
+    index: Optional[str] = Field(None, description="Path to index file (bai/crai/tbi) relative to data dir") # Added for index files
+    vcf: Optional[str] = Field(None, description="Path to VCF file relative to data dir") # Added for VCF input
+
 
 class PipelineInput(BaseModel):
-    # Sample information (from frontend form)
-    samples: List[SampleInfo] = Field(..., description="List of sample information")
+    """ Main input model, now includes input_type """
+    input_type: str = Field(..., description="Type of input data ('fastq', 'bam_cram', 'vcf')")
+    samples: List[SampleInfo] = Field(..., description="List of sample information, structure depends on input_type")
 
     # Required parameters (from Sarek docs / frontend form)
     genome: str = Field(..., description="Genome build to use (e.g., GRCh38, GRCh37)")
+    step: str = Field(..., description="Pipeline step to start from (e.g., mapping, variant_calling)") # Now required
 
     # Optional files (from Sarek docs / frontend form)
     intervals_file: Optional[str] = Field(None, description="Path to BED file with target regions (relative to data dir)")
@@ -28,10 +32,7 @@ class PipelineInput(BaseModel):
     pon: Optional[str] = Field(None, description="Path to Panel of Normals (PoN) VCF file (relative to data dir)")
 
     # Optional parameters (from Sarek docs / frontend form)
-    # *** UPDATED: Accept list of strings for tools from frontend ***
     tools: Optional[List[str]] = Field(None, description="List of tools (e.g., ['strelka', 'mutect2'])")
-    # ***************************************************************
-    step: Optional[str] = Field(None, description="Pipeline step to start from (e.g., mapping, variant_calling)")
     profile: Optional[str] = Field(None, description="Nextflow profile (e.g., docker, singularity)")
     aligner: Optional[str] = Field(None, description="Aligner to use (e.g., bwa-mem, dragmap)")
 
@@ -65,14 +66,16 @@ class JobStatusDetails(BaseModel):
     resources: Optional[JobResourceInfo] = Field(None, description="Resource usage statistics")
 # --- END Existing Models ---
 
-# --- <<< NEW MODELS FOR PROFILES >>> ---
+# --- UPDATED PROFILE MODELS ---
 class ProfileData(BaseModel):
     """
     Represents the data stored for a configuration profile.
-    Essentially PipelineInput minus the 'samples' field.
+    Essentially PipelineInput minus the 'samples' and 'input_type' fields.
+    Includes the intended starting step.
     """
     # Required parameters
     genome: str = Field(..., description="Genome build to use (e.g., GRCh38, GRCh37)")
+    step: str = Field(..., description="Intended pipeline step to start from (e.g., mapping, variant_calling)") # Added step
 
     # Optional files
     intervals_file: Optional[str] = Field(None, description="Path to BED file with target regions")
@@ -82,7 +85,6 @@ class ProfileData(BaseModel):
 
     # Optional parameters
     tools: Optional[List[str]] = Field(None, description="List of tools")
-    step: Optional[str] = Field(None, description="Pipeline step to start from")
     profile: Optional[str] = Field(None, description="Nextflow profile")
     aligner: Optional[str] = Field(None, description="Aligner to use")
 
@@ -101,4 +103,4 @@ class SaveProfileRequest(BaseModel):
     """ Request body for saving a profile. """
     name: str = Field(..., description="The name to save the profile under.")
     data: ProfileData = Field(..., description="The profile configuration data.")
-# --- <<< END NEW MODELS FOR PROFILES >>> ---
+# --- END UPDATED PROFILE MODELS ---

@@ -257,6 +257,7 @@ export const getProfileData = async (profileName: string): Promise<ProfileData> 
 export const saveProfile = async (profileName: string, data: ProfileData): Promise<{ message: string; profile_name: string }> => {
     if (!profileName) throw new Error("Profile name is required to save.");
     try {
+        // ProfileData includes step now, this is correct
         const payload = { name: profileName, data: data };
         const response = await apiClient.post("/api/profiles", payload);
         return response.data;

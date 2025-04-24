@@ -8,7 +8,7 @@ from typing import List, Dict
 
 from ..core.config import PIPELINE_PROFILES_KEY
 from ..core.redis_rq import get_redis_connection
-from ..models.pipeline import ProfileData, SaveProfileRequest # Import new models
+from ..models.pipeline import ProfileData, SaveProfileRequest # Import updated models
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -54,7 +54,7 @@ async def get_profile_data(
 
         profile_data = json.loads(profile_data_json.decode('utf-8'))
         logger.info(f"Successfully retrieved profile data for: {profile_name}")
-        # Validate data against the model (optional but good practice)
+        # Validate data against the model (includes step now)
         return ProfileData(**profile_data)
     except redis.exceptions.RedisError as e:
         logger.error(f"Redis error getting profile '{profile_name}': {e}")
@@ -73,7 +73,7 @@ async def save_profile(
 ):
     """ Saves a new profile configuration or updates an existing one. """
     profile_name = payload.name
-    profile_data = payload.data
+    profile_data = payload.data # This is ProfileData type, includes step
 
     logger.info(f"Attempting to save profile: {profile_name}")
 
@@ -84,6 +84,7 @@ async def save_profile(
          raise HTTPException(status_code=400, detail=f"Profile name exceeds maximum length of {MAX_PROFILE_NAME_LENGTH} characters.")
 
     try:
+        # ProfileData now includes step, which is saved
         profile_data_json = profile_data.model_dump_json(exclude_none=True) # Use model_dump_json for Pydantic v2
 
         # Use HSET (handles both create and update)
