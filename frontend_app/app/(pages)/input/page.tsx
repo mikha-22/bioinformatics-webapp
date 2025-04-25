@@ -188,11 +188,14 @@ const pipelineInputSchema = z.discriminatedUnion("input_type", [
          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "dbSNP or Known Indels file required if BQSR not skipped.", path: ["dbsnp"] });
          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "dbSNP or Known Indels file required.", path: ["skip_baserecalibrator"] });
     }
-    // WES and Intervals requirement
-    if (data.wes && !data.intervals_file) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Intervals file is required when WES mode is enabled.", path: ["intervals_file"] });
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Intervals file is required.", path: ["wes"] });
-    }
+
+    // --- REMOVED WES/Intervals Requirement ---
+    // if (data.wes && !data.intervals_file) {
+    //     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Intervals file is required when WES mode is enabled.", path: ["intervals_file"] });
+    //     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Intervals file is required.", path: ["wes"] });
+    // }
+    // --- END REMOVAL ---
+
     // Somatic Tools and Tumor Sample Requirement
     if (data.step !== 'annotation') {
         const toolsToCheck = data.tools ?? [];
@@ -255,8 +258,8 @@ export default function InputPage() {
   const watchedSkipBqsr = form.watch('skip_baserecalibrator');
   const watchedDbsnp = form.watch('dbsnp');
   const watchedKnownIndels = form.watch('known_indels');
-  const watchedWes = form.watch('wes');
-  const watchedIntervalsFile = form.watch('intervals_file');
+  // const watchedWes = form.watch('wes'); // No longer needed for button disabling
+  // const watchedIntervalsFile = form.watch('intervals_file'); // No longer needed for button disabling
   const watchedTools = form.watch('tools');
   const watchedSamples = form.watch('samples');
 
@@ -341,12 +344,16 @@ export default function InputPage() {
    const isSomaticToolSelected = watchedTools?.some(tool => SOMATIC_TOOLS.includes(tool)) ?? false;
    const hasTumorSample = watchedSamples?.some(sample => sample.status === 1) ?? false;
    const isSomaticTumorCheckFailedForButton = isSomaticToolSelected && !hasTumorSample && watchedStep !== 'annotation';
-   const isWesIntervalsCheckFailedForButton = watchedWes && (!watchedIntervalsFile || watchedIntervalsFile.trim() === '');
-   const isStagingDisabled = stageMutation.isPending || saveProfileMutation.isPending || isBqsrCheckFailedForButton || isSomaticTumorCheckFailedForButton || isWesIntervalsCheckFailedForButton;
+   // --- REMOVED WES/Intervals Check ---
+   // const isWesIntervalsCheckFailedForButton = watchedWes && (!watchedIntervalsFile || watchedIntervalsFile.trim() === '');
+   // --- END REMOVAL ---
+   const isStagingDisabled = stageMutation.isPending || saveProfileMutation.isPending || isBqsrCheckFailedForButton || isSomaticTumorCheckFailedForButton; // Removed isWesIntervalsCheckFailedForButton
    const getDisabledButtonTooltip = (): string | undefined => {
        if (isBqsrCheckFailedForButton) { return "BQSR requires dbSNP or Known Indels file unless skipped."; }
        if (isSomaticTumorCheckFailedForButton) { return "Selected somatic tool(s) require at least one Tumor sample (Status=1)."; }
-       if (isWesIntervalsCheckFailedForButton) { return "Intervals file is required when WES mode is enabled."; }
+       // --- REMOVED WES/Intervals Tooltip ---
+       // if (isWesIntervalsCheckFailedForButton) { return "Intervals file is required when WES mode is enabled."; }
+       // --- END REMOVAL ---
        if (stageMutation.isPending || saveProfileMutation.isPending) { return "Operation in progress..."; }
        return undefined;
    };
@@ -384,10 +391,17 @@ export default function InputPage() {
              }
             console.log(`Attempting to scroll to first error field: ${fieldName}`);
             let element = formRef.current?.querySelector(`[name="${fieldName}"]`);
+            // Fallback selectors if direct name match fails
             if (!element) {
-                 let selector = `#${errorPathParts.join('-')}-form-item`;
+                 const errorPathParts = fieldName.split('.'); // e.g., ['samples', '0', 'patient']
+                 let selector = `#${errorPathParts.join('-')}-form-item`; // Try ID first (e.g., #samples-0-patient-form-item)
                  element = formRef.current?.querySelector(selector);
-                 if (!element) { element = formRef.current?.querySelector(`label[for="${fieldName}"]`); }
+                 if (!element) { // Try label 'for' attribute
+                    element = formRef.current?.querySelector(`label[for="${fieldName}"]`);
+                 }
+                 if (!element && fieldName.startsWith('samples.')) { // Try the card header as a last resort for sample errors
+                     element = formRef.current?.querySelector('#samples-card-header');
+                 }
             }
             if (element) { element.scrollIntoView({ behavior: "smooth", block: "center" }); }
             else { console.warn(`Could not find element for error: ${fieldName}. Scrolling form to top.`); formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }
@@ -484,7 +498,11 @@ export default function InputPage() {
             <CardHeader> <CardTitle>Reference & Annotation Files</CardTitle> <CardDescription>Select the reference genome build and optional annotation files (relevance depends on starting step).</CardDescription> </CardHeader>
             <CardContent className="space-y-4">
               <FormField control={form.control} name="genome" render={({ field }) => ( <FormItem> <FormLabel>Reference Genome Build <span className="text-destructive">*</span></FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select genome build" /> </SelectTrigger> </FormControl> <SelectContent> {SAREK_GENOMES.map(g => ( <SelectItem key={g.value} value={g.value}> {g.label} </SelectItem> ))} </SelectContent> </Select> <FormDescription className="italic"> Select the genome assembly key (e.g., GATK.GRCh38). </FormDescription> <FormMessage /> </FormItem> )} />
-              <FormField control={form.control} name="intervals_file" render={({ field }) => ( <FormItem> <FormLabel> Intervals File <span className="text-muted-foreground text-xs"> (Optional)</span> </FormLabel> <FormControl> <FileSelector fileTypeLabel="Intervals" fileType="intervals" extensions={[".bed", ".list", ".interval_list"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select intervals file..." allowNone required={false} /> </FormControl> <FormDescription className="italic"> Target regions (e.g., for WES). Required if WES mode is checked below. </FormDescription> <FormMessage /> </FormItem> )} />
+              <FormField control={form.control} name="intervals_file" render={({ field }) => ( <FormItem> <FormLabel> Intervals File <span className="text-muted-foreground text-xs"> (Optional)</span> </FormLabel> <FormControl> <FileSelector fileTypeLabel="Intervals" fileType="intervals" extensions={[".bed", ".list", ".interval_list"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select intervals file..." allowNone required={false} /> </FormControl>
+              {/* --- UPDATED Description --- */}
+              <FormDescription className="italic"> Target regions (e.g., for WES). Recommended if WES mode is checked below. </FormDescription>
+              {/* --- END UPDATE --- */}
+              <FormMessage /> </FormItem> )} />
               <FormField control={form.control} name="dbsnp" render={({ field }) => ( <FormItem> <FormLabel>dbSNP (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="dbSNP" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select dbSNP file..." allowNone /> </FormControl> <FormDescription className="italic"> Known variants VCF. Required for Base Quality Score Recalibration (BQSR) if not skipped. </FormDescription> <FormMessage /> </FormItem> )} />
               <FormField control={form.control} name="known_indels" render={({ field }) => ( <FormItem> <FormLabel>Known Indels (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="Known Indels" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select known indels file..." allowNone /> </FormControl> <FormDescription className="italic"> Known indels VCF. Required for Base Quality Score Recalibration (BQSR) if not skipped. </FormDescription> <FormMessage /> </FormItem> )} />
               <FormField control={form.control} name="pon" render={({ field }) => ( <FormItem> <FormLabel>Panel of Normals (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="Panel of Normals" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select Panel of Normals file..." allowNone /> </FormControl> <FormDescription className="italic"> Panel of Normals VCF. Recommended for Mutect2 somatic variant calling. </FormDescription> <FormMessage /> </FormItem> )} />
@@ -501,7 +519,11 @@ export default function InputPage() {
                  {showTools && ( <div className="md:col-span-2"> <div className="mb-4"> <div className="text-base font-medium">Variant Calling Tools</div> <p className="text-sm text-muted-foreground">Select tools to run (not applicable when starting at annotation).</p> </div> <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2"> {SAREK_TOOLS.map((tool) => { const uniqueId = `tool-${tool}`; const currentTools: string[] = form.watch("tools") || []; const isChecked = currentTools.includes(tool); return ( <FormItem key={uniqueId} className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor={uniqueId} className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id={uniqueId} checked={isChecked} onCheckedChange={() => toggleCheckboxValue('tools', tool)} /> </FormControl> <span className="pt-px">{tool}</span> </FormLabel> </FormItem> ); })} </div> <FormField control={form.control} name="tools" render={() => <FormMessage className="pt-2" />} /> </div> )}
                  {/* Flags Group */}
                  <div className="md:col-span-2 space-y-4">
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-wes" className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id="flag-wes" checked={form.watch('wes')} onCheckedChange={() => toggleCheckboxValue('wes')} /> </FormControl> <div className="space-y-1 leading-none pt-px"> <span>Whole Exome Sequencing (WES)</span> <FormDescription className="italic mt-1"> Check if data is WES/targeted. Requires Intervals file. </FormDescription> </div> </FormLabel> <FormField control={form.control} name="wes" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem>
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-wes" className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id="flag-wes" checked={form.watch('wes')} onCheckedChange={() => toggleCheckboxValue('wes')} /> </FormControl> <div className="space-y-1 leading-none pt-px"> <span>Whole Exome Sequencing (WES)</span>
+                    {/* --- UPDATED Description --- */}
+                    <FormDescription className="italic mt-1"> Check if data is WES/targeted. Providing an Intervals file is recommended. </FormDescription>
+                    {/* --- END UPDATE --- */}
+                    </div> </FormLabel> <FormField control={form.control} name="wes" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem>
                     {showTrimFastq && ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-trim_fastq" className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id="flag-trim_fastq" checked={form.watch('trim_fastq')} onCheckedChange={() => toggleCheckboxValue('trim_fastq')} /> </FormControl> <div className="space-y-1 leading-none pt-px"> <span>Trim FASTQ</span> <FormDescription className="italic mt-1"> Enable adapter trimming (only for FASTQ input). </FormDescription> </div> </FormLabel> <FormField control={form.control} name="trim_fastq" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem> )}
                     {showSkipBaserecalibrator && ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-skip_baserecalibrator" className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id="flag-skip_baserecalibrator" checked={form.watch('skip_baserecalibrator')} onCheckedChange={() => toggleCheckboxValue('skip_baserecalibrator')} /> </FormControl> <div className="space-y-1 leading-none pt-px"> <span>Skip Base Recalibration</span> <FormDescription className="italic mt-1"> Skip BQSR step (requires dbSNP/Known Indels if not skipped). </FormDescription> </div> </FormLabel> <FormField control={form.control} name="skip_baserecalibrator" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem> )}
                     {showJointGermline && ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-joint_germline" className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id="flag-joint_germline" checked={form.watch('joint_germline')} onCheckedChange={() => toggleCheckboxValue('joint_germline')} /> </FormControl> <div className="space-y-1 leading-none pt-px"> <span>Joint Germline Calling</span> <FormDescription className="italic mt-1"> Enable joint calling (not applicable if starting at annotation). </FormDescription> </div> </FormLabel> <FormField control={form.control} name="joint_germline" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem> )}
