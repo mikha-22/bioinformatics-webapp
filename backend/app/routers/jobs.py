@@ -17,7 +17,7 @@ from rq import Queue, Worker
 from rq.job import Job, JobStatus
 from rq.exceptions import NoSuchJobError, InvalidJobOperation
 # Need all registries for removal
-from rq.registry import StartedJobRegistry, FinishedJobRegistry, FailedJobRegistry, DeferredJobRegistry, ScheduledJobRegistry
+from rq.registry import StartedJobRegistry, FinishedJobRegistry, FailedJobRegistry, DeferredJobRegistry, ScheduledJobRegistry, CanceledJobRegistry # Added CanceledJobRegistry
 from rq.command import send_stop_job_command
 
 # App specific imports
@@ -157,21 +157,29 @@ async def get_jobs_list(
     except redis.exceptions.RedisError as e: logger.error(f"Redis error fetching staged jobs from '{STAGED_JOBS_KEY}': {e}")
 
     # 2. Get RQ Jobs
-    registries_to_check = { "queued": queue, "started": StartedJobRegistry(queue=queue), "finished": FinishedJobRegistry(queue=queue), "failed": FailedJobRegistry(queue=queue), }
+    # Add CanceledJobRegistry to the list
+    registries_to_check = {
+        "queued": queue,
+        "started": StartedJobRegistry(queue=queue),
+        "finished": FinishedJobRegistry(queue=queue),
+        "failed": FailedJobRegistry(queue=queue),
+        "canceled": CanceledJobRegistry(queue=queue), # Check canceled jobs too
+    }
     rq_job_ids_to_fetch = set()
     for status_name, registry_or_queue in registries_to_check.items():
         try:
             job_ids = []
-            limit = MAX_REGISTRY_JOBS if status_name in ["finished", "failed"] else -1
-            if isinstance(registry_or_queue, Queue):
-                job_ids = registry_or_queue.get_job_ids()
-            elif isinstance(registry_or_queue, (StartedJobRegistry, FinishedJobRegistry, FailedJobRegistry)):
+            # Check if it's a registry first
+            if isinstance(registry_or_queue, (StartedJobRegistry, FinishedJobRegistry, FailedJobRegistry, CanceledJobRegistry)):
+                limit = MAX_REGISTRY_JOBS if status_name in ["finished", "failed", "canceled"] else -1
                 total_count = registry_or_queue.count
                 start_index = max(0, total_count - limit) if limit > 0 else 0
                 end_index = total_count - 1
                 if start_index <= end_index:
                      job_ids = registry_or_queue.get_job_ids(start_index, end_index)
-                     job_ids.reverse()
+                     job_ids.reverse() # Show most recent first for registries
+            elif isinstance(registry_or_queue, Queue):
+                 job_ids = registry_or_queue.get_job_ids() # Get all queued IDs
             else:
                  logger.warning(f"Unsupported type for job fetching: {type(registry_or_queue)}")
                  continue
@@ -201,7 +209,8 @@ async def get_jobs_list(
                         if stderr_snippet: error_summary += f" (stderr: {stderr_snippet}...)"
                     resources = { "peak_memory_mb": job_meta.get("peak_memory_mb"), "average_cpu_percent": job_meta.get("average_cpu_percent"), "duration_seconds": job_meta.get("duration_seconds") }
                     # Overwrite staged entry if RQ job exists for the same ID root
-                    if job.id not in all_jobs_dict or all_jobs_dict[job.id].get('status') == 'staged':
+                    # Also update if the RQ status is different from a previously fetched status (e.g., moved from queued to started)
+                    if job.id not in all_jobs_dict or all_jobs_dict[job.id].get('status') != current_status:
                          all_jobs_dict[job.id] = { "id": job.id, "status": current_status, "description": job_meta.get("description") or job.description or f"RQ job {job.id[:12]}...", "enqueued_at": dt_to_timestamp(job.enqueued_at), "started_at": dt_to_timestamp(job.started_at), "ended_at": dt_to_timestamp(job.ended_at), "result": job.result, "error": error_summary, "meta": job_meta, "staged_at": None, "resources": resources if any(v is not None for v in resources.values()) else None }
         except redis.exceptions.RedisError as e: logger.error(f"Redis error during Job.fetch_many: {e}")
         except Exception as e: logger.exception("Unexpected error fetching RQ job details.")
@@ -210,18 +219,18 @@ async def get_jobs_list(
     try: all_jobs_list = sorted( all_jobs_dict.values(), key=lambda j: j.get('ended_at') or j.get('started_at') or j.get('enqueued_at') or j.get('staged_at') or 0, reverse=True )
     except Exception as e: logger.exception("Error sorting combined jobs list."); all_jobs_list = list(all_jobs_dict.values())
 
-    # 4. Limit Finished/Failed jobs
+    # 4. Limit Finished/Failed/Canceled jobs
     if MAX_REGISTRY_JOBS > 0:
         final_list = []
-        finished_failed_count = 0
+        terminal_count = 0
         for job_item in all_jobs_list:
              status = job_item.get('status', '').lower()
              is_terminal = status in ['finished', 'failed', 'stopped', 'canceled']
              if is_terminal:
-                 if finished_failed_count < MAX_REGISTRY_JOBS:
+                 if terminal_count < MAX_REGISTRY_JOBS:
                      final_list.append(job_item)
-                     finished_failed_count += 1
-             else:
+                     terminal_count += 1
+             else: # Always include non-terminal jobs
                  final_list.append(job_item)
         all_jobs_list = final_list
 
@@ -248,21 +257,13 @@ async def get_job_status(
                 try:
                     if status == JobStatus.FINISHED:
                         result = job.result
-                    # *** Start Corrected Block ***
                     elif status == JobStatus.FAILED:
                         error_info_summary = meta_data.get('error_message', "Job failed processing")
                         stderr_snippet = meta_data.get('stderr_snippet')
-                        # Try to get a more specific error from exc_info if the default message is present
                         if error_info_summary == "Job failed processing" and job.exc_info:
-                            try:
-                                # Get the last line of the exception info
-                                error_info_summary = job.exc_info.strip().split('\n')[-1]
-                            except Exception:
-                                pass # Keep the default message if parsing fails
-                        # Append stderr snippet if available
-                        if stderr_snippet:
-                            error_info_summary += f" (stderr: {stderr_snippet}...)"
-                    # *** End Corrected Block ***
+                            try: error_info_summary = job.exc_info.strip().split('\n')[-1]
+                            except Exception: pass
+                        if stderr_snippet: error_info_summary += f" (stderr: {stderr_snippet}...)"
                 except Exception as e:
                     logger.exception(f"Error accessing result/error info for job {job_id} (status: {status}).")
                     error_info_summary = error_info_summary or "Could not retrieve job result/error details."
@@ -292,23 +293,60 @@ async def get_job_status(
 @router.post("/stop_job/{job_id}", status_code=200, summary="Cancel Running/Queued RQ Job")
 async def stop_job(
     job_id: str,
-    redis_conn: redis.Redis = Depends(get_redis_connection) # Use the standard connection
+    redis_conn: redis.Redis = Depends(get_redis_connection), # Use standard connection
+    queue: Queue = Depends(get_pipeline_queue) # Inject queue
 ):
-     if job_id.startswith("staged_"): raise HTTPException(status_code=400, detail="Cannot stop a 'staged' job. Remove it instead.")
-     logger.info(f"Received request to stop RQ job: {job_id}")
-     try:
-         # Fetch using bytes connection for commands compatibility
-         redis_conn_bytes = redis.Redis(host=redis_conn.connection_pool.connection_kwargs.get('host', 'localhost'), port=redis_conn.connection_pool.connection_kwargs.get('port', 6379), db=redis_conn.connection_pool.connection_kwargs.get('db', 0), decode_responses=False)
-         job = Job.fetch(job_id, connection=redis_conn_bytes); status = job.get_status(refresh=True)
-         if job.is_finished or job.is_failed or job.is_stopped or job.is_canceled: logger.warning(f"Attempted to stop job {job_id} which is already in state: {status}"); return JSONResponse(status_code=200, content={"message": f"Job already in terminal state: {status}.", "job_id": job_id})
-         logger.info(f"Job {job_id} is in state {status}. Attempting to send stop signal.")
-         message = f"Stop signal sent to job {job_id}."
-         try: send_stop_job_command(redis_conn_bytes, job.id); logger.info(f"Successfully sent stop signal command via RQ for job {job_id}.")
-         except Exception as sig_err: logger.warning(f"Could not send stop signal command via RQ for job {job_id}. Worker may not stop immediately. Error: {sig_err}"); message = f"Stop signal attempted for job {job_id} (check worker logs)."
-         return JSONResponse(status_code=200, content={"message": message, "job_id": job_id})
-     except NoSuchJobError: logger.warning(f"Stop job request failed: Job ID '{job_id}' not found."); raise HTTPException(status_code=404, detail=f"Cannot stop job: Job '{job_id}' not found.")
-     except redis.exceptions.RedisError as e: logger.error(f"Redis error interacting with job {job_id} for stopping: {e}"); raise HTTPException(status_code=503, detail="Service unavailable: Could not connect to job backend.")
-     except Exception as e: logger.exception(f"Unexpected error stopping job {job_id}."); raise HTTPException(status_code=500, detail="Internal server error attempting to stop job.")
+    if job_id.startswith("staged_"):
+        raise HTTPException(status_code=400, detail="Cannot stop a 'staged' job. Remove it instead.")
+
+    logger.info(f"Received request to stop/cancel RQ job: {job_id}")
+    message = f"Action processed for job {job_id}." # Default message
+
+    try:
+        # Use the queue's connection for fetching
+        job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer)
+        status = job.get_status(refresh=True)
+
+        if job.is_finished or job.is_failed or job.is_stopped or job.is_canceled:
+            logger.warning(f"Attempted to stop/cancel job {job_id} which is already in terminal state: {status}")
+            message = f"Job already in terminal state: {status}."
+        elif status == JobStatus.QUEUED:
+            logger.info(f"Job {job_id} is queued. Attempting to cancel...")
+            try:
+                job.cancel() # Cancel the job (removes from queue)
+                logger.info(f"Successfully canceled queued job {job_id}.")
+                message = f"Queued job {job_id} canceled successfully."
+            except Exception as cancel_err:
+                logger.error(f"Failed to cancel queued job {job_id}: {cancel_err}")
+                message = f"Failed to cancel queued job {job_id}."
+                # Optionally raise 500 if cancel fails critically
+                # raise HTTPException(status_code=500, detail=f"Failed to cancel queued job: {cancel_err}")
+        elif status == JobStatus.STARTED or status == JobStatus.RUNNING:
+            logger.info(f"Job {job_id} is {status}. Attempting to send stop signal...")
+            try:
+                # Use bytes connection for send_stop_job_command
+                redis_conn_bytes = redis.Redis(host=redis_conn.connection_pool.connection_kwargs.get('host', 'localhost'), port=redis_conn.connection_pool.connection_kwargs.get('port', 6379), db=redis_conn.connection_pool.connection_kwargs.get('db', 0), decode_responses=False)
+                send_stop_job_command(redis_conn_bytes, job.id)
+                logger.info(f"Successfully sent stop signal command via RQ for job {job_id}.")
+                message = f"Stop signal sent to job {job_id}."
+            except Exception as sig_err:
+                logger.warning(f"Could not send stop signal command via RQ for job {job_id}. Worker may not stop immediately. Error: {sig_err}")
+                message = f"Stop signal attempted for job {job_id} (check worker logs)."
+        else:
+             logger.warning(f"Job {job_id} has unexpected status '{status}', cannot stop/cancel.")
+             message = f"Job {job_id} has status '{status}', cannot stop/cancel."
+
+        return JSONResponse(status_code=200, content={"message": message, "job_id": job_id})
+
+    except NoSuchJobError:
+        logger.warning(f"Stop/cancel job request failed: Job ID '{job_id}' not found.")
+        raise HTTPException(status_code=404, detail=f"Cannot stop/cancel job: Job '{job_id}' not found.")
+    except redis.exceptions.RedisError as e:
+        logger.error(f"Redis error interacting with job {job_id} for stopping/canceling: {e}")
+        raise HTTPException(status_code=503, detail="Service unavailable: Could not connect to job backend.")
+    except Exception as e:
+        logger.exception(f"Unexpected error stopping/canceling job {job_id}.")
+        raise HTTPException(status_code=500, detail="Internal server error attempting to stop/cancel job.")
 
 
 @router.delete("/remove_job/{job_id}", status_code=200, summary="Remove Staged or RQ Job Data")
@@ -392,6 +430,7 @@ async def remove_job(
                 # Explicitly remove from terminal registries
                 FinishedJobRegistry(queue=queue).remove(job, delete_job=False)
                 FailedJobRegistry(queue=queue).remove(job, delete_job=False)
+                CanceledJobRegistry(queue=queue).remove(job, delete_job=False) # Also remove from canceled
                 # Add others if needed (Deferred, Scheduled)
                 # DeferredJobRegistry(queue=queue).remove(job, delete_job=False)
                 # ScheduledJobRegistry(queue=queue).remove(job, delete_job=False)
@@ -405,7 +444,7 @@ async def remove_job(
 
             # 2. Delete the job HASH itself
             try:
-                job.delete() # <<<< CORRECTED: No remove_from_registries argument here
+                job.delete() # CORRECTED: No remove_from_registries argument here
                 logger.info(f"Successfully deleted RQ job hash for {job_id}")
                 job_removed = True # Mark as removed
             except InvalidJobOperation as e:
@@ -593,8 +632,10 @@ async def rerun_job(
              logger.exception(f"Unexpected error processing sample data during re-stage of {job_id}: {sample_err}")
              raise HTTPException(status_code=500, detail="Error processing original sample data for re-run.")
 
+
         # Create the new CSV file (only if validation passed)
         try:
+            # Create temp file in system's temp dir
             with tempfile.NamedTemporaryFile(mode='w', newline='', suffix='.csv', delete=False) as temp_csv:
                 csv_writer = csv.writer(temp_csv)
                 csv_writer.writerow(csv_headers)

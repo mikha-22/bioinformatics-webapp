@@ -44,7 +44,7 @@ import {
     DialogTitle,
     DialogDescription,
     DialogFooter,
-    DialogClose
+    // DialogClose // No longer needed here
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
@@ -55,7 +55,7 @@ import * as api from "@/lib/api";
 import { formatDuration } from "@/lib/utils";
 import { formatDistanceToNow } from 'date-fns';
 
-// --- Helper functions ---
+// --- Helper functions (remain the same) ---
 function getStatusVariant(status: string | null | undefined): "default" | "destructive" | "secondary" | "outline" {
     switch (status?.toLowerCase()) {
         case 'finished': return 'default';
@@ -113,12 +113,11 @@ export default function JobActions({ job }: JobActionsProps) {
 
     const jobsQueryKey = ['jobsList']; // Define query key used by useJobsList
 
-    // --- Mutations with Updated onSuccess ---
+    // --- Mutations (remain the same) ---
     const startMutation = useMutation({
         mutationFn: api.startJob,
         onSuccess: (data) => {
             toast.success(`Job ${data.job_id} started successfully.`);
-            // Invalidate to ensure backend state is reflected
             queryClient.invalidateQueries({ queryKey: jobsQueryKey });
         },
         onError: (error: Error) => { toast.error(`Failed to start job: ${error.message}`); }
@@ -128,43 +127,35 @@ export default function JobActions({ job }: JobActionsProps) {
         mutationFn: api.stopJob,
         onSuccess: (data) => {
             toast.info(`Stop signal sent to job ${data.job_id}.`);
-            // Invalidate to reflect potential status change
             queryClient.invalidateQueries({ queryKey: jobsQueryKey });
         },
         onError: (error: Error) => { toast.error(`Failed to stop job: ${error.message}`); },
         onSettled: () => setIsStopConfirmOpen(false),
     });
 
-    // *** MODIFIED removeMutation onSuccess ***
     const removeMutation = useMutation({
         mutationFn: api.removeJob,
         onSuccess: (data) => {
             toast.success(`Job ${data.removed_id} removed.`);
-            // Manually update the cache: remove the deleted job
             queryClient.setQueryData<Job[]>(jobsQueryKey, (oldData) => {
                 if (!oldData) return [];
                 const newData = oldData.filter(j => j.id !== data.removed_id);
                 console.log(`[JobActions - ${job.id}] Manually updating cache after removing ${data.removed_id}. Old count: ${oldData.length}, New count: ${newData.length}`);
                 return newData;
             });
-            // No explicit invalidation needed here as setQueryData triggers re-render
         },
         onError: (error: Error) => {
             toast.error(`Failed to remove job: ${error.message}`);
-            // If removal fails, invalidate to refetch the potentially unchanged list from backend
             queryClient.invalidateQueries({ queryKey: jobsQueryKey });
         },
         onSettled: () => setIsRemoveConfirmOpen(false),
     });
-    // *** END MODIFIED removeMutation ***
 
     const rerunMutation = useMutation({
         mutationFn: api.rerunJob,
         onSuccess: (data) => {
             toast.success(`Job ${job.id} re-staged as ${data.staged_job_id}.`);
-            // Invalidate query to fetch the new list including the staged job
             queryClient.invalidateQueries({ queryKey: jobsQueryKey });
-            // router.push('/jobs'); // Navigation removed for now, let polling handle update
         },
         onError: (error: Error) => { toast.error(`Failed to re-stage job: ${error.message}`); },
         onSettled: () => setIsRerunConfirmOpen(false),
@@ -192,7 +183,7 @@ export default function JobActions({ job }: JobActionsProps) {
     // --- End Conditional Logic ---
 
 
-    // --- JSX Rendering (Mostly Unchanged, check button disabled states) ---
+    // --- JSX Rendering ---
     return (
         <>
             <div className="flex items-center gap-1">
@@ -266,7 +257,7 @@ export default function JobActions({ job }: JobActionsProps) {
 
             </div>
 
-            {/* Details Dialog (Unchanged JSX) */}
+            {/* Details Dialog */}
              <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
                 <DialogContent className="sm:max-w-2xl">
                     <DialogHeader> <DialogTitle>Job Details: {job.id}</DialogTitle> <DialogDescription>{job.description || "No description provided."}</DialogDescription> </DialogHeader>
@@ -291,7 +282,13 @@ export default function JobActions({ job }: JobActionsProps) {
                          {/* Result Path */}
                         {job.status === 'finished' && job.result?.results_path && ( <div> <h4 className="font-semibold mb-1">Results Path:</h4> <p className="text-sm pl-4 font-mono break-all">{job.result.results_path}</p> </div> )}
                     </div>
-                    <DialogFooter className="mt-4"> <DialogClose asChild> <Button type="button" variant="outline">Close</Button> </DialogClose> </DialogFooter>
+                    {/* *** MANUAL CLOSE WORKAROUND *** */}
+                    <DialogFooter className="mt-4">
+                         <Button type="button" variant="outline" onClick={() => setIsDetailsOpen(false)}>
+                             Close
+                         </Button>
+                     </DialogFooter>
+                     {/* *** END WORKAROUND *** */}
                 </DialogContent>
              </Dialog>
 
