@@ -44,7 +44,7 @@ import {
     DialogTitle,
     DialogDescription,
     DialogFooter,
-    // DialogClose // No longer needed here
+    // DialogClose // Keep removed from previous step
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
@@ -55,14 +55,18 @@ import * as api from "@/lib/api";
 import { formatDuration } from "@/lib/utils";
 import { formatDistanceToNow } from 'date-fns';
 
-// --- Helper functions (remain the same) ---
-function getStatusVariant(status: string | null | undefined): "default" | "destructive" | "secondary" | "outline" {
-    switch (status?.toLowerCase()) {
-        case 'finished': return 'default';
-        case 'failed': return 'destructive';
-        case 'running': case 'started': return 'default';
-        case 'queued': case 'staged': return 'secondary';
-        case 'stopped': case 'canceled': return 'outline';
+// --- Helper Functions ---
+// UPDATED: Get badge variant based on the *internal* status for correct styling
+function getStatusVariant(internalStatus: string | null | undefined): "default" | "destructive" | "secondary" | "outline" {
+    const status = internalStatus?.toLowerCase();
+    switch (status) {
+        case 'finished': return 'default'; // Greenish success -> Use primary for now
+        case 'failed': return 'destructive'; // Red
+        case 'started': return 'default'; // Blueish -> Primary (Represents Running)
+        case 'queued':
+        case 'staged': return 'secondary'; // Gray
+        case 'stopped': // RQ's stopped state
+        case 'canceled': return 'outline'; // Muted/outline (Represents UI Stopped/Canceled)
         default: return 'secondary';
     }
 }
@@ -126,10 +130,10 @@ export default function JobActions({ job }: JobActionsProps) {
     const stopMutation = useMutation({
         mutationFn: api.stopJob,
         onSuccess: (data) => {
-            toast.info(`Stop signal sent to job ${data.job_id}.`);
+            toast.info(`${data.message}`); // Use message from backend
             queryClient.invalidateQueries({ queryKey: jobsQueryKey });
         },
-        onError: (error: Error) => { toast.error(`Failed to stop job: ${error.message}`); },
+        onError: (error: Error) => { toast.error(`Failed to stop/cancel job: ${error.message}`); },
         onSettled: () => setIsStopConfirmOpen(false),
     });
 
@@ -171,11 +175,16 @@ export default function JobActions({ job }: JobActionsProps) {
     // --- End Handlers ---
 
 
-    // --- Conditional Logic & Metadata (Unchanged) ---
-    const canStart = job.status === 'staged';
-    const canStop = job.status === 'running' || job.status === 'started' || job.status === 'queued';
-    const canRerun = job.status === 'finished' || job.status === 'failed' || job.status === 'stopped' || job.status === 'canceled';
-    const canRemove = job.status === 'staged' || job.status === 'finished' || job.status === 'failed' || job.status === 'stopped' || job.status === 'canceled';
+    // --- Conditional Logic & Metadata ---
+    // Use internal RQ status names for logic
+    const internalStatus = job.status?.toLowerCase();
+    const canStart = internalStatus === 'staged';
+    const canStop = internalStatus === 'running' || internalStatus === 'started' || internalStatus === 'queued';
+    // UPDATED: Include 'canceled' (maps to UI 'Stopped')
+    const canRerun = internalStatus === 'finished' || internalStatus === 'failed' || internalStatus === 'stopped' || internalStatus === 'canceled';
+    // UPDATED: Include 'canceled' (maps to UI 'Stopped')
+    const canRemove = internalStatus === 'staged' || internalStatus === 'finished' || internalStatus === 'failed' || internalStatus === 'stopped' || internalStatus === 'canceled';
+
     const meta = job.meta as JobMeta | null | undefined;
     const inputParams = meta?.input_params;
     const sarekParams = meta?.sarek_params;
@@ -201,10 +210,10 @@ export default function JobActions({ job }: JobActionsProps) {
                  {canStop && (
                      <Button
                          variant="ghost" size="icon" onClick={() => setIsStopConfirmOpen(true)} disabled={stopMutation.isPending}
-                         className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" title="Stop Job"
+                         className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" title="Stop/Cancel Job"
                      >
                          {stopMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Square className="h-5 w-5" />}
-                         <span className="sr-only">Stop Job</span>
+                         <span className="sr-only">Stop/Cancel Job</span>
                      </Button>
                  )}
                  {/* Re-stage Button */}
@@ -282,19 +291,33 @@ export default function JobActions({ job }: JobActionsProps) {
                          {/* Result Path */}
                         {job.status === 'finished' && job.result?.results_path && ( <div> <h4 className="font-semibold mb-1">Results Path:</h4> <p className="text-sm pl-4 font-mono break-all">{job.result.results_path}</p> </div> )}
                     </div>
-                    {/* *** MANUAL CLOSE WORKAROUND *** */}
+                    {/* Manual Close Button */}
                     <DialogFooter className="mt-4">
                          <Button type="button" variant="outline" onClick={() => setIsDetailsOpen(false)}>
                              Close
                          </Button>
                      </DialogFooter>
-                     {/* *** END WORKAROUND *** */}
                 </DialogContent>
              </Dialog>
 
-            {/* Confirmation Dialogs (Unchanged JSX) */}
+            {/* Confirmation Dialogs */}
              <AlertDialog open={isStopConfirmOpen} onOpenChange={setIsStopConfirmOpen}>
-                <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Stop Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to stop job <span className="font-mono font-semibold">{job.id}</span>? This will attempt to cancel it if queued or signal it to terminate if running. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={stopMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleStop} disabled={stopMutation.isPending} className="bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-700"> {stopMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Stop Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirm Stop/Cancel Job</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to stop job <span className="font-mono font-semibold">{job.id}</span>?
+                            If it's running, a stop signal will be sent. If it's queued, it will be canceled.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={stopMutation.isPending}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleStop} disabled={stopMutation.isPending} className="bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-700">
+                            {stopMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Stop/Cancel Job
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
              </AlertDialog>
              <AlertDialog open={isRemoveConfirmOpen} onOpenChange={setIsRemoveConfirmOpen}>
                  <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Remove Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to remove job <span className="font-mono font-semibold">{job.id}</span>? This will remove its entry from the list. Results files (if any) will not be deleted. This action cannot be undone. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={removeMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleRemove} disabled={removeMutation.isPending} className={buttonVariants({ variant: "destructive" })}> {removeMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Remove Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent>

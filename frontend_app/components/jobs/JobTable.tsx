@@ -19,7 +19,38 @@ interface JobTableProps {
   jobs: Job[];
 }
 
-// Helper functions (keep as they are)
+// --- Helper Functions ---
+
+// NEW: Function to map internal status to simplified UI status
+function mapToUiStatus(internalStatus: string | null | undefined): string {
+    const status = internalStatus?.toLowerCase();
+    switch (status) {
+        case 'staged': return 'Staged';
+        case 'queued': return 'Queued';
+        case 'started': return 'Running'; // Map 'started' to 'Running'
+        case 'finished': return 'Finished';
+        case 'failed': return 'Failed';
+        case 'canceled': return 'Stopped'; // Map 'canceled' to 'Stopped'
+        case 'stopped': return 'Stopped'; // Also map RQ's 'stopped' to UI 'Stopped'
+        default: return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown';
+    }
+}
+
+// UPDATED: Get badge variant based on the *internal* status for correct styling
+function getStatusVariant(internalStatus: string | null | undefined): "default" | "destructive" | "secondary" | "outline" {
+    const status = internalStatus?.toLowerCase();
+    switch (status) {
+        case 'finished': return 'default'; // Greenish success -> Use primary for now
+        case 'failed': return 'destructive'; // Red
+        case 'started': return 'default'; // Blueish -> Primary (Represents Running)
+        case 'queued':
+        case 'staged': return 'secondary'; // Gray
+        case 'stopped': // RQ's stopped state
+        case 'canceled': return 'outline'; // Muted/outline (Represents UI Stopped/Canceled)
+        default: return 'secondary';
+    }
+}
+
 function formatTimestamp(timestamp: number | null | undefined): React.ReactElement | string {
   if (!timestamp) return "N/A";
   try {
@@ -33,27 +64,14 @@ function formatTimestamp(timestamp: number | null | undefined): React.ReactEleme
     return "Invalid Date";
   }
 }
+// --- End Helper Functions ---
 
-function getStatusVariant(status: string | null | undefined): "default" | "destructive" | "secondary" | "outline" {
-    switch (status?.toLowerCase()) {
-        case 'finished': return 'default';
-        case 'failed': return 'destructive';
-        case 'running': case 'started': return 'default';
-        case 'queued': case 'staged': return 'secondary';
-        case 'stopped': case 'canceled': return 'outline';
-        default: return 'secondary';
-    }
-}
 
 export default function JobTable({ jobs }: JobTableProps) {
-  // console.log("JobTable component received jobs prop:", jobs); // Keep logs if needed
 
   if (!jobs || jobs.length === 0) {
-    // console.log("JobTable rendering 'No jobs found.' message");
     return <p className="text-center text-muted-foreground py-8">No jobs found.</p>;
   }
-
-  // console.log("JobTable rendering the actual table with jobs:", jobs);
 
   return (
     <div className="border rounded-lg overflow-hidden overflow-x-auto">
@@ -89,7 +107,7 @@ export default function JobTable({ jobs }: JobTableProps) {
                 {job.description || <span className="italic text-muted-foreground">{job.id.startsWith("staged_") ? 'Staged Job' : 'Pipeline Job'}</span>}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground hidden xl:table-cell">
-                {job.meta?.sarek_params?.step || 'all'}
+                {job.meta?.sarek_params?.step || 'N/A'}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground hidden xl:table-cell">
                 {job.meta?.sarek_params?.genome || 'N/A'}
@@ -101,8 +119,9 @@ export default function JobTable({ jobs }: JobTableProps) {
                 {formatTimestamp(job.ended_at || job.started_at || job.enqueued_at || job.staged_at)}
               </TableCell>
               <TableCell>
-                <Badge variant={getStatusVariant(job.status)} className="capitalize text-xs px-1.5 py-0.5">
-                  {job.status}
+                {/* UPDATED: Use getStatusVariant with original status for styling, but mapToUiStatus for display text */}
+                <Badge variant={getStatusVariant(job.status)} className="text-xs px-1.5 py-0.5">
+                  {mapToUiStatus(job.status)}
                 </Badge>
               </TableCell>
               <TableCell className="text-right p-1">

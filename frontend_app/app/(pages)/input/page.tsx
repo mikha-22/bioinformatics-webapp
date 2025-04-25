@@ -116,7 +116,7 @@ const fastqPipelineSchemaBase = z.object({
     input_type: z.literal('fastq'),
     samples: z.array(fastqSampleSchema).min(1, "At least one sample is required for FASTQ input."),
     genome: z.enum(VALID_GENOME_VALUES, { required_error: "Genome build is required" }),
-    step: z.literal('mapping'),
+    step: z.enum(['mapping'], { required_error: "Starting step is required for FASTQ input." }), // Use enum
     intervals_file: z.string().optional().refine((val) => !val || val === "" || val.endsWith('.bed') || val.endsWith('.list') || val.endsWith('.interval_list'), { message: "Intervals file must end with .bed, .list, or .interval_list" }),
     dbsnp: z.string().optional(),
     known_indels: z.string().optional(),
@@ -156,7 +156,7 @@ const vcfPipelineSchemaBase = z.object({
     input_type: z.literal('vcf'),
     samples: z.array(vcfSampleSchema).min(1, "At least one sample is required for VCF input."),
     genome: z.enum(VALID_GENOME_VALUES, { required_error: "Genome build is required" }),
-    step: z.literal('annotation'),
+    step: z.enum(['annotation'], { required_error: "Starting step is required for VCF input." }), // Use enum
     intervals_file: z.string().optional().refine((val) => !val || val === "" || val.endsWith('.bed') || val.endsWith('.list') || val.endsWith('.interval_list'), { message: "Intervals file must end with .bed, .list, or .interval_list" }),
     dbsnp: z.string().optional(),
     known_indels: z.string().optional(),
@@ -188,13 +188,6 @@ const pipelineInputSchema = z.discriminatedUnion("input_type", [
          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "dbSNP or Known Indels file required if BQSR not skipped.", path: ["dbsnp"] });
          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "dbSNP or Known Indels file required.", path: ["skip_baserecalibrator"] });
     }
-
-    // --- REMOVED WES/Intervals Requirement ---
-    // if (data.wes && !data.intervals_file) {
-    //     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Intervals file is required when WES mode is enabled.", path: ["intervals_file"] });
-    //     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Intervals file is required.", path: ["wes"] });
-    // }
-    // --- END REMOVAL ---
 
     // Somatic Tools and Tumor Sample Requirement
     if (data.step !== 'annotation') {
@@ -228,8 +221,8 @@ export default function InputPage() {
 
   const form = useForm<PipelineFormValues>({
     resolver: zodResolver(pipelineInputSchema),
-    mode: "onBlur",
-    reValidateMode: "onChange",
+    mode: "onBlur", // Validate on blur
+    reValidateMode: "onChange", // Re-validate on change after first blur
     defaultValues: {
       input_type: 'fastq',
       samples: [{ patient: "", sample: "", sex: undefined, status: undefined, lane: "L001", fastq_1: "", fastq_2: "" }],
@@ -252,14 +245,19 @@ export default function InputPage() {
     },
   });
 
+  // Add console log to check initial step value after form initialization
+  useEffect(() => {
+    console.log("Initial form values:", form.getValues());
+    console.log("Initial step value:", form.getValues('step'));
+  }, [form]); // Run once after form is initialized
+
+
   // Watch necessary fields
   const watchedInputType = form.watch('input_type');
   const watchedStep = form.watch('step');
   const watchedSkipBqsr = form.watch('skip_baserecalibrator');
   const watchedDbsnp = form.watch('dbsnp');
   const watchedKnownIndels = form.watch('known_indels');
-  // const watchedWes = form.watch('wes'); // No longer needed for button disabling
-  // const watchedIntervalsFile = form.watch('intervals_file'); // No longer needed for button disabling
   const watchedTools = form.watch('tools');
   const watchedSamples = form.watch('samples');
 
@@ -317,7 +315,6 @@ export default function InputPage() {
         if (detail) { message = `Failed to stage job: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`; }
         else { message = `Failed to stage job: ${error.message}`; }
         toast.error(message, { duration: 10000 });
-        // Use formState.errors here too as fallback
         scrollToFirstError(form.formState.errors);
      }
   });
@@ -344,16 +341,10 @@ export default function InputPage() {
    const isSomaticToolSelected = watchedTools?.some(tool => SOMATIC_TOOLS.includes(tool)) ?? false;
    const hasTumorSample = watchedSamples?.some(sample => sample.status === 1) ?? false;
    const isSomaticTumorCheckFailedForButton = isSomaticToolSelected && !hasTumorSample && watchedStep !== 'annotation';
-   // --- REMOVED WES/Intervals Check ---
-   // const isWesIntervalsCheckFailedForButton = watchedWes && (!watchedIntervalsFile || watchedIntervalsFile.trim() === '');
-   // --- END REMOVAL ---
-   const isStagingDisabled = stageMutation.isPending || saveProfileMutation.isPending || isBqsrCheckFailedForButton || isSomaticTumorCheckFailedForButton; // Removed isWesIntervalsCheckFailedForButton
+   const isStagingDisabled = stageMutation.isPending || saveProfileMutation.isPending || isBqsrCheckFailedForButton || isSomaticTumorCheckFailedForButton;
    const getDisabledButtonTooltip = (): string | undefined => {
        if (isBqsrCheckFailedForButton) { return "BQSR requires dbSNP or Known Indels file unless skipped."; }
        if (isSomaticTumorCheckFailedForButton) { return "Selected somatic tool(s) require at least one Tumor sample (Status=1)."; }
-       // --- REMOVED WES/Intervals Tooltip ---
-       // if (isWesIntervalsCheckFailedForButton) { return "Intervals file is required when WES mode is enabled."; }
-       // --- END REMOVAL ---
        if (stageMutation.isPending || saveProfileMutation.isPending) { return "Operation in progress..."; }
        return undefined;
    };
@@ -372,49 +363,82 @@ export default function InputPage() {
      stageMutation.mutate(apiPayload);
   }
 
-  // --- Scroll Function ---
+  // --- Scroll Function (Refined) ---
   const scrollToFirstError = (errors: FieldErrors<PipelineFormValues>) => {
         const errorKeys = Object.keys(errors);
         if (errorKeys.length > 0) {
             let firstErrorKey = errorKeys[0] as keyof PipelineFormValues | 'samples';
             let fieldName = firstErrorKey;
-             if (firstErrorKey === 'samples' && Array.isArray(errors.samples)) {
-                 const firstSampleErrorIndex = errors.samples.findIndex(s => s && Object.keys(s).length > 0);
-                 if (firstSampleErrorIndex !== -1) {
-                     const sampleErrors = errors.samples[firstSampleErrorIndex];
-                      if (sampleErrors) { const firstSampleFieldError = Object.keys(sampleErrors)[0]; fieldName = `samples.${firstSampleErrorIndex}.${firstSampleFieldError}`; }
-                 }
-             } else if (firstErrorKey === 'samples' && typeof errors.samples?.root?.message === 'string') {
-                  const samplesCardHeader = formRef.current?.querySelector('#samples-card-header');
-                  if (samplesCardHeader) { samplesCardHeader.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
-                  else { fieldName = `samples.0.patient`; }
-             }
+
+            // --- Explicit handling for 'samples' and 'step' ---
+            if (firstErrorKey === 'samples') {
+                // If the root 'samples' array has the error message (e.g., minLength)
+                const samplesCardHeader = formRef.current?.querySelector('#samples-card-header');
+                if (samplesCardHeader) {
+                    console.log("Scrolling to Samples Card Header");
+                    samplesCardHeader.scrollIntoView({ behavior: "smooth", block: "center" });
+                    return; // Stop here if we scrolled to the header
+                }
+                // If error is nested within a specific sample/field
+                if (Array.isArray(errors.samples)) {
+                    const firstSampleErrorIndex = errors.samples.findIndex(s => s && Object.keys(s).length > 0);
+                    if (firstSampleErrorIndex !== -1) {
+                        const sampleErrors = errors.samples[firstSampleErrorIndex];
+                        if (sampleErrors) {
+                             const firstSampleFieldError = Object.keys(sampleErrors)[0];
+                             fieldName = `samples.${firstSampleErrorIndex}.${firstSampleFieldError}`;
+                        }
+                    } else {
+                         fieldName = 'samples.0.patient'; // Fallback if array structure is unexpected
+                    }
+                } else {
+                     fieldName = 'samples.0.patient'; // Fallback if array structure is unexpected
+                }
+            } else if (firstErrorKey === 'step') {
+                 fieldName = 'step'; // Keep field name as 'step'
+            }
+            // --- End explicit handling ---
+
+
             console.log(`Attempting to scroll to first error field: ${fieldName}`);
             let element = formRef.current?.querySelector(`[name="${fieldName}"]`);
-            // Fallback selectors if direct name match fails
+
+            // Fallback selectors
             if (!element) {
-                 const errorPathParts = fieldName.split('.'); // e.g., ['samples', '0', 'patient']
-                 let selector = `#${errorPathParts.join('-')}-form-item`; // Try ID first (e.g., #samples-0-patient-form-item)
+                 // Try finding the FormItem container by convention (might not always work)
+                 const errorPathParts = fieldName.split('.');
+                 let selector = `#${errorPathParts.join('-')}-form-item`;
                  element = formRef.current?.querySelector(selector);
                  if (!element) { // Try label 'for' attribute
                     element = formRef.current?.querySelector(`label[for="${fieldName}"]`);
                  }
-                 if (!element && fieldName.startsWith('samples.')) { // Try the card header as a last resort for sample errors
-                     element = formRef.current?.querySelector('#samples-card-header');
+                 // If still not found, try finding the specific trigger for 'step' select
+                 if (!element && fieldName === 'step') {
+                     element = formRef.current?.querySelector('button[role="combobox"][aria-controls*="radix"][id*="step"]'); // More specific selector for SelectTrigger
                  }
             }
-            if (element) { element.scrollIntoView({ behavior: "smooth", block: "center" }); }
-            else { console.warn(`Could not find element for error: ${fieldName}. Scrolling form to top.`); formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }
+
+            if (element) {
+                element.scrollIntoView({ behavior: "smooth", block: "center" });
+            } else {
+                console.warn(`Could not find element for error: ${fieldName}. Scrolling form to top.`);
+                formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
         }
     };
 
-   // --- Error Handler ---
+   // --- CLEANED UP Error Handler ---
    const onFormError: SubmitErrorHandler<PipelineFormValues> = (errorsArgument) => {
-       console.error("Form validation failed (errors arg):", errorsArgument);
-       console.error("Form validation failed (formState.errors):", form.formState.errors);
+       // Log just once that validation failed, optionally log keys if needed for future debug
+       console.warn("Form validation failed. Error keys:", Object.keys(errorsArgument));
+       // console.debug("Validation errors object:", errorsArgument); // Uncomment for deeper debugging if needed
+
        toast.error("Please fix the validation errors before staging.", { duration: 5000 });
-       scrollToFirstError(form.formState.errors);
+       // Use the reliable errorsArgument for scrolling
+       scrollToFirstError(errorsArgument);
    };
+   // --- END CLEANED UP Error Handler ---
+
 
    // --- toggleCheckboxValue function ---
    const toggleCheckboxValue = (fieldName: keyof PipelineFormValues | 'tools', tool?: string) => {
@@ -436,8 +460,6 @@ export default function InputPage() {
                  toast.info(`Profile '${name}' requires ${loadedInputType.toUpperCase()} input. Switching input type.`);
                  form.setValue('input_type', loadedInputType, { shouldValidate: true });
             }
-            // Let ProfileLoader handle setting the values
-            // It has access to the form and the loaded data
        } else {
             form.reset();
             setSelectedInputType('fastq');
@@ -489,7 +511,8 @@ export default function InputPage() {
                   return null;
               })}
                <Button type="button" variant="outline" size="sm" onClick={addSample} className="mt-2 cursor-pointer" > <PlusCircle className="mr-2 h-4 w-4" /> Add Sample </Button>
-               <FormMessage>{form.formState.errors.samples?.message || form.formState.errors.samples?.root?.message}</FormMessage>
+               {/* Display root error for samples array if it exists */}
+               <FormMessage>{form.formState.errors.samples?.root?.message}</FormMessage>
             </CardContent>
           </Card>
 
@@ -499,9 +522,7 @@ export default function InputPage() {
             <CardContent className="space-y-4">
               <FormField control={form.control} name="genome" render={({ field }) => ( <FormItem> <FormLabel>Reference Genome Build <span className="text-destructive">*</span></FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select genome build" /> </SelectTrigger> </FormControl> <SelectContent> {SAREK_GENOMES.map(g => ( <SelectItem key={g.value} value={g.value}> {g.label} </SelectItem> ))} </SelectContent> </Select> <FormDescription className="italic"> Select the genome assembly key (e.g., GATK.GRCh38). </FormDescription> <FormMessage /> </FormItem> )} />
               <FormField control={form.control} name="intervals_file" render={({ field }) => ( <FormItem> <FormLabel> Intervals File <span className="text-muted-foreground text-xs"> (Optional)</span> </FormLabel> <FormControl> <FileSelector fileTypeLabel="Intervals" fileType="intervals" extensions={[".bed", ".list", ".interval_list"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select intervals file..." allowNone required={false} /> </FormControl>
-              {/* --- UPDATED Description --- */}
               <FormDescription className="italic"> Target regions (e.g., for WES). Recommended if WES mode is checked below. </FormDescription>
-              {/* --- END UPDATE --- */}
               <FormMessage /> </FormItem> )} />
               <FormField control={form.control} name="dbsnp" render={({ field }) => ( <FormItem> <FormLabel>dbSNP (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="dbSNP" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select dbSNP file..." allowNone /> </FormControl> <FormDescription className="italic"> Known variants VCF. Required for Base Quality Score Recalibration (BQSR) if not skipped. </FormDescription> <FormMessage /> </FormItem> )} />
               <FormField control={form.control} name="known_indels" render={({ field }) => ( <FormItem> <FormLabel>Known Indels (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="Known Indels" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select known indels file..." allowNone /> </FormControl> <FormDescription className="italic"> Known indels VCF. Required for Base Quality Score Recalibration (BQSR) if not skipped. </FormDescription> <FormMessage /> </FormItem> )} />
@@ -513,16 +534,31 @@ export default function InputPage() {
           <Card>
              <CardHeader> <CardTitle>Pipeline Parameters</CardTitle> <CardDescription>Configure Sarek workflow options. Availability depends on Input Type and Starting Step.</CardDescription> </CardHeader>
              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <FormField control={form.control} name="step" render={({ field }) => ( <FormItem> <FormLabel>Starting Step <span className="text-destructive">*</span></FormLabel> <Select onValueChange={field.onChange} value={field.value} disabled={availableSteps.length <= 1} > <FormControl> <SelectTrigger> <SelectValue placeholder="Select starting step" /> </SelectTrigger> </FormControl> <SelectContent> {availableSteps.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)} </SelectContent> </Select> <FormDescription className="italic">Pipeline execution starting point.</FormDescription> <FormMessage /> </FormItem> )} />
+                 {/* Use id convention for easier selection in scrollToFirstError */}
+                 <FormField control={form.control} name="step" render={({ field }) => (
+                    <FormItem id="step-form-item"> {/* Add ID */}
+                        <FormLabel>Starting Step <span className="text-destructive">*</span></FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={availableSteps.length <= 1} >
+                            <FormControl>
+                                <SelectTrigger id="step"> {/* Add ID to trigger */}
+                                    <SelectValue placeholder="Select starting step" />
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                {availableSteps.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <FormDescription className="italic">Pipeline execution starting point.</FormDescription>
+                        <FormMessage />
+                    </FormItem>
+                 )} />
                  <FormField control={form.control} name="profile" render={({ field }) => ( <FormItem> <FormLabel>Execution Profile</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select execution profile" /> </SelectTrigger> </FormControl> <SelectContent> {SAREK_PROFILES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)} </SelectContent> </Select> <FormDescription className="italic"> Container or environment system. </FormDescription> <FormMessage /> </FormItem> )} />
                  {showAligner && ( <FormField control={form.control} name="aligner" render={({ field }) => ( <FormItem> <FormLabel>Aligner</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value || ""}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select aligner" /> </SelectTrigger> </FormControl> <SelectContent> {SAREK_ALIGNERS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)} </SelectContent> </Select> <FormDescription className="italic"> Alignment algorithm (only for FASTQ input). </FormDescription> <FormMessage /> </FormItem> )} /> )}
                  {showTools && ( <div className="md:col-span-2"> <div className="mb-4"> <div className="text-base font-medium">Variant Calling Tools</div> <p className="text-sm text-muted-foreground">Select tools to run (not applicable when starting at annotation).</p> </div> <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2"> {SAREK_TOOLS.map((tool) => { const uniqueId = `tool-${tool}`; const currentTools: string[] = form.watch("tools") || []; const isChecked = currentTools.includes(tool); return ( <FormItem key={uniqueId} className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor={uniqueId} className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id={uniqueId} checked={isChecked} onCheckedChange={() => toggleCheckboxValue('tools', tool)} /> </FormControl> <span className="pt-px">{tool}</span> </FormLabel> </FormItem> ); })} </div> <FormField control={form.control} name="tools" render={() => <FormMessage className="pt-2" />} /> </div> )}
                  {/* Flags Group */}
                  <div className="md:col-span-2 space-y-4">
                     <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-wes" className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id="flag-wes" checked={form.watch('wes')} onCheckedChange={() => toggleCheckboxValue('wes')} /> </FormControl> <div className="space-y-1 leading-none pt-px"> <span>Whole Exome Sequencing (WES)</span>
-                    {/* --- UPDATED Description --- */}
                     <FormDescription className="italic mt-1"> Check if data is WES/targeted. Providing an Intervals file is recommended. </FormDescription>
-                    {/* --- END UPDATE --- */}
                     </div> </FormLabel> <FormField control={form.control} name="wes" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem>
                     {showTrimFastq && ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-trim_fastq" className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id="flag-trim_fastq" checked={form.watch('trim_fastq')} onCheckedChange={() => toggleCheckboxValue('trim_fastq')} /> </FormControl> <div className="space-y-1 leading-none pt-px"> <span>Trim FASTQ</span> <FormDescription className="italic mt-1"> Enable adapter trimming (only for FASTQ input). </FormDescription> </div> </FormLabel> <FormField control={form.control} name="trim_fastq" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem> )}
                     {showSkipBaserecalibrator && ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-skip_baserecalibrator" className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id="flag-skip_baserecalibrator" checked={form.watch('skip_baserecalibrator')} onCheckedChange={() => toggleCheckboxValue('skip_baserecalibrator')} /> </FormControl> <div className="space-y-1 leading-none pt-px"> <span>Skip Base Recalibration</span> <FormDescription className="italic mt-1"> Skip BQSR step (requires dbSNP/Known Indels if not skipped). </FormDescription> </div> </FormLabel> <FormField control={form.control} name="skip_baserecalibrator" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem> )}
