@@ -22,14 +22,14 @@ tags_metadata = [
     {"name": "Data Access", "description": "API endpoints for retrieving file/result lists."},
     {"name": "Jobs Management", "description": "API endpoints for staging, starting, monitoring, and managing pipeline jobs."},
     {"name": "Profiles Management", "description": "API endpoints for saving and loading pipeline configuration profiles."},
-    {"name": "WebSocket", "description": "Endpoints for real-time communication (e.g., logs)."}, # <<< ADDED
+    {"name": "WebSocket", "description": "Endpoints for real-time communication (e.g., logs)."}, # <<< ADDED WebSocket Tag
     {"name": "Health Check", "description": "Basic application health status."},
 ]
 
 app = FastAPI(
     title="Bioinformatics Webapp API",
-    description="Backend API for staging, running, and managing Sarek bioinformatics pipelines using FastAPI and RQ.",
-    version="0.5.0", # <<< Version Bump
+    description="Backend API for staging, running, and managing Sarek bioinformatics pipelines using FastAPI and RQ. Includes WebSocket for live logs.", # Updated description
+    version="0.6.0", # <<< Version Bump for WebSocket feature
     openapi_tags=tags_metadata
 )
 
@@ -47,9 +47,9 @@ logger.info(f"CORS middleware configured. Allowed origins: {allowed_origins}")
 # --- Include Routers ---
 app.include_router(data.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
-app.include_router(profiles.router) # Already has /api/profiles prefix
+app.include_router(profiles.router, prefix="/api/profiles") # Keep explicit prefix here if desired
 # Include the WebSocket router - the prefix is defined *within* websockets.py
-app.include_router(websockets.router)
+app.include_router(websockets.router) # <<< ADDED THIS LINE
 logger.info("Included API routers: data, jobs, profiles, websockets.") # <<< Updated log message
 
 # --- Root endpoint for health check ---

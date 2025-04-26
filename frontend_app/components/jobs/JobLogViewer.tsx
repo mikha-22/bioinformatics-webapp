@@ -21,49 +21,55 @@ import { cn } from '@/lib/utils';
 
 interface LogLine {
     id: number;
-    type: 'stdout' | 'stderr' | 'info' | 'error' | 'status' | 'control' | 'raw';
+    type: 'stdout' | 'stderr' | 'info' | 'error' | 'status' | 'control' | 'raw'; // Added 'control' type
     line: string;
     timestamp: number;
 }
 
 interface JobLogViewerProps {
-    jobId: string | null;
-    isOpen: boolean;
-    onOpenChange: (open: boolean) => void;
-    jobDescription?: string | null;
+    jobId: string | null; // ID of the job to view logs for
+    isOpen: boolean; // Whether the dialog is open
+    onOpenChange: (open: boolean) => void; // Function to control dialog state
+    jobDescription?: string | null; // Optional description for the dialog title
 }
 
 let messageIdCounter = 0; // Simple counter for unique log line keys
 
 export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescription }: JobLogViewerProps) {
     const [logs, setLogs] = useState<LogLine[]>([]);
-    const logContainerRef = useRef<HTMLDivElement>(null); // Ref for the inner div of ScrollArea
+    const scrollAreaViewportRef = useRef<HTMLDivElement>(null); // Ref for the ScrollArea Viewport
     const [websocketUrl, setWebsocketUrl] = useState<string | null>(null);
     const [showEOFMessage, setShowEOFMessage] = useState(false);
+    const [isScrolledToBottom, setIsScrolledToBottom] = useState(true); // Track if user is at the bottom
 
     // Construct WebSocket URL only on the client when jobId changes or dialog opens
     useEffect(() => {
         if (isOpen && jobId && typeof window !== 'undefined') {
             const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || window.location.origin;
+            // Ensure correct protocol (ws/wss) based on API URL
             const wsProtocol = apiUrl.startsWith('https://') ? 'wss://' : 'ws://';
+            // Remove http(s):// prefix and trailing slash if present
             const domainAndPath = apiUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
-            // Use the prefix defined in the websockets router
+            // Construct the URL using the prefix defined in the websockets router
             const url = `${wsProtocol}${domainAndPath}/api/ws/logs/${jobId}`;
             console.log("[JobLogViewer] Setting WebSocket URL:", url);
             setWebsocketUrl(url);
             setShowEOFMessage(false); // Reset EOF on open/job change
+            setLogs([]); // Clear previous logs when opening for a new job
+            messageIdCounter = 0; // Reset message counter
+            setIsScrolledToBottom(true); // Default to auto-scroll when opening
         } else {
             // Clear URL when dialog closes or no job ID
             setWebsocketUrl(null);
         }
-    }, [jobId, isOpen]); // Depend on isOpen as well
+    }, [jobId, isOpen]);
 
-    // Reset logs when dialog closes or jobId changes
+    // Reset logs and EOF when dialog closes
     useEffect(() => {
         if (!isOpen) {
-            console.log("[JobLogViewer] Dialog closed, resetting logs.");
+            // console.log("[JobLogViewer] Dialog closed, resetting state.");
             setLogs([]);
-            messageIdCounter = 0; // Reset counter
+            messageIdCounter = 0;
             setShowEOFMessage(false);
         }
     }, [isOpen]);
@@ -76,73 +82,80 @@ export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescripti
         share: false, // Each instance should have its own connection
         shouldReconnect: (closeEvent) => true, // Attempt to reconnect on close
         reconnectInterval: 3000,
-        reconnectAttempts: 10, // Increase attempts slightly
-        retryOnError: true, // Retry connection on error
+        reconnectAttempts: 10,
+        retryOnError: true,
         onOpen: () => console.log(`[JobLogViewer] WebSocket opened for ${jobId}`),
         onClose: (event) => console.log(`[JobLogViewer] WebSocket closed for ${jobId}. Code: ${event.code}, Reason: ${event.reason}`),
         onError: (event) => console.error(`[JobLogViewer] WebSocket error for ${jobId}:`, event),
-        // Filter out non-relevant messages if needed, though backend should only send strings
-        filter: (message: MessageEvent<any>): boolean => {
-            return typeof message.data === 'string'; // Only process string messages
-        },
+        filter: (message: MessageEvent<any>): boolean => typeof message.data === 'string',
     }, !!websocketUrl); // Connect only if websocketUrl is not null
 
     // Handle incoming messages using lastMessage
     useEffect(() => {
         if (lastMessage !== null) {
             try {
+                // Attempt to parse the message data as JSON
                 const jsonData = JSON.parse(lastMessage.data);
-                const logData = jsonData as { type?: string; line?: any }; // Type assertion
+                const logData = jsonData as { type?: string; line?: any };
                 const logType = logData.type || 'raw';
-                const logLineContent = typeof logData.line === 'string' ? logData.line : JSON.stringify(logData.line);
+                const logLineContent = typeof logData.line === 'string' ? logData.line : JSON.stringify(logData.line ?? '');
 
                 // Check for EOF control message
                 if (logType === 'control' && logLineContent === 'EOF') {
                     console.log(`[JobLogViewer] Received EOF for ${jobId}`);
                     setShowEOFMessage(true);
-                    return; // Stop processing this message
+                    return; // Stop processing this message, don't add it to visible logs
                 }
 
+                // Create the log entry (only for non-control messages)
                 const logEntry: LogLine = {
                     id: messageIdCounter++,
                     type: logType as LogLine['type'], // Assert type
                     line: logLineContent,
                     timestamp: Date.now()
                 };
-                // Add new log entry, potentially capping the total number of lines
-                setLogs((prevLogs) => {
-                     const newLogs = [...prevLogs, logEntry];
-                    // Optional: Limit the number of log lines stored in state to prevent memory issues
-                    // const MAX_LOG_LINES = 2000;
-                    // if (newLogs.length > MAX_LOG_LINES) {
-                    //     return newLogs.slice(newLogs.length - MAX_LOG_LINES);
-                    // }
-                    return newLogs;
-                });
+
+                // Add new log entry
+                setLogs((prevLogs) => [...prevLogs, logEntry]);
 
             } catch (e) {
-                console.error("[JobLogViewer] Error processing WebSocket message:", e, lastMessage.data);
-                 setLogs((prevLogs) => [...prevLogs, { id: messageIdCounter++, type: 'error', line: `Error processing message: ${lastMessage.data}`, timestamp: Date.now()}]);
+                // If parsing fails, treat it as a raw line (could be direct output)
+                console.warn("[JobLogViewer] Message not valid JSON, treating as raw:", lastMessage.data);
+                const logEntry: LogLine = {
+                    id: messageIdCounter++,
+                    type: 'raw',
+                    line: lastMessage.data,
+                    timestamp: Date.now()
+                };
+                setLogs((prevLogs) => [...prevLogs, logEntry]);
             }
         }
     }, [lastMessage, jobId]); // Depend on lastMessage and jobId
 
     // Scroll to bottom effect
     useEffect(() => {
-        if (logContainerRef.current) {
-            // Slightly more robust scroll check
-            const scrollThreshold = 100; // Pixels from bottom
-            const isScrolledToBottom = logContainerRef.current.scrollHeight - logContainerRef.current.scrollTop - logContainerRef.current.clientHeight < scrollThreshold;
+        if (isScrolledToBottom && scrollAreaViewportRef.current) {
+            // Use requestAnimationFrame for smoother scrolling after render
+            requestAnimationFrame(() => {
+                if (scrollAreaViewportRef.current) {
+                    scrollAreaViewportRef.current.scrollTop = scrollAreaViewportRef.current.scrollHeight;
+                }
+            });
+        }
+    }, [logs, isScrolledToBottom]); // Trigger scroll on new logs only if already at bottom
 
-            if (isScrolledToBottom) {
-                requestAnimationFrame(() => {
-                     if (logContainerRef.current) {
-                        logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-                     }
-                });
+    // Handle manual scrolling
+    const handleScroll = () => {
+        if (scrollAreaViewportRef.current) {
+            const { scrollTop, scrollHeight, clientHeight } = scrollAreaViewportRef.current;
+            // Check if scrolled near the bottom (within a small threshold)
+            const atBottom = scrollHeight - scrollTop - clientHeight < 10;
+            if (atBottom !== isScrolledToBottom) {
+                setIsScrolledToBottom(atBottom);
             }
         }
-    }, [logs]); // Trigger scroll on new logs
+    };
+
 
     // Connection status text and indicator
     const connectionStatusText = {
@@ -169,64 +182,75 @@ export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescripti
             case 'stdout': return 'text-gray-300 dark:text-gray-300';
             case 'stderr': return 'text-red-500 dark:text-red-400';
             case 'error': return 'text-red-600 dark:text-red-500 font-semibold';
-            case 'info': return 'text-blue-600 dark:text-blue-400';
+            case 'info': return 'text-blue-500 dark:text-blue-400';
             case 'status': return 'text-yellow-600 dark:text-yellow-400 italic';
-            case 'control': return 'text-purple-600 dark:text-purple-400 italic'; // Should not be displayed now
+            case 'control': return 'hidden'; // Control messages shouldn't be displayed
             case 'raw':
-            default: return 'text-gray-500 dark:text-gray-500';
+            default: return 'text-gray-500 dark:text-gray-500'; // Default for raw/unknown
         }
     };
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            {/* Increased max width and height */}
             <DialogContent className="sm:max-w-5xl md:max-w-6xl lg:max-w-7xl h-[90vh] flex flex-col p-0 gap-0">
                 <DialogHeader className="p-4 border-b flex-shrink-0">
                     <DialogTitle className="flex items-center gap-2">
-                        <Terminal className="h-5 w-5" /> Live Logs: <span className="font-mono text-sm ml-1">{jobDescription || jobId}</span>
+                        <Terminal className="h-5 w-5" /> Live Logs: <span className="font-mono text-sm ml-1 truncate">{jobDescription || jobId}</span>
                     </DialogTitle>
                     <DialogDescription className="flex items-center justify-between text-xs pt-1">
-                         <span>Real-time output from the pipeline process.</span>
+                         <span>Real-time output & history from the pipeline process.</span>
                          <Badge variant="outline" className="flex items-center gap-1.5 py-0.5 px-2 text-xs">
                              {getStatusIndicator()}
                              {connectionStatusText}
                          </Badge>
                     </DialogDescription>
                 </DialogHeader>
-                {/* Use ScrollArea for consistent scrollbars */}
-                <ScrollArea className="flex-grow bg-gray-950 dark:bg-black text-white font-mono text-[0.8rem] leading-relaxed overflow-y-auto">
-                     {/* The direct child of ScrollArea needs the ref */}
-                     <div ref={logContainerRef} className="p-4 space-y-0.5 min-h-full">
-                         {logs.length === 0 && readyState === ReadyState.OPEN && !showEOFMessage && (
-                             <p className="text-gray-500 italic">Waiting for logs...</p>
-                         )}
-                         {logs.length === 0 && (readyState === ReadyState.CLOSED || readyState === ReadyState.UNINSTANTIATED) && !websocketUrl && jobId && (
+
+                <ScrollArea className="flex-grow bg-gray-950 dark:bg-black text-white font-mono text-[0.8rem] leading-relaxed overflow-y-auto" onScroll={handleScroll}>
+                     {/* Assign ref to the Viewport component */}
+                    <ScrollAreaPrimitive.Viewport ref={scrollAreaViewportRef} className="h-full w-full rounded-[inherit] p-4">
+                        {/* Initial Status Messages */}
+                        {logs.length === 0 && readyState === ReadyState.CONNECTING && (
+                            <p className="text-yellow-500 italic">Connecting to log stream...</p>
+                        )}
+                        {logs.length === 0 && readyState === ReadyState.OPEN && !showEOFMessage && (
+                             <p className="text-gray-500 italic">Loading history or waiting for live logs...</p>
+                        )}
+                        {logs.length === 0 && (readyState === ReadyState.CLOSED || readyState === ReadyState.UNINSTANTIATED) && !websocketUrl && jobId && (
                              <p className="text-gray-500 italic">Preparing connection...</p>
+                        )}
+                         {logs.length === 0 && readyState === ReadyState.CLOSED && websocketUrl && !showEOFMessage && (
+                              <p className="text-red-500 italic">Connection closed. Attempting to reconnect...</p>
                          )}
-                          {logs.length === 0 && readyState === ReadyState.CLOSED && websocketUrl && !showEOFMessage && (
-                              <p className="text-red-500 italic">Connection closed unexpectedly. Logs might be incomplete. Attempting to reconnect...</p>
-                         )}
-                         {logs.length === 0 && readyState === ReadyState.CONNECTING && (
-                              <p className="text-yellow-500 italic">Connecting to log stream...</p>
-                         )}
+
+                        {/* Render Logs */}
                         {logs.map((log) => (
-                           <p key={log.id} className={cn(getLogLineColor(log.type))}>
+                           <p key={log.id} className={cn(getLogLineColor(log.type), "whitespace-pre-wrap break-words")}> {/* Ensure wrapping */}
                                 {log.line}
                            </p>
                         ))}
+
+                        {/* EOF Message */}
                         {showEOFMessage && (
                              <p className="text-yellow-400 italic pt-2">--- End of log stream (Job finished or stopped) ---</p>
                         )}
-                    </div>
+                    </ScrollAreaPrimitive.Viewport>
                     <ScrollBar orientation="vertical" />
-                    <ScrollBar orientation="horizontal" /> {/* Added horizontal scrollbar */}
+                    <ScrollBar orientation="horizontal" />
                 </ScrollArea>
+
                  <DialogFooter className="p-3 border-t flex-shrink-0">
+                    <Button type="button" variant="secondary" onClick={() => setIsScrolledToBottom(!isScrolledToBottom)} size="sm">
+                       {isScrolledToBottom ? "Pause Auto-Scroll" : "Resume Auto-Scroll"}
+                    </Button>
                     <DialogClose asChild>
-                        <Button type="button" variant="outline">Close</Button>
+                        <Button type="button" variant="outline" size="sm">Close</Button>
                     </DialogClose>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
     );
 }
+
+// Need to import ScrollAreaPrimitive explicitly if using its Viewport directly
+import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"

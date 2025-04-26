@@ -25,7 +25,8 @@ from ..core.config import (
     STAGED_JOBS_KEY, DEFAULT_JOB_TIMEOUT,
     DEFAULT_RESULT_TTL, DEFAULT_FAILURE_TTL, MAX_REGISTRY_JOBS,
     SAREK_DEFAULT_PROFILE, SAREK_DEFAULT_TOOLS, SAREK_DEFAULT_STEP, SAREK_DEFAULT_ALIGNER,
-    RESULTS_DIR, DATA_DIR # Ensure DATA_DIR is imported
+    RESULTS_DIR, DATA_DIR,
+    LOG_HISTORY_PREFIX # <<< Import LOG_HISTORY_PREFIX
 )
 from ..core.redis_rq import get_redis_connection, get_pipeline_queue
 from ..models.pipeline import PipelineInput, SampleInfo, JobStatusDetails, JobResourceInfo
@@ -42,7 +43,7 @@ router = APIRouter(
 )
 
 # --- Job Staging and Control Routes ---
-# (stage_pipeline_job and start_job remain unchanged from the previous correct version)
+# (stage_pipeline_job and start_job remain unchanged)
 @router.post("/run_pipeline", status_code=200, summary="Stage Pipeline Job")
 async def stage_pipeline_job(
     input_data: PipelineInput,
@@ -138,7 +139,7 @@ async def start_job(
 
 
 # --- Job Listing and Status Routes ---
-
+# (get_jobs_list and get_job_status remain unchanged)
 @router.get("/jobs_list", response_model=List[Dict[str, Any]], summary="List All Relevant Jobs (Staged & RQ)")
 async def get_jobs_list(
     redis_conn: redis.Redis = Depends(get_redis_connection),
@@ -157,59 +158,38 @@ async def get_jobs_list(
     except redis.exceptions.RedisError as e: logger.error(f"Redis error fetching staged jobs from '{STAGED_JOBS_KEY}': {e}")
 
     # 2. Get RQ Jobs
-    # Add CanceledJobRegistry to the list
     registries_to_check = {
-        "queued": queue,
-        "started": StartedJobRegistry(queue=queue),
-        "finished": FinishedJobRegistry(queue=queue),
-        "failed": FailedJobRegistry(queue=queue),
-        "canceled": CanceledJobRegistry(queue=queue), # Check canceled jobs too
+        "queued": queue, "started": StartedJobRegistry(queue=queue),
+        "finished": FinishedJobRegistry(queue=queue), "failed": FailedJobRegistry(queue=queue),
+        "canceled": CanceledJobRegistry(queue=queue),
     }
     rq_job_ids_to_fetch = set()
     for status_name, registry_or_queue in registries_to_check.items():
         try:
             job_ids = []
-            # Check if it's a registry first
             if isinstance(registry_or_queue, (StartedJobRegistry, FinishedJobRegistry, FailedJobRegistry, CanceledJobRegistry)):
                 limit = MAX_REGISTRY_JOBS if status_name in ["finished", "failed", "canceled"] else -1
                 total_count = registry_or_queue.count
                 start_index = max(0, total_count - limit) if limit > 0 else 0
                 end_index = total_count - 1
-                if start_index <= end_index:
-                     job_ids = registry_or_queue.get_job_ids(start_index, end_index)
-                     job_ids.reverse() # Show most recent first for registries
-            elif isinstance(registry_or_queue, Queue):
-                 job_ids = registry_or_queue.get_job_ids() # Get all queued IDs
-            else:
-                 logger.warning(f"Unsupported type for job fetching: {type(registry_or_queue)}")
-                 continue
-            if job_ids:
-                 rq_job_ids_to_fetch.update(job_ids)
-        except redis.exceptions.RedisError as e:
-            logger.error(f"Redis error fetching job IDs from {status_name} registry/queue: {e}")
-        except Exception as e:
-            logger.exception(f"Unexpected error fetching job IDs from {status_name} registry/queue.")
+                if start_index <= end_index: job_ids = registry_or_queue.get_job_ids(start_index, end_index); job_ids.reverse()
+            elif isinstance(registry_or_queue, Queue): job_ids = registry_or_queue.get_job_ids()
+            else: logger.warning(f"Unsupported type for job fetching: {type(registry_or_queue)}"); continue
+            if job_ids: rq_job_ids_to_fetch.update(job_ids)
+        except redis.exceptions.RedisError as e: logger.error(f"Redis error fetching job IDs from {status_name}: {e}")
+        except Exception as e: logger.exception(f"Unexpected error fetching job IDs from {status_name}.")
 
     if rq_job_ids_to_fetch:
         try:
-            # Use the queue's connection directly for fetching
             fetched_jobs = Job.fetch_many(list(rq_job_ids_to_fetch), connection=queue.connection, serializer=queue.serializer)
             for job in fetched_jobs:
                 if job:
-                    # No need to call refresh() explicitly here, fetch_many should provide current data
-                    current_status = job.get_status(refresh=False)
-                    error_summary = None
-                    job_meta = job.meta or {}
+                    current_status = job.get_status(refresh=False); error_summary = None; job_meta = job.meta or {}
                     if current_status == JobStatus.FAILED:
-                        error_summary = job_meta.get('error_message', "Job failed processing")
-                        stderr_snippet = job_meta.get('stderr_snippet')
-                        if error_summary == "Job failed processing" and job.exc_info:
-                            try: error_summary = job.exc_info.strip().split('\n')[-1]
-                            except Exception: pass
-                        if stderr_snippet: error_summary += f" (stderr: {stderr_snippet}...)"
+                        error_summary = job_meta.get('error_message', "Job failed processing"); stderr_snippet = job_meta.get('stderr_snippet')
+                        if error_summary == "Job failed processing" and job.exc_info: try: error_summary = job.exc_info.strip().split('\n')[-1]; except Exception: pass
+                        if stderr_snippet: error_summary += f" (stderr: ...{stderr_snippet[-100:]})" # Show tail of snippet
                     resources = { "peak_memory_mb": job_meta.get("peak_memory_mb"), "average_cpu_percent": job_meta.get("average_cpu_percent"), "duration_seconds": job_meta.get("duration_seconds") }
-                    # Overwrite staged entry if RQ job exists for the same ID root
-                    # Also update if the RQ status is different from a previously fetched status (e.g., moved from queued to started)
                     if job.id not in all_jobs_dict or all_jobs_dict[job.id].get('status') != current_status:
                          all_jobs_dict[job.id] = { "id": job.id, "status": current_status, "description": job_meta.get("description") or job.description or f"RQ job {job.id[:12]}...", "enqueued_at": dt_to_timestamp(job.enqueued_at), "started_at": dt_to_timestamp(job.started_at), "ended_at": dt_to_timestamp(job.ended_at), "result": job.result, "error": error_summary, "meta": job_meta, "staged_at": None, "resources": resources if any(v is not None for v in resources.values()) else None }
         except redis.exceptions.RedisError as e: logger.error(f"Redis error during Job.fetch_many: {e}")
@@ -221,17 +201,12 @@ async def get_jobs_list(
 
     # 4. Limit Finished/Failed/Canceled jobs
     if MAX_REGISTRY_JOBS > 0:
-        final_list = []
-        terminal_count = 0
+        final_list = []; terminal_count = 0
         for job_item in all_jobs_list:
-             status = job_item.get('status', '').lower()
-             is_terminal = status in ['finished', 'failed', 'stopped', 'canceled']
+             status = job_item.get('status', '').lower(); is_terminal = status in ['finished', 'failed', 'stopped', 'canceled']
              if is_terminal:
-                 if terminal_count < MAX_REGISTRY_JOBS:
-                     final_list.append(job_item)
-                     terminal_count += 1
-             else: # Always include non-terminal jobs
-                 final_list.append(job_item)
+                 if terminal_count < MAX_REGISTRY_JOBS: final_list.append(job_item); terminal_count += 1
+             else: final_list.append(job_item)
         all_jobs_list = final_list
 
     return all_jobs_list
@@ -247,27 +222,15 @@ async def get_job_status(
     try:
         if not job_id.startswith("staged_"):
             try:
-                # Use queue's connection for fetching single job too
-                job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer)
-                # No need for refresh() if just fetched
-                status = job.get_status(refresh=False)
-                result = None
-                meta_data = job.meta or {}
-                error_info_summary = None
+                job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer); status = job.get_status(refresh=False)
+                result = None; meta_data = job.meta or {}; error_info_summary = None
                 try:
-                    if status == JobStatus.FINISHED:
-                        result = job.result
+                    if status == JobStatus.FINISHED: result = job.result
                     elif status == JobStatus.FAILED:
-                        error_info_summary = meta_data.get('error_message', "Job failed processing")
-                        stderr_snippet = meta_data.get('stderr_snippet')
-                        if error_info_summary == "Job failed processing" and job.exc_info:
-                            try: error_info_summary = job.exc_info.strip().split('\n')[-1]
-                            except Exception: pass
-                        if stderr_snippet: error_info_summary += f" (stderr: {stderr_snippet}...)"
-                except Exception as e:
-                    logger.exception(f"Error accessing result/error info for job {job_id} (status: {status}).")
-                    error_info_summary = error_info_summary or "Could not retrieve job result/error details."
-
+                        error_info_summary = meta_data.get('error_message', "Job failed processing"); stderr_snippet = meta_data.get('stderr_snippet')
+                        if error_info_summary == "Job failed processing" and job.exc_info: try: error_info_summary = job.exc_info.strip().split('\n')[-1]; except Exception: pass
+                        if stderr_snippet: error_info_summary += f" (stderr: ...{stderr_snippet[-100:]})"
+                except Exception as e: logger.exception(f"Error accessing result/error info for job {job_id} (status: {status})."); error_info_summary = error_info_summary or "Could not retrieve job result/error details."
                 resource_stats = {"peak_memory_mb": meta_data.get("peak_memory_mb"), "average_cpu_percent": meta_data.get("average_cpu_percent"), "duration_seconds": meta_data.get("duration_seconds")}
                 return JobStatusDetails(job_id=job.id, status=status, description=meta_data.get("description") or job.description, enqueued_at=dt_to_timestamp(job.enqueued_at), started_at=dt_to_timestamp(job.started_at), ended_at=dt_to_timestamp(job.ended_at), result=result, error=error_info_summary, meta=meta_data, resources=JobResourceInfo(**resource_stats) if any(v is not None for v in resource_stats.values()) else None)
             except NoSuchJobError: logger.warning(f"RQ Job ID '{job_id}' not found.")
@@ -290,6 +253,7 @@ async def get_job_status(
     except Exception as e: logger.exception(f"Unexpected error in get_job_status for {job_id}."); raise HTTPException(status_code=500, detail="Internal server error retrieving job status.")
 
 
+# (stop_job remains unchanged)
 @router.post("/stop_job/{job_id}", status_code=200, summary="Cancel Running/Queued RQ Job")
 async def stop_job(
     job_id: str,
@@ -303,50 +267,24 @@ async def stop_job(
     message = f"Action processed for job {job_id}." # Default message
 
     try:
-        # Use the queue's connection for fetching
-        job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer)
-        status = job.get_status(refresh=True)
-
+        job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer); status = job.get_status(refresh=True)
         if job.is_finished or job.is_failed or job.is_stopped or job.is_canceled:
-            logger.warning(f"Attempted to stop/cancel job {job_id} which is already in terminal state: {status}")
-            message = f"Job already in terminal state: {status}."
+            logger.warning(f"Attempted to stop/cancel job {job_id} which is already in terminal state: {status}"); message = f"Job already in terminal state: {status}."
         elif status == JobStatus.QUEUED:
             logger.info(f"Job {job_id} is queued. Attempting to cancel...")
-            try:
-                job.cancel() # Cancel the job (removes from queue)
-                logger.info(f"Successfully canceled queued job {job_id}.")
-                message = f"Queued job {job_id} canceled successfully."
-            except Exception as cancel_err:
-                logger.error(f"Failed to cancel queued job {job_id}: {cancel_err}")
-                message = f"Failed to cancel queued job {job_id}."
-                # Optionally raise 500 if cancel fails critically
-                # raise HTTPException(status_code=500, detail=f"Failed to cancel queued job: {cancel_err}")
+            try: job.cancel(); logger.info(f"Successfully canceled queued job {job_id}."); message = f"Queued job {job_id} canceled successfully."
+            except Exception as cancel_err: logger.error(f"Failed to cancel queued job {job_id}: {cancel_err}"); message = f"Failed to cancel queued job {job_id}."
         elif status == JobStatus.STARTED or status == JobStatus.RUNNING:
             logger.info(f"Job {job_id} is {status}. Attempting to send stop signal...")
             try:
-                # Use bytes connection for send_stop_job_command
                 redis_conn_bytes = redis.Redis(host=redis_conn.connection_pool.connection_kwargs.get('host', 'localhost'), port=redis_conn.connection_pool.connection_kwargs.get('port', 6379), db=redis_conn.connection_pool.connection_kwargs.get('db', 0), decode_responses=False)
-                send_stop_job_command(redis_conn_bytes, job.id)
-                logger.info(f"Successfully sent stop signal command via RQ for job {job_id}.")
-                message = f"Stop signal sent to job {job_id}."
-            except Exception as sig_err:
-                logger.warning(f"Could not send stop signal command via RQ for job {job_id}. Worker may not stop immediately. Error: {sig_err}")
-                message = f"Stop signal attempted for job {job_id} (check worker logs)."
-        else:
-             logger.warning(f"Job {job_id} has unexpected status '{status}', cannot stop/cancel.")
-             message = f"Job {job_id} has status '{status}', cannot stop/cancel."
-
+                send_stop_job_command(redis_conn_bytes, job.id); logger.info(f"Successfully sent stop signal command via RQ for job {job_id}."); message = f"Stop signal sent to job {job_id}."
+            except Exception as sig_err: logger.warning(f"Could not send stop signal command via RQ for job {job_id}. Worker may not stop immediately. Error: {sig_err}"); message = f"Stop signal attempted for job {job_id} (check worker logs)."
+        else: logger.warning(f"Job {job_id} has unexpected status '{status}', cannot stop/cancel."); message = f"Job {job_id} has status '{status}', cannot stop/cancel."
         return JSONResponse(status_code=200, content={"message": message, "job_id": job_id})
-
-    except NoSuchJobError:
-        logger.warning(f"Stop/cancel job request failed: Job ID '{job_id}' not found.")
-        raise HTTPException(status_code=404, detail=f"Cannot stop/cancel job: Job '{job_id}' not found.")
-    except redis.exceptions.RedisError as e:
-        logger.error(f"Redis error interacting with job {job_id} for stopping/canceling: {e}")
-        raise HTTPException(status_code=503, detail="Service unavailable: Could not connect to job backend.")
-    except Exception as e:
-        logger.exception(f"Unexpected error stopping/canceling job {job_id}.")
-        raise HTTPException(status_code=500, detail="Internal server error attempting to stop/cancel job.")
+    except NoSuchJobError: logger.warning(f"Stop/cancel job request failed: Job ID '{job_id}' not found."); raise HTTPException(status_code=404, detail=f"Cannot stop/cancel job: Job '{job_id}' not found.")
+    except redis.exceptions.RedisError as e: logger.error(f"Redis error interacting with job {job_id} for stopping/canceling: {e}"); raise HTTPException(status_code=503, detail="Service unavailable: Could not connect to job backend.")
+    except Exception as e: logger.exception(f"Unexpected error stopping/canceling job {job_id}."); raise HTTPException(status_code=500, detail="Internal server error attempting to stop/cancel job.")
 
 
 @router.delete("/remove_job/{job_id}", status_code=200, summary="Remove Staged or RQ Job Data")
@@ -358,139 +296,88 @@ async def remove_job(
     logger.info(f"Request received to remove job/data for ID: {job_id}")
     csv_path_to_remove = None
     job_removed = False
+    log_history_key = f"{LOG_HISTORY_PREFIX}{job_id}" # Define log history key
 
     if job_id.startswith("staged_"):
         logger.info(f"Attempting to remove staged job '{job_id}' from hash '{STAGED_JOBS_KEY}'.")
         try:
-            # Check if job exists and get CSV path before deleting
             job_details_bytes = redis_conn.hget(STAGED_JOBS_KEY, job_id.encode('utf-8'))
             if job_details_bytes:
-                try:
-                    details = json.loads(job_details_bytes.decode('utf-8'))
-                    csv_path_to_remove = details.get("input_csv_path")
-                    logger.debug(f"Identified potential CSV path for staged job {job_id}: {csv_path_to_remove}")
-                except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as parse_err:
-                    logger.warning(f"Could not parse details for staged job {job_id} during removal, cannot identify CSV. Error: {parse_err}")
-            else:
-                 logger.warning(f"Staged job '{job_id}' not found in hash for removal.")
-                 raise HTTPException(status_code=404, detail=f"Staged job '{job_id}' not found.")
+                try: details = json.loads(job_details_bytes.decode('utf-8')); csv_path_to_remove = details.get("input_csv_path"); logger.debug(f"Identified potential CSV path for staged job {job_id}: {csv_path_to_remove}")
+                except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as parse_err: logger.warning(f"Could not parse details for staged job {job_id} during removal, cannot identify CSV. Error: {parse_err}")
+            else: logger.warning(f"Staged job '{job_id}' not found in hash for removal."); raise HTTPException(status_code=404, detail=f"Staged job '{job_id}' not found.")
 
-            # Attempt deletion
             num_deleted = redis_conn.hdel(STAGED_JOBS_KEY, job_id.encode('utf-8'))
-            if num_deleted == 1:
-                logger.info(f"Successfully removed staged job entry: {job_id}")
-                job_removed = True # Mark as removed
+            if num_deleted == 1: logger.info(f"Successfully removed staged job entry: {job_id}"); job_removed = True
             else:
-                # This case might occur if the job was deleted between the check and the hdel
                 logger.warning(f"Staged job '{job_id}' disappeared before hdel could complete.")
-                # Consider it removed if it's gone, but log the warning
-                if not redis_conn.hexists(STAGED_JOBS_KEY, job_id.encode('utf-8')):
-                    job_removed = True
-                else:
-                    # If it still exists after num_deleted was 0, something is wrong
-                     logger.error(f"Inconsistent state removing staged job {job_id}. HDEL returned 0 but job still exists?")
-                     raise HTTPException(status_code=500, detail="Inconsistent state during job removal.")
-
-        except redis.exceptions.RedisError as e:
-            logger.error(f"Redis error removing staged job {job_id}: {e}")
-            raise HTTPException(status_code=503, detail="Service unavailable: Could not remove job due to storage error.")
-        except HTTPException as e:
-            raise e
-        except Exception as e:
-            logger.exception(f"Unexpected error during staged job removal for {job_id}.")
-            raise HTTPException(status_code=500, detail="Internal server error removing staged job.")
+                if not redis_conn.hexists(STAGED_JOBS_KEY, job_id.encode('utf-8')): job_removed = True
+                else: logger.error(f"Inconsistent state removing staged job {job_id}. HDEL returned 0 but job still exists?"); raise HTTPException(status_code=500, detail="Inconsistent state during job removal.")
+        except redis.exceptions.RedisError as e: logger.error(f"Redis error removing staged job {job_id}: {e}"); raise HTTPException(status_code=503, detail="Service unavailable: Could not remove job due to storage error.")
+        except HTTPException as e: raise e
+        except Exception as e: logger.exception(f"Unexpected error during staged job removal for {job_id}."); raise HTTPException(status_code=500, detail="Internal server error removing staged job.")
     else:
         # Handle RQ Job Removal
         logger.info(f"Attempting to remove RQ job '{job_id}' data.")
         job = None
         try:
-            # Use the queue's connection
-            try:
-                job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer)
-                logger.debug(f"Fetched RQ job {job_id} successfully.")
-            except NoSuchJobError:
-                logger.warning(f"RQ Job '{job_id}' not found for removal.")
-                raise HTTPException(status_code=404, detail=f"RQ Job '{job_id}' not found.")
-            except Exception as fetch_err:
-                logger.error(f"Error fetching job {job_id}: {fetch_err}")
-                raise HTTPException(status_code=500, detail=f"Could not fetch job {job_id} for removal")
+            try: job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer); logger.debug(f"Fetched RQ job {job_id} successfully.")
+            except NoSuchJobError: logger.warning(f"RQ Job '{job_id}' not found for removal."); raise HTTPException(status_code=404, detail=f"RQ Job '{job_id}' not found.")
+            except Exception as fetch_err: logger.error(f"Error fetching job {job_id}: {fetch_err}"); raise HTTPException(status_code=500, detail=f"Could not fetch job {job_id} for removal")
 
-            # Get CSV path from metadata *before* deleting
-            if job.meta:
-                # Preferentially use the specific path used in the task execution if available
-                csv_path_to_remove = job.meta.get("input_csv_path_used") or job.meta.get("input_csv_path")
-                logger.debug(f"Identified potential CSV path for RQ job {job_id}: {csv_path_to_remove}")
+            if job.meta: csv_path_to_remove = job.meta.get("input_csv_path_used") or job.meta.get("input_csv_path"); logger.debug(f"Identified potential CSV path for RQ job {job_id}: {csv_path_to_remove}")
 
-            # *** Start Corrected Block ***
             # 1. Remove from queue and registries FIRST
             try:
-                logger.info(f"Attempting to remove job {job_id} from queue/registries...")
-                # Cancel removes from queue/started and moves to CanceledRegistry if applicable
-                job.cancel()
-                # Explicitly remove from terminal registries
-                FinishedJobRegistry(queue=queue).remove(job, delete_job=False)
-                FailedJobRegistry(queue=queue).remove(job, delete_job=False)
-                CanceledJobRegistry(queue=queue).remove(job, delete_job=False) # Also remove from canceled
-                # Add others if needed (Deferred, Scheduled)
-                # DeferredJobRegistry(queue=queue).remove(job, delete_job=False)
-                # ScheduledJobRegistry(queue=queue).remove(job, delete_job=False)
+                logger.info(f"Attempting to remove job {job_id} from queue/registries..."); job.cancel()
+                FinishedJobRegistry(queue=queue).remove(job, delete_job=False); FailedJobRegistry(queue=queue).remove(job, delete_job=False); CanceledJobRegistry(queue=queue).remove(job, delete_job=False)
                 logger.info(f"Successfully removed/cancelled job {job_id} from relevant registries/queue.")
-            except InvalidJobOperation as e:
-                # This might happen for jobs already finished/failed, which is okay.
-                logger.debug(f"Job {job_id} might have already been removed from registries/queue or in unexpected state: {e}")
-            except Exception as reg_remove_err:
-                # Log error but proceed to delete the job hash if possible
-                logger.warning(f"Error removing job {job_id} from registries/queue: {reg_remove_err}")
+            except InvalidJobOperation as e: logger.debug(f"Job {job_id} might have already been removed from registries/queue or in unexpected state: {e}")
+            except Exception as reg_remove_err: logger.warning(f"Error removing job {job_id} from registries/queue: {reg_remove_err}")
 
             # 2. Delete the job HASH itself
+            try: job.delete(); logger.info(f"Successfully deleted RQ job hash for {job_id}"); job_removed = True
+            except InvalidJobOperation as e: logger.warning(f"Invalid operation trying to delete RQ job hash for {job_id}: {e}."); raise HTTPException(status_code=409, detail=f"Cannot remove job '{job_id}': Invalid operation (job might be active or locked). Try stopping first.")
+            except Exception as delete_err: logger.error(f"Error deleting job hash for {job_id}: {delete_err}"); raise HTTPException(status_code=500, detail=f"Could not delete job {job_id}")
+
+        except HTTPException as e: raise e
+        except redis.exceptions.RedisError as e: logger.error(f"Redis error removing RQ job {job_id}: {e}"); raise HTTPException(status_code=503, detail="Service unavailable: Could not remove RQ job due to storage error.")
+        except Exception as e: logger.exception(f"Unexpected error during RQ job removal for {job_id}: {str(e)}"); raise HTTPException(status_code=500, detail=f"Internal server error removing RQ job: {str(e)}")
+
+    # --- Cleanup CSV and Log History ---
+    if job_removed:
+        # Cleanup CSV
+        if csv_path_to_remove:
             try:
-                job.delete() # CORRECTED: No remove_from_registries argument here
-                logger.info(f"Successfully deleted RQ job hash for {job_id}")
-                job_removed = True # Mark as removed
-            except InvalidJobOperation as e:
-                 # This might happen if the job is still actively running and locked
-                logger.warning(f"Invalid operation trying to delete RQ job hash for {job_id}: {e}.")
-                raise HTTPException(status_code=409, detail=f"Cannot remove job '{job_id}': Invalid operation (job might be active or locked). Try stopping first.")
-            except Exception as delete_err:
-                logger.error(f"Error deleting job hash for {job_id}: {delete_err}")
-                raise HTTPException(status_code=500, detail=f"Could not delete job {job_id}")
-            # *** End Corrected Block ***
+                csv_path = Path(csv_path_to_remove)
+                if csv_path.is_file() and csv_path.suffix == '.csv' and str(csv_path.parent).startswith(tempfile.gettempdir()):
+                    os.remove(csv_path); logger.info(f"Cleaned up temporary CSV file for removed job {job_id}: {csv_path}")
+                elif csv_path.exists(): logger.warning(f"Temporary CSV path '{csv_path_to_remove}' exists but not cleaned up for job {job_id}.")
+                else: logger.debug(f"Temporary CSV path '{csv_path_to_remove}' not found. No cleanup needed for job {job_id}.")
+            except Exception as e: logger.warning(f"Unexpected error during CSV cleanup for job {job_id}: {e}")
 
-        except HTTPException as e:
-            raise e
-        except redis.exceptions.RedisError as e:
-            logger.error(f"Redis error removing RQ job {job_id}: {e}")
-            raise HTTPException(status_code=503, detail="Service unavailable: Could not remove RQ job due to storage error.")
-        except Exception as e:
-            logger.exception(f"Unexpected error during RQ job removal for {job_id}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Internal server error removing RQ job: {str(e)}")
-
-    # --- Cleanup CSV ---
-    # Do this *after* successful removal from Redis/RQ structures
-    if job_removed and csv_path_to_remove:
-        try:
-            csv_path = Path(csv_path_to_remove)
-            # Basic check: is it a CSV file in the system's temp directory?
-            if csv_path.is_file() and csv_path.suffix == '.csv' and str(csv_path.parent).startswith(tempfile.gettempdir()):
-                os.remove(csv_path)
-                logger.info(f"Cleaned up temporary CSV file for removed job {job_id}: {csv_path}")
-            elif csv_path.exists():
-                logger.warning(f"Temporary CSV path '{csv_path_to_remove}' exists but is not a file, not a CSV, or not in temp dir. Skipping cleanup for job {job_id}.")
-            else:
-                 logger.debug(f"Temporary CSV path '{csv_path_to_remove}' not found. No cleanup needed for job {job_id}.")
-        except OSError as e:
-            logger.warning(f"Could not clean up temporary CSV file {csv_path_to_remove} for job {job_id}: {e}")
-        except Exception as e:
-            logger.warning(f"Unexpected error during CSV cleanup for job {job_id}: {e}")
+        # --- ADDED: Cleanup Log History List ---
+        if not job_id.startswith("staged_"): # Don't cleanup history for staged jobs (they don't have one)
+            try:
+                deleted_count = redis_conn.delete(log_history_key)
+                if deleted_count > 0:
+                    logger.info(f"Cleaned up log history list for removed job {job_id}: {log_history_key}")
+                else:
+                    logger.debug(f"Log history list not found or already deleted for job {job_id}: {log_history_key}")
+            except redis.exceptions.RedisError as e:
+                logger.error(f"Redis error deleting log history list {log_history_key} for job {job_id}: {e}")
+            except Exception as e:
+                 logger.error(f"Unexpected error deleting log history list {log_history_key} for job {job_id}: {e}")
+        # --- END ADDED ---
 
     if not job_removed:
-        # Fallback if logic somehow fails to set the flag despite no exception
         logger.error(f"Job removal process completed for {job_id}, but job_removed flag is false. Removal likely failed.")
         raise HTTPException(status_code=500, detail=f"Failed to remove job {job_id}.")
 
     return JSONResponse(status_code=200, content={"message": f"Successfully removed job {job_id}.", "removed_id": job_id})
 
 
+# (rerun_job remains unchanged)
 @router.post("/rerun_job/{job_id}", status_code=200, summary="Re-stage Failed/Finished Job")
 async def rerun_job(
     job_id: str,
@@ -505,239 +392,86 @@ async def rerun_job(
 
     try:
         # Fetch the original job using the queue's connection
-        try:
-            original_job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer)
-            logger.debug(f"Fetched original job {job_id} for re-staging.")
-        except NoSuchJobError:
-            logger.warning(f"Re-stage request failed: Original RQ job ID '{job_id}' not found.")
-            raise HTTPException(status_code=404, detail=f"Original job '{job_id}' not found to re-stage.")
+        try: original_job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer); logger.debug(f"Fetched original job {job_id} for re-staging.")
+        except NoSuchJobError: logger.warning(f"Re-stage request failed: Original RQ job ID '{job_id}' not found."); raise HTTPException(status_code=404, detail=f"Original job '{job_id}' not found to re-stage.")
 
-        if not original_job.meta:
-            logger.error(f"Cannot re-stage job {job_id}: Original job metadata is missing.")
-            raise HTTPException(status_code=400, detail=f"Cannot re-stage job {job_id}: Missing original parameters.")
-
-        original_meta = original_job.meta
-        logger.debug(f"Original job metadata found for {job_id}")
+        if not original_job.meta: logger.error(f"Cannot re-stage job {job_id}: Original job metadata is missing."); raise HTTPException(status_code=400, detail=f"Cannot re-stage job {job_id}: Missing original parameters.")
+        original_meta = original_job.meta; logger.debug(f"Original job metadata found for {job_id}")
 
         # Extract necessary parameters from metadata
-        original_sarek_params = original_meta.get("sarek_params", {})
-        original_input_params = original_meta.get("input_params", {})
-        original_sample_info = original_meta.get("sample_info", [])
-        original_description = original_meta.get("description", f"Sarek run") # Use stored description
-        original_input_type = original_meta.get("input_type")
-        original_step = original_sarek_params.get("step")
+        original_sarek_params = original_meta.get("sarek_params", {}); original_input_params = original_meta.get("input_params", {}); original_sample_info = original_meta.get("sample_info", [])
+        original_description = original_meta.get("description", f"Sarek run"); original_input_type = original_meta.get("input_type"); original_step = original_sarek_params.get("step")
 
-        # Validate essential metadata fields
-        if not original_input_type or not original_step:
-            logger.error(f"Missing input_type ('{original_input_type}') or step ('{original_step}') in original metadata for job {job_id}")
-            raise HTTPException(status_code=400, detail=f"Cannot re-stage job {job_id}: Original input type or step missing from metadata.")
-        if not original_sample_info:
-            logger.error(f"Missing sample_info in original metadata for job {job_id}")
-            raise HTTPException(status_code=400, detail=f"Cannot re-stage job {job_id}: Original sample info missing from metadata.")
+        if not original_input_type or not original_step: logger.error(f"Missing input_type ('{original_input_type}') or step ('{original_step}') in original metadata for job {job_id}"); raise HTTPException(status_code=400, detail=f"Cannot re-stage job {job_id}: Original input type or step missing from metadata.")
+        if not original_sample_info: logger.error(f"Missing sample_info in original metadata for job {job_id}"); raise HTTPException(status_code=400, detail=f"Cannot re-stage job {job_id}: Original sample info missing from metadata.")
 
-        # --- Recreate Samplesheet with ABSOLUTE Paths ---
-        logger.info(f"Recreating samplesheet for input type: {original_input_type} with absolute paths.")
-        new_sample_rows_for_csv = []
-        csv_headers = []
-        validation_errors_rerun = [] # Collect errors during path validation
-
+        # Recreate Samplesheet with ABSOLUTE Paths
+        logger.info(f"Recreating samplesheet for input type: {original_input_type} with absolute paths."); new_sample_rows_for_csv = []; csv_headers = []; validation_errors_rerun = []
         try:
-            # Determine headers based on input type
-            if original_input_type == "fastq":
-                csv_headers = ['patient', 'sample', 'sex', 'status', 'lane', 'fastq_1', 'fastq_2']
+            if original_input_type == "fastq": csv_headers = ['patient', 'sample', 'sex', 'status', 'lane', 'fastq_1', 'fastq_2']
             elif original_input_type == "bam_cram":
-                first_file_rel = original_sample_info[0].get('bam_cram') if original_sample_info else None
+                first_file_rel = original_sample_info[0].get('bam_cram') if original_sample_info else None;
                 if not first_file_rel: raise ValueError("Missing bam_cram path in first sample for BAM/CRAM re-stage.")
-                bam_cram_col = 'cram' if first_file_rel.lower().endswith('.cram') else 'bam'
-                csv_headers = ['patient', 'sample', 'sex', 'status', bam_cram_col, 'index']
-            elif original_input_type == "vcf":
-                csv_headers = ['patient', 'sample', 'sex', 'status', 'vcf', 'index']
-            else:
-                 raise ValueError(f"Unknown original input type '{original_input_type}'.")
+                bam_cram_col = 'cram' if first_file_rel.lower().endswith('.cram') else 'bam'; csv_headers = ['patient', 'sample', 'sex', 'status', bam_cram_col, 'index']
+            elif original_input_type == "vcf": csv_headers = ['patient', 'sample', 'sex', 'status', 'vcf', 'index']
+            else: raise ValueError(f"Unknown original input type '{original_input_type}'.")
 
-            # Process each sample to resolve paths
             for i, sample_data in enumerate(original_sample_info):
-                row_dict = {}
-                # Map common fields (assuming they exist, validated above)
-                for key in ['patient', 'sample', 'sex', 'status']:
-                    row_dict[key] = sample_data[key]
-
-                # Resolve and validate file paths
+                row_dict = {}; for key in ['patient', 'sample', 'sex', 'status']: row_dict[key] = sample_data[key]
                 def resolve_and_validate(relative_path_key: str, is_required: bool, allowed_suffixes: Optional[List[str]] = None) -> Optional[str]:
                     relative_path = sample_data.get(relative_path_key)
                     if not relative_path:
-                        if is_required:
-                            validation_errors_rerun.append(f"Sample {i+1}: Missing required field '{relative_path_key}' in original metadata.")
-                        return None # Return None for optional or failed required
+                        if is_required: validation_errors_rerun.append(f"Sample {i+1}: Missing required field '{relative_path_key}' in original metadata."); return None
                     try:
-                        # Use get_safe_path which checks existence and ensures path is within DATA_DIR
                         absolute_path = get_safe_path(DATA_DIR, relative_path)
-                        if not absolute_path.is_file():
-                            validation_errors_rerun.append(f"Sample {i+1}: File for '{relative_path_key}' ('{relative_path}') not found at resolved path {absolute_path}.")
-                            return None
-                        # Check suffixes if provided
-                        if allowed_suffixes and absolute_path.suffix.lower() not in [s.lower() for s in allowed_suffixes] and not any(absolute_path.name.lower().endswith(s.lower()) for s in allowed_suffixes):
-                             validation_errors_rerun.append(f"Sample {i+1}: File for '{relative_path_key}' ('{relative_path}') has invalid suffix. Allowed: {', '.join(allowed_suffixes)}")
-                             return None
+                        if not absolute_path.is_file(): validation_errors_rerun.append(f"Sample {i+1}: File for '{relative_path_key}' ('{relative_path}') not found at resolved path {absolute_path}."); return None
+                        if allowed_suffixes and absolute_path.suffix.lower() not in [s.lower() for s in allowed_suffixes] and not any(absolute_path.name.lower().endswith(s.lower()) for s in allowed_suffixes): validation_errors_rerun.append(f"Sample {i+1}: File for '{relative_path_key}' ('{relative_path}') has invalid suffix. Allowed: {', '.join(allowed_suffixes)}"); return None
                         return str(absolute_path)
-                    except HTTPException as e: # Catch errors from get_safe_path
-                        validation_errors_rerun.append(f"Sample {i+1}: Error validating path for '{relative_path_key}' ('{relative_path}'): {e.detail}")
-                        return None
-                    except Exception as e:
-                        logger.error(f"Unexpected error resolving path for {relative_path_key} ('{relative_path}') in sample {i+1}: {e}")
-                        validation_errors_rerun.append(f"Sample {i+1}: Internal error resolving path for '{relative_path_key}'.")
-                        return None
-
-                # Map type-specific fields using resolved paths
+                    except HTTPException as e: validation_errors_rerun.append(f"Sample {i+1}: Error validating path for '{relative_path_key}' ('{relative_path}'): {e.detail}"); return None
+                    except Exception as e: logger.error(f"Unexpected error resolving path for {relative_path_key} ('{relative_path}') in sample {i+1}: {e}"); validation_errors_rerun.append(f"Sample {i+1}: Internal error resolving path for '{relative_path_key}'."); return None
                 if original_input_type == "fastq":
-                    row_dict['lane'] = sample_data.get('lane')
+                    row_dict['lane'] = sample_data.get('lane');
                     if not row_dict['lane']: validation_errors_rerun.append(f"Sample {i+1}: Missing 'lane'.")
-                    row_dict['fastq_1'] = resolve_and_validate('fastq_1', True, ['.fq.gz', '.fastq.gz', '.fq', '.fastq'])
-                    row_dict['fastq_2'] = resolve_and_validate('fastq_2', True, ['.fq.gz', '.fastq.gz', '.fq', '.fastq'])
-                    if not row_dict['fastq_1'] or not row_dict['fastq_2']:
-                         # Error already added by resolve_and_validate if required
-                         pass
-
+                    row_dict['fastq_1'] = resolve_and_validate('fastq_1', True, ['.fq.gz', '.fastq.gz', '.fq', '.fastq']); row_dict['fastq_2'] = resolve_and_validate('fastq_2', True, ['.fq.gz', '.fastq.gz', '.fq', '.fastq'])
                 elif original_input_type == "bam_cram":
-                    row_dict[bam_cram_col] = resolve_and_validate('bam_cram', True, ['.bam', '.cram'])
-                    row_dict['index'] = resolve_and_validate('index', False, ['.bai', '.crai']) # Index optional unless CRAM
-                    # Add CRAM index requirement check
-                    if row_dict[bam_cram_col] and row_dict[bam_cram_col].lower().endswith('.cram') and not row_dict['index']:
-                        validation_errors_rerun.append(f"Sample {i+1}: CRAM file requires a corresponding index file (.crai).")
-                    if not row_dict[bam_cram_col]:
-                        pass # Error already added
-
+                    row_dict[bam_cram_col] = resolve_and_validate('bam_cram', True, ['.bam', '.cram']); row_dict['index'] = resolve_and_validate('index', False, ['.bai', '.crai'])
+                    if row_dict[bam_cram_col] and row_dict[bam_cram_col].lower().endswith('.cram') and not row_dict['index']: validation_errors_rerun.append(f"Sample {i+1}: CRAM file requires a corresponding index file (.crai).")
                 elif original_input_type == "vcf":
-                    row_dict['vcf'] = resolve_and_validate('vcf', True, ['.vcf', '.vcf.gz'])
-                    row_dict['index'] = resolve_and_validate('index', False, ['.tbi', '.csi']) # Index optional unless VCF.GZ
-                    # Add VCF.GZ index requirement check
-                    if row_dict['vcf'] and row_dict['vcf'].lower().endswith('.vcf.gz') and not row_dict['index']:
-                         validation_errors_rerun.append(f"Sample {i+1}: Compressed VCF (.vcf.gz) requires a corresponding index file (.tbi/.csi).")
-                    if not row_dict['vcf']:
-                        pass # Error already added
-
-                # Convert row_dict to list based on header order
+                    row_dict['vcf'] = resolve_and_validate('vcf', True, ['.vcf', '.vcf.gz']); row_dict['index'] = resolve_and_validate('index', False, ['.tbi', '.csi'])
+                    if row_dict['vcf'] and row_dict['vcf'].lower().endswith('.vcf.gz') and not row_dict['index']: validation_errors_rerun.append(f"Sample {i+1}: Compressed VCF (.vcf.gz) requires a corresponding index file (.tbi/.csi).")
                 new_sample_rows_for_csv.append([row_dict.get(h) for h in csv_headers])
+            if validation_errors_rerun: error_message = "Cannot re-stage job: Errors found validating original file paths:\n" + "\n".join(f"- {e}" for e in validation_errors_rerun); logger.error(error_message); raise HTTPException(status_code=400, detail=error_message)
+        except ValueError as sample_err: logger.error(f"Error processing sample structure during re-stage of {job_id}: {sample_err}"); raise HTTPException(status_code=400, detail=f"Cannot re-stage: Incomplete or invalid sample data structure in original job {job_id}.")
+        except Exception as sample_err: logger.exception(f"Unexpected error processing sample data during re-stage of {job_id}: {sample_err}"); raise HTTPException(status_code=500, detail="Error processing original sample data for re-run.")
 
-            # Check for validation errors *before* writing CSV
-            if validation_errors_rerun:
-                 error_message = "Cannot re-stage job: Errors found validating original file paths:\n" + "\n".join(f"- {e}" for e in validation_errors_rerun)
-                 logger.error(error_message)
-                 raise HTTPException(status_code=400, detail=error_message)
-
-        except ValueError as sample_err: # Catch errors from header/key checks
-            logger.error(f"Error processing sample structure during re-stage of {job_id}: {sample_err}")
-            raise HTTPException(status_code=400, detail=f"Cannot re-stage: Incomplete or invalid sample data structure in original job {job_id}.")
-        except Exception as sample_err: # Catch unexpected errors
-             logger.exception(f"Unexpected error processing sample data during re-stage of {job_id}: {sample_err}")
-             raise HTTPException(status_code=500, detail="Error processing original sample data for re-run.")
-
-
-        # Create the new CSV file (only if validation passed)
         try:
-            # Create temp file in system's temp dir
-            with tempfile.NamedTemporaryFile(mode='w', newline='', suffix='.csv', delete=False) as temp_csv:
-                csv_writer = csv.writer(temp_csv)
-                csv_writer.writerow(csv_headers)
-                csv_writer.writerows(new_sample_rows_for_csv)
-                new_temp_csv_file_path = temp_csv.name # Store the absolute path
+            with tempfile.NamedTemporaryFile(mode='w', newline='', suffix='.csv', delete=False) as temp_csv: csv_writer = csv.writer(temp_csv); csv_writer.writerow(csv_headers); csv_writer.writerows(new_sample_rows_for_csv); new_temp_csv_file_path = temp_csv.name
             logger.info(f"Created new temporary samplesheet for re-run with absolute paths: {new_temp_csv_file_path}")
-        except (OSError, csv.Error) as e:
-            logger.error(f"Failed to create new temporary samplesheet for re-run of {job_id}: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error: Could not create samplesheet for re-run.")
+        except (OSError, csv.Error) as e: logger.error(f"Failed to create new temporary samplesheet for re-run of {job_id}: {e}"); raise HTTPException(status_code=500, detail="Internal server error: Could not create samplesheet for re-run.")
 
-
-        # --- Prepare Job Details for Staging ---
-        # Function to resolve optional paths relative to DATA_DIR (kept for consistency, but uses relative paths from meta now)
         def get_original_optional_file_path_str(key):
-            filename = original_input_params.get(key) # Get original RELATIVE path
+            filename = original_input_params.get(key);
             if not filename: return None
             try:
-                full_path = (DATA_DIR / filename).resolve()
-                if os.path.commonpath([DATA_DIR.resolve(), full_path.resolve()]) == str(DATA_DIR.resolve()) and full_path.is_file():
-                    return str(full_path) # Return ABSOLUTE path for job args
-                else:
-                    logger.warning(f"Optional file '{filename}' (resolved: {full_path}) for key '{key}' not found or invalid during re-stage of {job_id}. Setting to None.")
-                    return None
-            except Exception as e:
-                logger.warning(f"Error resolving optional file path '{filename}' for key '{key}' during re-stage of {job_id}: {e}. Setting to None.")
-                return None
-
-        intervals_path = get_original_optional_file_path_str("intervals_file")
-        dbsnp_path = get_original_optional_file_path_str("dbsnp")
-        known_indels_path = get_original_optional_file_path_str("known_indels")
-        pon_path = get_original_optional_file_path_str("pon")
-
+                full_path = (DATA_DIR / filename).resolve();
+                if os.path.commonpath([DATA_DIR.resolve(), full_path.resolve()]) == str(DATA_DIR.resolve()) and full_path.is_file(): return str(full_path)
+                else: logger.warning(f"Optional file '{filename}' (resolved: {full_path}) for key '{key}' not found or invalid during re-stage of {job_id}. Setting to None."); return None
+            except Exception as e: logger.warning(f"Error resolving optional file path '{filename}' for key '{key}' during re-stage of {job_id}: {e}. Setting to None."); return None
+        intervals_path = get_original_optional_file_path_str("intervals_file"); dbsnp_path = get_original_optional_file_path_str("dbsnp"); known_indels_path = get_original_optional_file_path_str("known_indels"); pon_path = get_original_optional_file_path_str("pon")
         new_staged_job_id = f"staged_{uuid.uuid4()}"
-        new_job_details = {
-            # --- Paths ---
-            "input_csv_path": new_temp_csv_file_path, # Use the new absolute path
-            "intervals_path": intervals_path, # Absolute path if valid, else None
-            "dbsnp_path": dbsnp_path,         # Absolute path if valid, else None
-            "known_indels_path": known_indels_path, # Absolute path if valid, else None
-            "pon_path": pon_path,             # Absolute path if valid, else None
-            "outdir_base_path": str(RESULTS_DIR), # Use config path
-            # --- Sarek Params (Directly from original_sarek_params) ---
-            "genome": original_sarek_params.get("genome"), # Keep original value (should exist)
-            "tools": original_sarek_params.get("tools"), # Keep original value (can be None)
-            "step": original_step,
-            "profile": original_sarek_params.get("profile", SAREK_DEFAULT_PROFILE),
-            "aligner": original_sarek_params.get("aligner"), # Keep original value
-            "joint_germline": original_sarek_params.get("joint_germline", False),
-            "wes": original_sarek_params.get("wes", False),
-            "trim_fastq": original_sarek_params.get("trim_fastq", False),
-            "skip_qc": original_sarek_params.get("skip_qc", False),
-            "skip_annotation": original_sarek_params.get("skip_annotation", False),
-            "skip_baserecalibrator": original_sarek_params.get("skip_baserecalibrator", False),
-            # --- Metadata ---
-            "description": f"Re-run of job {job_id} ({original_description})",
-            "staged_at": time.time(),
-            "input_type": original_input_type,
-            "input_filenames": original_input_params, # Store original *relative* paths here
-            "sample_info": original_sample_info, # Store original sample info (with relative paths)
-            "is_rerun": True, # Mark as a re-run
-            "original_job_id": job_id, # Reference the original job ID
-        }
-
-        # Stage the new job in Redis
+        new_job_details = { "input_csv_path": new_temp_csv_file_path, "intervals_path": intervals_path, "dbsnp_path": dbsnp_path, "known_indels_path": known_indels_path, "pon_path": pon_path, "outdir_base_path": str(RESULTS_DIR), "genome": original_sarek_params.get("genome"), "tools": original_sarek_params.get("tools"), "step": original_step, "profile": original_sarek_params.get("profile", SAREK_DEFAULT_PROFILE), "aligner": original_sarek_params.get("aligner"), "joint_germline": original_sarek_params.get("joint_germline", False), "wes": original_sarek_params.get("wes", False), "trim_fastq": original_sarek_params.get("trim_fastq", False), "skip_qc": original_sarek_params.get("skip_qc", False), "skip_annotation": original_sarek_params.get("skip_annotation", False), "skip_baserecalibrator": original_sarek_params.get("skip_baserecalibrator", False), "description": f"Re-run of job {job_id} ({original_description})", "staged_at": time.time(), "input_type": original_input_type, "input_filenames": original_input_params, "sample_info": original_sample_info, "is_rerun": True, "original_job_id": job_id, }
         redis_conn.hset(STAGED_JOBS_KEY, new_staged_job_id.encode('utf-8'), json.dumps(new_job_details).encode('utf-8'))
         logger.info(f"Created new staged job {new_staged_job_id} for re-run of {job_id}")
 
-        # --- Optional: Remove the original failed/finished job ---
-        # Uncomment the block below if you want the original job to be removed automatically
-        # try:
-        #     logger.info(f"Attempting to remove original job {job_id} after successful re-stage.")
-        #     original_job.delete() # Delete only the hash after re-stage
-        #     logger.info(f"Successfully removed original job hash {job_id}.")
-        # except Exception as e:
-        #     logger.warning(f"Could not remove original job hash {job_id} after re-stage: {e}")
-        # --- End Optional Remove ---
-
-        return JSONResponse(
-            status_code=200, # Return 200 OK as the staging was successful
-            content={
-                "message": f"Job {job_id} re-staged successfully as {new_staged_job_id}. Please start the new job.",
-                "staged_job_id": new_staged_job_id
-            }
-        )
-
+        return JSONResponse( status_code=200, content={ "message": f"Job {job_id} re-staged successfully as {new_staged_job_id}. Please start the new job.", "staged_job_id": new_staged_job_id } )
     except redis.exceptions.RedisError as e:
         logger.error(f"Redis error during job re-stage for {job_id}: {e}")
-        # Cleanup the newly created CSV if staging fails
-        if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists():
-            try: os.remove(new_temp_csv_file_path)
-            except OSError: logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after Redis error.")
+        if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists(): try: os.remove(new_temp_csv_file_path); except OSError: logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after Redis error.")
         raise HTTPException(status_code=503, detail="Service unavailable: Could not access job storage.")
     except HTTPException as e:
-        # Cleanup the newly created CSV if staging fails
-        if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists():
-            try: os.remove(new_temp_csv_file_path)
-            except OSError: logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after HTTP error.")
+        if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists(): try: os.remove(new_temp_csv_file_path); except OSError: logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after HTTP error.")
         raise e
     except Exception as e:
         logger.exception(f"Unexpected error during job re-stage for {job_id}: {e}")
-        # Cleanup the newly created CSV if staging fails
-        if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists():
-             try: os.remove(new_temp_csv_file_path)
-             except OSError: logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after unexpected error.")
+        if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists(): try: os.remove(new_temp_csv_file_path); except OSError: logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after unexpected error.")
         raise HTTPException(status_code=500, detail="Internal server error during job re-stage.")
