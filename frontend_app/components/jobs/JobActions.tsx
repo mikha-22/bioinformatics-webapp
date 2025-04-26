@@ -7,14 +7,14 @@ import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
     MoreHorizontal,
-    Play,             // For Start
-    Square,           // For Stop
-    RotateCcw,        // For Rerun
+    Play,
+    Square,
+    RotateCcw,
     Trash2,
     Info,
     FolderGit2,
     Loader2,
-    Terminal,         // For Logs
+    Terminal,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -41,6 +41,7 @@ import {
     DialogClose,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 // Type and API Imports
 import { Job, SampleInfo, JobMeta, InputFilenames, SarekParams, RunParameters } from "@/lib/types";
@@ -91,7 +92,7 @@ export default function JobActions({ job }: JobActionsProps) {
     // --- Base Check (Unchanged) ---
     if (!job) {
         console.warn("JobActions rendered with undefined job prop");
-        return <div className="flex items-center justify-end gap-1 h-9 w-[60px]"></div>;
+        return <div className="flex items-center justify-end gap-1 h-9 w-[100px]"></div>;
     }
     // --- End Base Check ---
 
@@ -111,10 +112,38 @@ export default function JobActions({ job }: JobActionsProps) {
 
     return (
         <>
-            {/* --- Parent Flex Container (Unchanged) --- */}
+            {/* --- Parent FLEX Container with justify-between --- */}
             <div className="flex items-center justify-between gap-1 w-full">
 
-                {/* --- Group for Action Buttons --- */}
+                {/* --- Group 1: Left-aligned Buttons (Stop, Logs, Rerun) --- */}
+                <div className="flex items-center gap-1">
+                    {/* Stop Button */}
+                    {canStop && (
+                        <Button variant="ghost" size="icon" onClick={() => setIsStopConfirmOpen(true)} disabled={stopMutation.isPending} className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" title="Stop/Cancel Job">
+                            {stopMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Square className="h-5 w-5" />}
+                            <span className="sr-only">Stop/Cancel Job</span>
+                        </Button>
+                    )}
+                    {/* Logs Button */}
+                    {canViewLogs && !job.id.startsWith("staged_") && (
+                       <Button variant="ghost" size="icon" onClick={handleViewLogs} className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" title="View Live Logs">
+                            <Terminal className="h-5 w-5" />
+                            <span className="sr-only">View Logs</span>
+                        </Button>
+                    )}
+                    {/* Re-stage Button */}
+                     {canRerun && (
+                       <Button variant="ghost" size="icon" onClick={() => setIsRerunConfirmOpen(true)} disabled={rerunMutation.isPending} className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" title="Re-stage Job">
+                           {rerunMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <RotateCcw className="h-5 w-5" />}
+                           <span className="sr-only">Re-stage Job</span>
+                       </Button>
+                    )}
+                    {/* If this group is empty, it won't take up space */}
+                </div>
+                {/* --- End Group 1 --- */}
+
+
+                {/* --- Group 2: Right-aligned Buttons (Start, More Actions) --- */}
                 <div className="flex items-center gap-1">
                     {/* Start Button */}
                     {canStart && (
@@ -123,81 +152,53 @@ export default function JobActions({ job }: JobActionsProps) {
                             <span className="sr-only">Start Job</span>
                         </Button>
                     )}
-                    {/* Stop Button */}
-                    {canStop && (
-                        <Button variant="ghost" size="icon" onClick={() => setIsStopConfirmOpen(true)} disabled={stopMutation.isPending} className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" title="Stop/Cancel Job">
-                            {stopMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Square className="h-5 w-5" />}
-                            <span className="sr-only">Stop/Cancel Job</span>
-                        </Button>
-                    )}
 
-                    {/* --- SWAPPED ORDER: Logs Button FIRST --- */}
-                    {canViewLogs && !job.id.startsWith("staged_") && (
-                       <Button variant="ghost" size="icon" onClick={handleViewLogs} className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" title="View Live Logs">
-                            <Terminal className="h-5 w-5" />
-                            <span className="sr-only">View Logs</span>
-                        </Button>
-                    )}
-                    {/* --- SWAPPED ORDER: Re-stage Button SECOND --- */}
-                     {canRerun && (
-                       <Button variant="ghost" size="icon" onClick={() => setIsRerunConfirmOpen(true)} disabled={rerunMutation.isPending} className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" title="Re-stage Job">
-                           {rerunMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <RotateCcw className="h-5 w-5" />}
-                           <span className="sr-only">Re-stage Job</span>
-                       </Button>
-                    )}
-                    {/* --- END SWAPPED ORDER --- */}
-
-                </div>
-                {/* --- End Action Buttons Group --- */}
-
-
-                {/* --- More Actions Dropdown (Pushed to Right - Unchanged) --- */}
-                <DropdownMenuPrimitive.Root>
-                     <DropdownMenuPrimitive.Trigger asChild>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors">
-                            <MoreHorizontal className="h-5 w-5" /> <span className="sr-only">Job Actions</span>
-                        </Button>
-                    </DropdownMenuPrimitive.Trigger>
-                    <DropdownMenuPrimitive.Portal>
-                        <DropdownMenuPrimitive.Content
-                            align="end"
-                            sideOffset={4}
-                            className="min-w-[12rem] z-50 overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2"
-                         >
-                            {/* View Details */}
-                            <DropdownMenuPrimitive.Item
-                                onSelect={(e) => { e.preventDefault(); setIsDetailsOpen(true); }}
-                                className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                    {/* More Actions Dropdown (Always present in this group) */}
+                    <DropdownMenuPrimitive.Root>
+                        <DropdownMenuPrimitive.Trigger asChild>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors flex-shrink-0">
+                                <MoreHorizontal className="h-5 w-5" /> <span className="sr-only">Job Actions</span>
+                            </Button>
+                        </DropdownMenuPrimitive.Trigger>
+                        <DropdownMenuPrimitive.Portal>
+                            <DropdownMenuPrimitive.Content
+                                align="end"
+                                sideOffset={4}
+                                className="min-w-[12rem] z-50 overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2"
                             >
-                                <span className="flex items-center gap-2"><Info className="h-4 w-4" /> View Details</span>
-                            </DropdownMenuPrimitive.Item>
-                             {/* View Results Link */}
-                            {job.status === 'finished' && job.result?.results_path && (
-                                <DropdownMenuPrimitive.Item asChild className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground">
-                                    <Link href={`/results?highlight=${encodeURIComponent(job.result.results_path.split('/').filter(Boolean).pop() || '')}`} className="flex items-center gap-2">
-                                        <FolderGit2 className="h-4 w-4" /> View Results
-                                    </Link>
+                                {/* Dropdown Items */}
+                                <DropdownMenuPrimitive.Item
+                                    onSelect={(e) => { e.preventDefault(); setIsDetailsOpen(true); }}
+                                    className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                                >
+                                    <span className="flex items-center gap-2"><Info className="h-4 w-4" /> View Details</span>
                                 </DropdownMenuPrimitive.Item>
-                            )}
-                             {/* Remove Job */}
-                             {canRemove && (
-                                <>
-                                    <DropdownMenuPrimitive.Separator className="my-1 h-px bg-muted -mx-1" />
-                                    <DropdownMenuPrimitive.Item
-                                        onSelect={(e) => { e.preventDefault(); setIsRemoveConfirmOpen(true); }}
-                                        disabled={removeMutation.isPending}
-                                        className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-destructive/10 hover:text-destructive text-destructive data-[disabled]:pointer-events-none data-[disabled]:opacity-50 dark:hover:bg-destructive/20"
-                                    >
-                                        <span className="flex items-center gap-2">
-                                            {removeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Remove Job
-                                        </span>
+                                {job.status === 'finished' && job.result?.results_path && (
+                                    <DropdownMenuPrimitive.Item asChild className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground">
+                                        <Link href={`/results?highlight=${encodeURIComponent(job.result.results_path.split('/').filter(Boolean).pop() || '')}`} className="flex items-center gap-2">
+                                            <FolderGit2 className="h-4 w-4" /> View Results
+                                        </Link>
                                     </DropdownMenuPrimitive.Item>
-                                </>
-                            )}
-                        </DropdownMenuPrimitive.Content>
-                    </DropdownMenuPrimitive.Portal>
-                 </DropdownMenuPrimitive.Root>
-                 {/* --- End Dropdown --- */}
+                                )}
+                                {canRemove && (
+                                    <>
+                                        <DropdownMenuPrimitive.Separator className="my-1 h-px bg-muted -mx-1" />
+                                        <DropdownMenuPrimitive.Item
+                                            onSelect={(e) => { e.preventDefault(); setIsRemoveConfirmOpen(true); }}
+                                            disabled={removeMutation.isPending}
+                                            className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-destructive/10 hover:text-destructive text-destructive data-[disabled]:pointer-events-none data-[disabled]:opacity-50 dark:hover:bg-destructive/20"
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                {removeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Remove Job
+                                            </span>
+                                        </DropdownMenuPrimitive.Item>
+                                    </>
+                                )}
+                            </DropdownMenuPrimitive.Content>
+                        </DropdownMenuPrimitive.Portal>
+                    </DropdownMenuPrimitive.Root>
+                </div>
+                {/* --- End Group 2 --- */}
 
             </div> {/* --- End Parent Flex Container --- */}
 
