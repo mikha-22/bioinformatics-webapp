@@ -1,4 +1,5 @@
-# backend/app/app.py
+# File: backend/app/app.py
+# --- START OF FILE ---
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,10 +48,12 @@ logger.info(f"CORS middleware configured. Allowed origins: {allowed_origins}")
 # --- Include Routers ---
 app.include_router(data.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
-app.include_router(profiles.router, prefix="/api/profiles") # Keep explicit prefix here if desired
+# --- >>> Add /api prefix here <<< ---
+app.include_router(profiles.router, prefix="/api") # Profiles router defines /profiles internally
+# ----------------------------------
 # Include the WebSocket router - the prefix is defined *within* websockets.py
-app.include_router(websockets.router) # <<< ADDED THIS LINE
-logger.info("Included API routers: data, jobs, profiles, websockets.") # <<< Updated log message
+app.include_router(websockets.router)
+logger.info("Included API routers: data, jobs, profiles, websockets.")
 
 # --- Root endpoint for health check ---
 @app.get("/health", tags=["Health Check"], summary="Basic Health Check")
@@ -59,3 +62,4 @@ async def health_check():
     return {"status": "ok", "message": "Backend API is running"}
 
 logger.info("--- Bioinformatics Webapp Backend API Initialization Complete. Ready to serve requests. ---")
+# --- END OF FILE ---

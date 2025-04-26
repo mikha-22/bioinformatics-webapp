@@ -1,4 +1,5 @@
-# backend/app/routers/profiles.py
+# File: backend/app/routers/profiles.py
+# --- START OF FILE ---
 import logging
 import json
 import re # For name validation
@@ -11,14 +12,19 @@ from ..core.redis_rq import get_redis_connection
 from ..models.pipeline import ProfileData, SaveProfileRequest # Import updated models
 
 logger = logging.getLogger(__name__)
+
+# --- MODIFIED PREFIX ---
 router = APIRouter(
-    tags=["Profiles Management"], # Tag for OpenAPI docs
-    prefix="/api/profiles"        # Prefix for all routes in this router
+    tags=["Profiles Management"],
+    prefix="/profiles"        # <<< CHANGED: Remove /api from here
 )
+# --- END MODIFICATION ---
 
 # Basic validation for profile names (alphanumeric, underscore, dash)
 VALID_PROFILE_NAME_REGEX = re.compile(r"^[a-zA-Z0-9_\-]+$")
 MAX_PROFILE_NAME_LENGTH = 50
+
+# --- Rest of the file remains the same ---
 
 @router.get("", response_model=List[str], summary="List Saved Profile Names")
 async def list_profile_names(
@@ -122,3 +128,4 @@ async def delete_profile(
     except Exception as e:
         logger.exception(f"Unexpected error deleting profile '{profile_name}'.")
         raise HTTPException(status_code=500, detail="Internal server error deleting profile.")
+# --- END OF FILE ---
