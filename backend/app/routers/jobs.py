@@ -89,14 +89,20 @@ async def stage_pipeline_job(
     except redis.exceptions.RedisError as e:
         logger.error(f"Redis error staging job: {e}")
         if input_csv_path and input_csv_path.exists():
-             try: os.remove(input_csv_path); logger.info(f"Cleaned up temporary CSV file due to Redis error: {input_csv_path}")
-             except OSError as remove_e: logger.warning(f"Could not clean up temporary CSV file {input_csv_path} after Redis error: {remove_e}")
+             try:
+                 os.remove(input_csv_path)
+                 logger.info(f"Cleaned up temporary CSV file due to Redis error: {input_csv_path}")
+             except OSError as remove_e:
+                 logger.warning(f"Could not clean up temporary CSV file {input_csv_path} after Redis error: {remove_e}")
         raise HTTPException(status_code=503, detail="Service unavailable: Could not stage job due to storage error.")
     except Exception as e:
          logger.exception(f"Unexpected error during job staging for input: {input_data}")
          if input_csv_path and input_csv_path.exists():
-             try: os.remove(input_csv_path); logger.info(f"Cleaned up temporary CSV file due to unexpected error: {input_csv_path}")
-             except OSError as remove_e: logger.warning(f"Could not clean up temporary CSV file {input_csv_path} after error: {remove_e}")
+             try:
+                 os.remove(input_csv_path)
+                 logger.info(f"Cleaned up temporary CSV file due to unexpected error: {input_csv_path}")
+             except OSError as remove_e:
+                 logger.warning(f"Could not clean up temporary CSV file {input_csv_path} after error: {remove_e}")
          raise HTTPException(status_code=500, detail="Internal server error during job staging.")
 
 
@@ -139,7 +145,6 @@ async def start_job(
 
 
 # --- Job Listing and Status Routes ---
-# (get_jobs_list and get_job_status remain unchanged)
 @router.get("/jobs_list", response_model=List[Dict[str, Any]], summary="List All Relevant Jobs (Staged & RQ)")
 async def get_jobs_list(
     redis_conn: redis.Redis = Depends(get_redis_connection),
@@ -187,7 +192,11 @@ async def get_jobs_list(
                     current_status = job.get_status(refresh=False); error_summary = None; job_meta = job.meta or {}
                     if current_status == JobStatus.FAILED:
                         error_summary = job_meta.get('error_message', "Job failed processing"); stderr_snippet = job_meta.get('stderr_snippet')
-                        if error_summary == "Job failed processing" and job.exc_info: try: error_summary = job.exc_info.strip().split('\n')[-1]; except Exception: pass
+                        if error_summary == "Job failed processing" and job.exc_info:
+                            try:
+                                error_summary = job.exc_info.strip().split('\n')[-1]
+                            except Exception:
+                                pass
                         if stderr_snippet: error_summary += f" (stderr: ...{stderr_snippet[-100:]})" # Show tail of snippet
                     resources = { "peak_memory_mb": job_meta.get("peak_memory_mb"), "average_cpu_percent": job_meta.get("average_cpu_percent"), "duration_seconds": job_meta.get("duration_seconds") }
                     if job.id not in all_jobs_dict or all_jobs_dict[job.id].get('status') != current_status:
@@ -228,7 +237,11 @@ async def get_job_status(
                     if status == JobStatus.FINISHED: result = job.result
                     elif status == JobStatus.FAILED:
                         error_info_summary = meta_data.get('error_message', "Job failed processing"); stderr_snippet = meta_data.get('stderr_snippet')
-                        if error_info_summary == "Job failed processing" and job.exc_info: try: error_info_summary = job.exc_info.strip().split('\n')[-1]; except Exception: pass
+                        if error_info_summary == "Job failed processing" and job.exc_info:
+                            try:
+                                error_info_summary = job.exc_info.strip().split('\n')[-1]
+                            except Exception:
+                                pass
                         if stderr_snippet: error_info_summary += f" (stderr: ...{stderr_snippet[-100:]})"
                 except Exception as e: logger.exception(f"Error accessing result/error info for job {job_id} (status: {status})."); error_info_summary = error_info_summary or "Could not retrieve job result/error details."
                 resource_stats = {"peak_memory_mb": meta_data.get("peak_memory_mb"), "average_cpu_percent": meta_data.get("average_cpu_percent"), "duration_seconds": meta_data.get("duration_seconds")}
@@ -253,7 +266,6 @@ async def get_job_status(
     except Exception as e: logger.exception(f"Unexpected error in get_job_status for {job_id}."); raise HTTPException(status_code=500, detail="Internal server error retrieving job status.")
 
 
-# (stop_job remains unchanged)
 @router.post("/stop_job/{job_id}", status_code=200, summary="Cancel Running/Queued RQ Job")
 async def stop_job(
     job_id: str,
@@ -356,19 +368,14 @@ async def remove_job(
                 else: logger.debug(f"Temporary CSV path '{csv_path_to_remove}' not found. No cleanup needed for job {job_id}.")
             except Exception as e: logger.warning(f"Unexpected error during CSV cleanup for job {job_id}: {e}")
 
-        # --- ADDED: Cleanup Log History List ---
-        if not job_id.startswith("staged_"): # Don't cleanup history for staged jobs (they don't have one)
+        # Cleanup Log History List
+        if not job_id.startswith("staged_"):
             try:
                 deleted_count = redis_conn.delete(log_history_key)
-                if deleted_count > 0:
-                    logger.info(f"Cleaned up log history list for removed job {job_id}: {log_history_key}")
-                else:
-                    logger.debug(f"Log history list not found or already deleted for job {job_id}: {log_history_key}")
-            except redis.exceptions.RedisError as e:
-                logger.error(f"Redis error deleting log history list {log_history_key} for job {job_id}: {e}")
-            except Exception as e:
-                 logger.error(f"Unexpected error deleting log history list {log_history_key} for job {job_id}: {e}")
-        # --- END ADDED ---
+                if deleted_count > 0: logger.info(f"Cleaned up log history list for removed job {job_id}: {log_history_key}")
+                else: logger.debug(f"Log history list not found or already deleted for job {job_id}: {log_history_key}")
+            except redis.exceptions.RedisError as e: logger.error(f"Redis error deleting log history list {log_history_key} for job {job_id}: {e}")
+            except Exception as e: logger.error(f"Unexpected error deleting log history list {log_history_key} for job {job_id}: {e}")
 
     if not job_removed:
         logger.error(f"Job removal process completed for {job_id}, but job_removed flag is false. Removal likely failed.")
@@ -377,7 +384,6 @@ async def remove_job(
     return JSONResponse(status_code=200, content={"message": f"Successfully removed job {job_id}.", "removed_id": job_id})
 
 
-# (rerun_job remains unchanged)
 @router.post("/rerun_job/{job_id}", status_code=200, summary="Re-stage Failed/Finished Job")
 async def rerun_job(
     job_id: str,
@@ -417,18 +423,27 @@ async def rerun_job(
             else: raise ValueError(f"Unknown original input type '{original_input_type}'.")
 
             for i, sample_data in enumerate(original_sample_info):
-                row_dict = {}; for key in ['patient', 'sample', 'sex', 'status']: row_dict[key] = sample_data[key]
+                row_dict = {}
+                for key in ['patient', 'sample', 'sex', 'status']:
+                    row_dict[key] = sample_data[key]
+
                 def resolve_and_validate(relative_path_key: str, is_required: bool, allowed_suffixes: Optional[List[str]] = None) -> Optional[str]:
                     relative_path = sample_data.get(relative_path_key)
                     if not relative_path:
                         if is_required: validation_errors_rerun.append(f"Sample {i+1}: Missing required field '{relative_path_key}' in original metadata."); return None
+                        return None # Return None for optional or failed required
                     try:
                         absolute_path = get_safe_path(DATA_DIR, relative_path)
-                        if not absolute_path.is_file(): validation_errors_rerun.append(f"Sample {i+1}: File for '{relative_path_key}' ('{relative_path}') not found at resolved path {absolute_path}."); return None
-                        if allowed_suffixes and absolute_path.suffix.lower() not in [s.lower() for s in allowed_suffixes] and not any(absolute_path.name.lower().endswith(s.lower()) for s in allowed_suffixes): validation_errors_rerun.append(f"Sample {i+1}: File for '{relative_path_key}' ('{relative_path}') has invalid suffix. Allowed: {', '.join(allowed_suffixes)}"); return None
+                        if not absolute_path.is_file():
+                            validation_errors_rerun.append(f"Sample {i+1}: File for '{relative_path_key}' ('{relative_path}') not found at resolved path {absolute_path}.")
+                            return None
+                        if allowed_suffixes and absolute_path.suffix.lower() not in [s.lower() for s in allowed_suffixes] and not any(absolute_path.name.lower().endswith(s.lower()) for s in allowed_suffixes):
+                             validation_errors_rerun.append(f"Sample {i+1}: File for '{relative_path_key}' ('{relative_path}') has invalid suffix. Allowed: {', '.join(allowed_suffixes)}")
+                             return None
                         return str(absolute_path)
                     except HTTPException as e: validation_errors_rerun.append(f"Sample {i+1}: Error validating path for '{relative_path_key}' ('{relative_path}'): {e.detail}"); return None
                     except Exception as e: logger.error(f"Unexpected error resolving path for {relative_path_key} ('{relative_path}') in sample {i+1}: {e}"); validation_errors_rerun.append(f"Sample {i+1}: Internal error resolving path for '{relative_path_key}'."); return None
+
                 if original_input_type == "fastq":
                     row_dict['lane'] = sample_data.get('lane');
                     if not row_dict['lane']: validation_errors_rerun.append(f"Sample {i+1}: Missing 'lane'.")
@@ -440,15 +455,19 @@ async def rerun_job(
                     row_dict['vcf'] = resolve_and_validate('vcf', True, ['.vcf', '.vcf.gz']); row_dict['index'] = resolve_and_validate('index', False, ['.tbi', '.csi'])
                     if row_dict['vcf'] and row_dict['vcf'].lower().endswith('.vcf.gz') and not row_dict['index']: validation_errors_rerun.append(f"Sample {i+1}: Compressed VCF (.vcf.gz) requires a corresponding index file (.tbi/.csi).")
                 new_sample_rows_for_csv.append([row_dict.get(h) for h in csv_headers])
+
             if validation_errors_rerun: error_message = "Cannot re-stage job: Errors found validating original file paths:\n" + "\n".join(f"- {e}" for e in validation_errors_rerun); logger.error(error_message); raise HTTPException(status_code=400, detail=error_message)
         except ValueError as sample_err: logger.error(f"Error processing sample structure during re-stage of {job_id}: {sample_err}"); raise HTTPException(status_code=400, detail=f"Cannot re-stage: Incomplete or invalid sample data structure in original job {job_id}.")
         except Exception as sample_err: logger.exception(f"Unexpected error processing sample data during re-stage of {job_id}: {sample_err}"); raise HTTPException(status_code=500, detail="Error processing original sample data for re-run.")
 
+
+        # Create the new CSV file
         try:
             with tempfile.NamedTemporaryFile(mode='w', newline='', suffix='.csv', delete=False) as temp_csv: csv_writer = csv.writer(temp_csv); csv_writer.writerow(csv_headers); csv_writer.writerows(new_sample_rows_for_csv); new_temp_csv_file_path = temp_csv.name
             logger.info(f"Created new temporary samplesheet for re-run with absolute paths: {new_temp_csv_file_path}")
         except (OSError, csv.Error) as e: logger.error(f"Failed to create new temporary samplesheet for re-run of {job_id}: {e}"); raise HTTPException(status_code=500, detail="Internal server error: Could not create samplesheet for re-run.")
 
+        # Function to resolve optional paths relative to DATA_DIR
         def get_original_optional_file_path_str(key):
             filename = original_input_params.get(key);
             if not filename: return None
@@ -464,14 +483,33 @@ async def rerun_job(
         logger.info(f"Created new staged job {new_staged_job_id} for re-run of {job_id}")
 
         return JSONResponse( status_code=200, content={ "message": f"Job {job_id} re-staged successfully as {new_staged_job_id}. Please start the new job.", "staged_job_id": new_staged_job_id } )
+
     except redis.exceptions.RedisError as e:
         logger.error(f"Redis error during job re-stage for {job_id}: {e}")
-        if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists(): try: os.remove(new_temp_csv_file_path); except OSError: logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after Redis error.")
+        # --- CORRECTED CLEANUP ---
+        if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists():
+            try:
+                os.remove(new_temp_csv_file_path)
+            except OSError:
+                logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after Redis error.")
+        # --- END CORRECTION ---
         raise HTTPException(status_code=503, detail="Service unavailable: Could not access job storage.")
     except HTTPException as e:
-        if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists(): try: os.remove(new_temp_csv_file_path); except OSError: logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after HTTP error.")
+        # --- CORRECTED CLEANUP ---
+        if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists():
+            try:
+                os.remove(new_temp_csv_file_path)
+            except OSError:
+                logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after HTTP error.")
+        # --- END CORRECTION ---
         raise e
     except Exception as e:
         logger.exception(f"Unexpected error during job re-stage for {job_id}: {e}")
-        if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists(): try: os.remove(new_temp_csv_file_path); except OSError: logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after unexpected error.")
+        # --- CORRECTED CLEANUP ---
+        if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists():
+             try:
+                 os.remove(new_temp_csv_file_path)
+             except OSError:
+                 logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after unexpected error.")
+        # --- END CORRECTION ---
         raise HTTPException(status_code=500, detail="Internal server error during job re-stage.")

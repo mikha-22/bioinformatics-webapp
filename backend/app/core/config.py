@@ -54,15 +54,35 @@ REDIS_DB = int(os.getenv("REDIS_DB", 0))         # Ensure db is integer
 PIPELINE_QUEUE_NAME = "pipeline_tasks"
 STAGED_JOBS_KEY = "staged_pipeline_jobs" # Key for Redis Hash storing staged jobs
 PIPELINE_PROFILES_KEY = "pipeline_profiles" # Key for storing profiles
-LOG_CHANNEL_PREFIX = "logs:" # <--- ADDED: Prefix for log Pub/Sub channels
-
+LOG_CHANNEL_PREFIX = "logs:"
+# --- ADD THIS LINE ---
+LOG_HISTORY_PREFIX = "log_history:" # Prefix for Redis List storing log history
+# --- END ADD ---
 
 logger.info(f"Using REDIS_HOST: {REDIS_HOST}:{REDIS_PORT} DB:{REDIS_DB}")
 
 # --- Job Settings ---
-DEFAULT_JOB_TIMEOUT = '2h' # Default timeout for RQ job itself
-DEFAULT_RESULT_TTL = 86400  # Keep successful job result 1 day
-DEFAULT_FAILURE_TTL = 604800 # Keep failed job result 1 week
+# Convert TTL strings from environment or use defaults (make sure they are integers)
+try:
+    DEFAULT_RESULT_TTL = int(os.getenv("DEFAULT_RESULT_TTL", 86400)) # Keep successful job result 1 day
+except ValueError:
+    logger.warning("Invalid DEFAULT_RESULT_TTL environment variable. Using default: 86400")
+    DEFAULT_RESULT_TTL = 86400
+
+try:
+    DEFAULT_FAILURE_TTL = int(os.getenv("DEFAULT_FAILURE_TTL", 604800)) # Keep failed job result 1 week
+except ValueError:
+    logger.warning("Invalid DEFAULT_FAILURE_TTL environment variable. Using default: 604800")
+    DEFAULT_FAILURE_TTL = 604800
+
+try:
+    # Ensure timeout is a string for RQ or an integer in seconds (RQ handles '1h' etc.)
+    # Let's keep it as a string compatible with RQ, defaulting to '2h'
+    DEFAULT_JOB_TIMEOUT = os.getenv("DEFAULT_JOB_TIMEOUT", '2h')
+except ValueError:
+     logger.warning("Invalid DEFAULT_JOB_TIMEOUT environment variable. Using default: '2h'")
+     DEFAULT_JOB_TIMEOUT = '2h'
+
 MAX_REGISTRY_JOBS = 50 # Max finished/failed jobs to fetch for the list view
 
 # --- Sarek Pipeline Configuration ---

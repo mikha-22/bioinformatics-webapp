@@ -12,15 +12,16 @@ import redis # <--- IMPORT redis
 from typing import Optional, List, Dict, Any
 
 # --- RQ Imports ---
-from rq import get_current_job, Queue, Retry
-from rq.job import JobStatus
+from rq import get_current_job, Queue
 
 # --- Import Config ---
-# Make sure TTLs are imported
-from .core.config import (
+# --- CORRECTED RELATIVE IMPORT ---
+from .core.config import ( # Use ONE dot for sibling directory within the package
     RESULTS_DIR, REDIS_HOST, REDIS_PORT, REDIS_DB,
-    LOG_CHANNEL_PREFIX, DEFAULT_RESULT_TTL, DEFAULT_FAILURE_TTL
+    LOG_CHANNEL_PREFIX, LOG_HISTORY_PREFIX,
+    DEFAULT_RESULT_TTL, DEFAULT_FAILURE_TTL
 )
+# --- END CORRECTION ---
 
 # --- Configure Logging ---
 logging.basicConfig(
@@ -33,22 +34,21 @@ logger = logging.getLogger(__name__)
 # --- Path Definitions ---
 MONITORING_INTERVAL_SECONDS = 5
 METADATA_FILENAME = "run_metadata.json"
-LOG_HISTORY_PREFIX = "log_history:" # Define prefix for Redis List
+# LOG_HISTORY_PREFIX defined in config
 
 # --- Get Redis Connection for Publishing & List Operations ---
-# This connection will handle both PUBLISH and RPUSH/EXPIRE
 try:
     redis_log_handler = redis.Redis(
         host=REDIS_HOST,
         port=REDIS_PORT,
         db=REDIS_DB,
-        decode_responses=True # Decode responses for easier handling of JSON strings
+        decode_responses=True
     )
-    redis_log_handler.ping() # Check connection
+    redis_log_handler.ping()
     logger.info("Redis log handler connection successful for tasks (Publish/List).")
 except redis.exceptions.ConnectionError as e:
     logger.error(f"FATAL: Could not connect Redis log handler in tasks.py: {e}")
-    redis_log_handler = None # Set to None if connection fails
+    redis_log_handler = None
 except Exception as e:
     logger.error(f"FATAL: Unexpected error connecting Redis log handler in tasks.py: {e}")
     redis_log_handler = None
@@ -74,17 +74,10 @@ def publish_and_store_log(job_id: str, log_type: str, line: str):
     message = json.dumps({"type": log_type, "line": line.strip()})
 
     try:
-        # Pipeline commands for atomicity (optional but good practice)
         pipe = redis_log_handler.pipeline()
         pipe.publish(channel, message)
         pipe.rpush(list_key, message)
-        # Optional: Set a preliminary TTL on the list key in case the job fails early
-        # pipe.expire(list_key, DEFAULT_FAILURE_TTL) # Set initial TTL
         results = pipe.execute()
-
-        # logger.debug(f"[Job {job_id}] Published to {channel}: {message}")
-        # logger.debug(f"[Job {job_id}] Pushed to list {list_key}: {message} (List length: {results[1]})")
-
     except redis.exceptions.RedisError as e:
         logger.error(f"[Job {job_id}] Redis error publishing/storing log to {channel}/{list_key}: {e}")
     except Exception as e:
@@ -117,25 +110,22 @@ def run_pipeline_task(
     final_results_dir = None
     job_succeeded = False # Track success for final TTL setting
 
-    # Log parameters (use publish_and_store_log for key info)
     logger.info(f"[Job {job_id}] Starting Sarek pipeline task...")
     publish_and_store_log(job_id, "info", f"Starting Sarek task (Input: {Path(input_csv_path_str).name}, Genome: {genome}, Step: {step})")
-    # Log other params locally for debugging if needed
     logger.info(f"[Job {job_id}] Input CSV: {input_csv_path_str}")
     logger.info(f"[Job {job_id}] Output Base: {outdir_base_path_str}")
-    # ... (keep other local logs if desired)
 
     # --- Command Construction (remains same) ---
     script_path = Path(__file__).resolve().parent / "sarek_pipeline.sh"
     if not script_path.exists():
          error_msg = f"CRITICAL: Sarek wrapper script not found at {script_path}"
          logger.error(f"[Job {job_id}] {error_msg}")
-         publish_and_store_log(job_id, "error", error_msg) # <<< Publish/Store error
+         publish_and_store_log(job_id, "error", error_msg)
          raise FileNotFoundError(f"Sarek wrapper script not found: {script_path}")
     if not os.access(script_path, os.X_OK):
         error_msg = f"CRITICAL: Sarek wrapper script is not executable: {script_path}"
         logger.error(f"[Job {job_id}] {error_msg}")
-        publish_and_store_log(job_id, "error", error_msg) # <<< Publish/Store error
+        publish_and_store_log(job_id, "error", error_msg)
         raise PermissionError(f"Sarek wrapper script not executable: {script_path}")
 
     command = [
@@ -153,7 +143,7 @@ def run_pipeline_task(
     logger.info(f"[Job {job_id}] Running command in directory: {script_working_dir}")
     command_str = ' '.join(command)
     logger.info(f"[Job {job_id}] Command: {command_str}")
-    publish_and_store_log(job_id, "info", f"Executing: {command_str}") # <<< Publish/Store command
+    publish_and_store_log(job_id, "info", f"Executing: {command_str}")
 
     # Set Environment (remains same)
     subprocess_env = os.environ.copy()
@@ -173,20 +163,20 @@ def run_pipeline_task(
     try:
         # --- Process Execution ---
         logger.info(f"[Job {job_id}] Preparing to execute Popen...")
-        publish_and_store_log(job_id, "info", "Pipeline process starting...") # <<< Publish/Store status
+        publish_and_store_log(job_id, "info", "Pipeline process starting...")
         try:
             process = subprocess.Popen(
                 command, cwd=str(script_working_dir), stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, text=True, bufsize=1, env=subprocess_env
             )
             logger.info(f"[Job {job_id}] Popen successful. PID: {process.pid}")
-            publish_and_store_log(job_id, "info", f"Pipeline process started (PID: {process.pid}).") # <<< Publish/Store status
+            publish_and_store_log(job_id, "info", f"Pipeline process started (PID: {process.pid}).")
             if not process.stdout: logger.error(f"[Job {job_id}] process.stdout is None!")
             if not process.stderr: logger.error(f"[Job {job_id}] process.stderr is None!")
         except Exception as popen_err:
             error_msg = f"CRITICAL ERROR starting pipeline process: {popen_err}"
             logger.exception(f"[Job {job_id}] {error_msg}")
-            publish_and_store_log(job_id, "error", error_msg) # <<< Publish/Store error
+            publish_and_store_log(job_id, "error", error_msg)
             raise popen_err
 
         # Initialize psutil (remains same)
@@ -210,7 +200,7 @@ def run_pipeline_task(
         if not streams_to_select:
              error_msg = "Both stdout and stderr are None/invalid after Popen."
              logger.error(f"[Job {job_id}] {error_msg}")
-             publish_and_store_log(job_id, "error", "Pipeline streams unavailable after start.") # <<< Publish/Store error
+             publish_and_store_log(job_id, "error", "Pipeline streams unavailable after start.")
              raise IOError("Subprocess streams are not available.")
 
         while streams_to_select:
@@ -224,7 +214,7 @@ def run_pipeline_task(
             except ValueError as select_err:
                  error_msg = f"Error during select (stream likely closed unexpectedly): {select_err}"
                  logger.error(f"[Job {job_id}] {error_msg}")
-                 publish_and_store_log(job_id, "warning", f"Stream error during log capture: {select_err}") # <<< Publish/Store warning
+                 publish_and_store_log(job_id, "warning", f"Stream error during log capture: {select_err}")
                  # Attempt cleanup (remains same)
                  for stream in streams_to_select[:]:
                      if stream and not stream.closed:
@@ -273,7 +263,7 @@ def run_pipeline_task(
                             stdout_lines.append(line + '\n')
                             log_line = line.strip()
                             logger.info(f"[Job {job_id}][STDOUT] {log_line}")
-                            publish_and_store_log(job_id, "stdout", log_line) # <<< PUBLISH/STORE STDOUT
+                            publish_and_store_log(job_id, "stdout", log_line)
                             if "Results directory:" in line:
                                 try: final_results_dir = line.split("Results directory:", 1)[1].strip()
                                 except IndexError: logger.warning(f"[Job {job_id}] Could not parse results dir: {log_line}")
@@ -284,15 +274,19 @@ def run_pipeline_task(
                             stderr_lines.append(line + '\n')
                             log_line = line.strip()
                             logger.warning(f"[Job {job_id}][STDERR] {log_line}")
-                            publish_and_store_log(job_id, "stderr", log_line) # <<< PUBLISH/STORE STDERR
+                            publish_and_store_log(job_id, "stderr", log_line)
 
                 except (OSError, ValueError) as e:
                      error_msg = f"Error reading from stream {stream.fileno()}: {e}"
                      logger.error(f"[Job {job_id}] {error_msg}")
-                     publish_and_store_log(job_id, "warning", f"Error reading log stream: {e}") # <<< Publish/Store warning
+                     publish_and_store_log(job_id, "warning", f"Error reading log stream: {e}")
                      if stream in streams_to_select:
-                         try: stream.close(); except: pass
+                         try:
+                             stream.close()
+                         except Exception:
+                             pass
                          streams_to_select.remove(stream)
+
 
             # Resource Monitoring (remains same)
             if process_psutil and process.poll() is None:
@@ -316,17 +310,17 @@ def run_pipeline_task(
             log_line = stdout_buffer.strip()
             logger.info(f"[Job {job_id}][STDOUT] {log_line}")
             stdout_lines.append(stdout_buffer)
-            publish_and_store_log(job_id, "stdout", log_line) # <<< Publish/Store remaining stdout
+            publish_and_store_log(job_id, "stdout", log_line)
             if not final_results_dir and "Results directory:" in stdout_buffer:
                  for rem_line in stdout_buffer.splitlines():
                      if "Results directory:" in rem_line:
                           try: final_results_dir = rem_line.split("Results directory:", 1)[1].strip(); break
-                          except IndexError: pass # Ignore parsing error on buffer
+                          except IndexError: pass
         if stderr_buffer:
              log_line = stderr_buffer.strip()
              logger.warning(f"[Job {job_id}][STDERR] {log_line}")
              stderr_lines.append(stderr_buffer)
-             publish_and_store_log(job_id, "stderr", log_line) # <<< Publish/Store remaining stderr
+             publish_and_store_log(job_id, "stderr", log_line)
 
         if return_code is None:
             logger.warning(f"[Job {job_id}] Process return code was None after loop, calling process.wait().")
@@ -336,7 +330,7 @@ def run_pipeline_task(
         duration_seconds = end_time - start_time
         log_message = f"Pipeline process {process.pid} finished with code {return_code} after {duration_seconds:.2f}s."
         logger.info(f"[Job {job_id}] {log_message}")
-        publish_and_store_log(job_id, "info", log_message) # <<< Publish/Store final status
+        publish_and_store_log(job_id, "info", log_message)
 
         average_cpu = sum(cpu_percentages) / len(cpu_percentages) if cpu_percentages else 0
 
@@ -362,12 +356,12 @@ def run_pipeline_task(
         if final_status_success:
             success_message = f"Sarek pipeline finished successfully (Exit Code {return_code})."
             logger.info(f"[Job {job_id}] {success_message}")
-            publish_and_store_log(job_id, "info", success_message) # <<< Publish/Store success
+            publish_and_store_log(job_id, "info", success_message)
             if final_results_dir:
                 results_path_obj = Path(final_results_dir)
                 if results_path_obj.is_dir():
                      logger.info(f"[Job {job_id}] Confirmed results directory exists: {final_results_dir}")
-                     publish_and_store_log(job_id, "info", f"Results directory: {final_results_dir}") # <<< Publish/Store result dir
+                     publish_and_store_log(job_id, "info", f"Results directory: {final_results_dir}")
                      if job:
                           job.meta['results_path'] = final_results_dir
                           job.save_meta()
@@ -382,13 +376,13 @@ def run_pipeline_task(
                 else:
                      error_message = f"Pipeline reported success, but results directory '{final_results_dir}' not found!"
                      logger.error(f"[Job {job_id}] {error_message}")
-                     publish_and_store_log(job_id, "error", error_message) # <<< Publish/Store error
+                     publish_and_store_log(job_id, "error", error_message)
                      if job: job.meta['error_message'] = error_message; job.save_meta()
                      raise RuntimeError(error_message)
             else:
                 warn_message = "Pipeline finished successfully, but could not determine results directory from output."
                 logger.warning(f"[Job {job_id}] {warn_message}")
-                publish_and_store_log(job_id, "warning", warn_message) # <<< Publish/Store warning
+                publish_and_store_log(job_id, "warning", warn_message)
                 if job: job.meta['warning_message'] = "Pipeline finished, results dir unclear."; job.save_meta()
                 return { "status": "success", "message": "Pipeline finished, results directory unclear.", "resources": job.meta if job else {} }
         else:
@@ -397,13 +391,13 @@ def run_pipeline_task(
             if script_reported_error: error_message += " Critical error detected in script logs."
             elif script_reported_failure: error_message += " Script reported status::failed."
             logger.error(f"[Job {job_id}] {error_message}")
-            publish_and_store_log(job_id, "error", error_message) # <<< Publish/Store failure
+            publish_and_store_log(job_id, "error", error_message)
 
             # Log/publish more stderr on failure
             stderr_to_log = full_stderr[-2000:]
             logger.error(f"[Job {job_id}] STDERR Tail:\n{stderr_to_log}")
             for err_line in stderr_to_log.strip().split('\n'):
-                publish_and_store_log(job_id, "stderr", err_line) # <<< Publish/Store stderr snippet
+                publish_and_store_log(job_id, "stderr", err_line)
 
             if job:
                 job.meta['error_message'] = error_message
@@ -411,31 +405,31 @@ def run_pipeline_task(
                 job.save_meta()
             raise subprocess.CalledProcessError(return_code or 1, command, output=full_stdout, stderr=full_stderr)
 
-    # --- Exception Handling ---
+    # --- Exception Handling (remains same) ---
     except subprocess.TimeoutExpired as e:
         error_msg = "Sarek pipeline timed out."
         logger.error(f"[Job {job_id}] {error_msg}")
-        publish_and_store_log(job_id, "error", error_msg) # <<< Publish/Store timeout
+        publish_and_store_log(job_id, "error", error_msg)
         stderr_output = e.stderr if e.stderr else 'N/A'
         if job: job.meta['error_message'] = error_msg; job.meta['stderr_snippet'] = stderr_output[:1000]; job.save_meta()
         raise
     except FileNotFoundError as e:
          error_msg = f"Error executing pipeline: {e}"
          logger.error(f"[Job {job_id}] {error_msg}")
-         publish_and_store_log(job_id, "error", error_msg) # <<< Publish/Store error
+         publish_and_store_log(job_id, "error", error_msg)
          if job: job.meta['error_message'] = f"Task execution error: {e}"; job.save_meta()
          raise
     except Exception as e:
         error_msg = f"An unexpected error occurred during pipeline execution: {type(e).__name__}"
         logger.exception(f"[Job {job_id}] {error_msg}")
-        publish_and_store_log(job_id, "error", f"{error_msg}: {e}") # <<< Publish/Store error
+        publish_and_store_log(job_id, "error", f"{error_msg}: {e}")
         if job:
             job.meta['error_message'] = error_msg
             job.meta['error_details'] = str(e)
             job.save_meta()
         raise
     finally:
-        # --- Final Log Handling ---
+        # --- Final Log Handling (remains same) ---
         list_key = f"{LOG_HISTORY_PREFIX}{job_id}"
         try:
             # Always publish EOF marker
@@ -445,29 +439,20 @@ def run_pipeline_task(
 
                 # Set TTL on the log history list based on job outcome
                 final_ttl = DEFAULT_RESULT_TTL if job_succeeded else DEFAULT_FAILURE_TTL
-                # If job object available, try to get its specific TTL
                 if job:
                     ttl_to_use = job.result_ttl if job_succeeded else job.failure_ttl
-                    if ttl_to_use is not None and ttl_to_use >= 0: # RQ uses -1 for infinite
-                         final_ttl = ttl_to_use
-                    elif ttl_to_use == -1:
-                        final_ttl = -1 # Keep forever if job TTL is -1
-                    # else use default calculated above
+                    if ttl_to_use is not None and ttl_to_use >= 0: final_ttl = ttl_to_use
+                    elif ttl_to_use == -1: final_ttl = -1
 
                 if final_ttl > 0:
                     redis_log_handler.expire(list_key, final_ttl)
                     logger.info(f"[Job {job_id}] Set TTL={final_ttl}s for log history list: {list_key}")
                 elif final_ttl == -1:
-                     redis_log_handler.persist(list_key) # Ensure it persists if TTL is infinite
-                     logger.info(f"[Job {job_id}] Persisted log history list (infinite TTL): {list_key}")
-                else: # TTL <= 0 means delete immediately (or default if error)
-                    logger.warning(f"[Job {job_id}] Invalid final TTL calculated ({final_ttl}). Deleting log history list: {list_key}")
-                    redis_log_handler.delete(list_key)
+                     redis_log_handler.persist(list_key); logger.info(f"[Job {job_id}] Persisted log history list (infinite TTL): {list_key}")
+                else: logger.warning(f"[Job {job_id}] Invalid final TTL calculated ({final_ttl}). Deleting log history list: {list_key}"); redis_log_handler.delete(list_key)
 
-        except redis.exceptions.RedisError as e:
-            logger.error(f"[Job {job_id}] Redis error during final log cleanup/TTL setting for {list_key}: {e}")
-        except Exception as e:
-            logger.error(f"[Job {job_id}] Unexpected error during final log cleanup/TTL setting: {e}")
+        except redis.exceptions.RedisError as e: logger.error(f"[Job {job_id}] Redis error during final log cleanup/TTL setting for {list_key}: {e}")
+        except Exception as e: logger.error(f"[Job {job_id}] Unexpected error during final log cleanup/TTL setting: {e}")
 
         # --- Cleanup temporary CSV file (remains same) ---
         if input_csv_path_str and Path(input_csv_path_str).exists():
