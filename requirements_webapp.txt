@@ -2,7 +2,7 @@
 fastapi
 uvicorn[standard]
 rq
-redis
-# REMOVED: Jinja2 - No longer needed for templating
+redis[hiredis] # Use hiredis for potentially better async performance
+websockets # Add websockets for FastAPI support
 python-multipart # Keep for now, might be needed if any endpoint expects form data
 psutil # Keep for testing/consistency with worker

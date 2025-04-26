@@ -49,15 +49,15 @@ except Exception as e:
 # --- Redis/RQ Configuration ---
 # Point to the Redis container name or IP accessible from the host
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost") # Use localhost if Redis is exposed on host port 6379
-REDIS_PORT = 6379
-REDIS_DB = 0
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379)) # Ensure port is integer
+REDIS_DB = int(os.getenv("REDIS_DB", 0))         # Ensure db is integer
 PIPELINE_QUEUE_NAME = "pipeline_tasks"
 STAGED_JOBS_KEY = "staged_pipeline_jobs" # Key for Redis Hash storing staged jobs
-# >>>>>>>>>> MAKE SURE THIS LINE EXISTS AND IS SAVED <<<<<<<<<<
 PIPELINE_PROFILES_KEY = "pipeline_profiles" # Key for storing profiles
-# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+LOG_CHANNEL_PREFIX = "logs:" # <--- ADDED: Prefix for log Pub/Sub channels
 
-logger.info(f"Using REDIS_HOST: {REDIS_HOST}")
+
+logger.info(f"Using REDIS_HOST: {REDIS_HOST}:{REDIS_PORT} DB:{REDIS_DB}")
 
 # --- Job Settings ---
 DEFAULT_JOB_TIMEOUT = '2h' # Default timeout for RQ job itself

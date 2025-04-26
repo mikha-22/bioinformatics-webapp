@@ -4,18 +4,17 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useMutation, useQueryClient } from "@tanstack/react-query"; // Ensure both are imported
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
     MoreHorizontal,
     Play,
     Square,
-    StopCircle,
     Trash2,
     RotateCcw,
     Info,
     FolderGit2,
-    ExternalLink,
     Loader2,
+    Terminal, // <--- Import Terminal icon
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -44,16 +43,16 @@ import {
     DialogTitle,
     DialogDescription,
     DialogFooter,
-    // DialogClose // Keep removed from previous step
+    DialogClose, // Import DialogClose
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 
 // Import specific types needed
 import { Job, SampleInfo, JobMeta, InputFilenames, SarekParams } from "@/lib/types";
 import * as api from "@/lib/api";
 import { formatDuration } from "@/lib/utils";
 import { formatDistanceToNow } from 'date-fns';
+import JobLogViewer from "./JobLogViewer"; // <--- Import the log viewer
 
 // --- Helper Functions ---
 // UPDATED: Get badge variant based on the *internal* status for correct styling
@@ -62,7 +61,8 @@ function getStatusVariant(internalStatus: string | null | undefined): "default" 
     switch (status) {
         case 'finished': return 'default'; // Greenish success -> Use primary for now
         case 'failed': return 'destructive'; // Red
-        case 'started': return 'default'; // Blueish -> Primary (Represents Running)
+        case 'started': // Treat 'started' as 'running' for UI consistency
+        case 'running': return 'default'; // Blueish -> Primary
         case 'queued':
         case 'staged': return 'secondary'; // Gray
         case 'stopped': // RQ's stopped state
@@ -114,10 +114,12 @@ export default function JobActions({ job }: JobActionsProps) {
     const [isStopConfirmOpen, setIsStopConfirmOpen] = useState(false);
     const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false);
     const [isRerunConfirmOpen, setIsRerunConfirmOpen] = useState(false);
+    const [isLogViewerOpen, setIsLogViewerOpen] = useState(false); // <--- State for log viewer
+    const [logViewerJobId, setLogViewerJobId] = useState<string | null>(null); // Store ID for log viewer
 
     const jobsQueryKey = ['jobsList']; // Define query key used by useJobsList
 
-    // --- Mutations (remain the same) ---
+    // --- Mutations ---
     const startMutation = useMutation({
         mutationFn: api.startJob,
         onSuccess: (data) => {
@@ -141,16 +143,12 @@ export default function JobActions({ job }: JobActionsProps) {
         mutationFn: api.removeJob,
         onSuccess: (data) => {
             toast.success(`Job ${data.removed_id} removed.`);
-            queryClient.setQueryData<Job[]>(jobsQueryKey, (oldData) => {
-                if (!oldData) return [];
-                const newData = oldData.filter(j => j.id !== data.removed_id);
-                console.log(`[JobActions - ${job.id}] Manually updating cache after removing ${data.removed_id}. Old count: ${oldData.length}, New count: ${newData.length}`);
-                return newData;
-            });
+            // Use invalidateQueries for simplicity and robustness
+            queryClient.invalidateQueries({ queryKey: jobsQueryKey });
         },
         onError: (error: Error) => {
             toast.error(`Failed to remove job: ${error.message}`);
-            queryClient.invalidateQueries({ queryKey: jobsQueryKey });
+            queryClient.invalidateQueries({ queryKey: jobsQueryKey }); // Invalidate on error too
         },
         onSettled: () => setIsRemoveConfirmOpen(false),
     });
@@ -172,18 +170,24 @@ export default function JobActions({ job }: JobActionsProps) {
     const handleStop = () => { if (!job) return; stopMutation.mutate(job.id); };
     const handleRemove = () => { if (!job) return; removeMutation.mutate(job.id); };
     const handleRerun = () => { if (!job) return; rerunMutation.mutate(job.id); };
+    // Handler to set the job ID and open the log viewer
+    const handleViewLogs = () => {
+        if (job) {
+            setLogViewerJobId(job.id); // Set the ID to pass to the viewer
+            setIsLogViewerOpen(true);
+        }
+     };
     // --- End Handlers ---
 
 
     // --- Conditional Logic & Metadata ---
-    // Use internal RQ status names for logic
     const internalStatus = job.status?.toLowerCase();
     const canStart = internalStatus === 'staged';
     const canStop = internalStatus === 'running' || internalStatus === 'started' || internalStatus === 'queued';
-    // UPDATED: Include 'canceled' (maps to UI 'Stopped')
     const canRerun = internalStatus === 'finished' || internalStatus === 'failed' || internalStatus === 'stopped' || internalStatus === 'canceled';
-    // UPDATED: Include 'canceled' (maps to UI 'Stopped')
     const canRemove = internalStatus === 'staged' || internalStatus === 'finished' || internalStatus === 'failed' || internalStatus === 'stopped' || internalStatus === 'canceled';
+    // Allow viewing logs for any non-staged job
+    const canViewLogs = internalStatus !== 'staged';
 
     const meta = job.meta as JobMeta | null | undefined;
     const inputParams = meta?.input_params;
@@ -216,6 +220,16 @@ export default function JobActions({ job }: JobActionsProps) {
                          <span className="sr-only">Stop/Cancel Job</span>
                      </Button>
                  )}
+                 {/* View Logs Button */}
+                 {canViewLogs && !job.id.startsWith("staged_") && (
+                    <Button
+                        variant="ghost" size="icon" onClick={handleViewLogs}
+                        className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" title="View Live Logs"
+                    >
+                         <Terminal className="h-5 w-5" />
+                         <span className="sr-only">View Logs</span>
+                     </Button>
+                 )}
                  {/* Re-stage Button */}
                   {canRerun && (
                     <Button
@@ -228,41 +242,40 @@ export default function JobActions({ job }: JobActionsProps) {
                  )}
 
                  {/* More Actions Dropdown */}
-                <DropdownMenuPrimitive.Root>
-                     <DropdownMenuPrimitive.Trigger asChild>
+                <DropdownMenu> {/* Use simplified component */}
+                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors">
                             <MoreHorizontal className="h-5 w-5" /> <span className="sr-only">Job Actions</span>
                         </Button>
-                    </DropdownMenuPrimitive.Trigger>
-                    <DropdownMenuPrimitive.Portal>
-                        <DropdownMenuPrimitive.Content align="end" sideOffset={4} className="min-w-[12rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2">
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" sideOffset={4} >
                             {/* View Details */}
-                            <DropdownMenuPrimitive.Item onSelect={() => setIsDetailsOpen(true)} className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50">
-                                <span className="flex items-center gap-2"><Info className="h-4 w-4" /> View Details</span>
-                            </DropdownMenuPrimitive.Item>
+                            <DropdownMenuItem onSelect={() => setIsDetailsOpen(true)}>
+                                <Info className="mr-2 h-4 w-4" /> View Details
+                            </DropdownMenuItem>
                              {/* View Results Link */}
                             {job.status === 'finished' && job.result?.results_path && (
-                                <DropdownMenuPrimitive.Item asChild className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground">
-                                    {/* Ensure the link correctly extracts the run name */}
-                                    <Link href={`/results?highlight=${encodeURIComponent(job.result.results_path.split('/').filter(Boolean).pop() || '')}`} className="flex items-center gap-2">
-                                        <FolderGit2 className="h-4 w-4" /> View Results
+                                <DropdownMenuItem asChild>
+                                    <Link href={`/results?highlight=${encodeURIComponent(job.result.results_path.split('/').filter(Boolean).pop() || '')}`}>
+                                        <FolderGit2 className="mr-2 h-4 w-4" /> View Results
                                     </Link>
-                                </DropdownMenuPrimitive.Item>
+                                </DropdownMenuItem>
                             )}
                              {/* Remove Job */}
                              {canRemove && (
                                 <>
-                                    <DropdownMenuPrimitive.Separator className="my-1 h-px bg-muted" />
-                                    <DropdownMenuPrimitive.Item onSelect={() => setIsRemoveConfirmOpen(true)} disabled={removeMutation.isPending} className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-destructive/10 hover:text-destructive text-destructive data-[disabled]:pointer-events-none data-[disabled]:opacity-50 dark:hover:bg-destructive/20">
-                                        <span className="flex items-center gap-2">
-                                            {removeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Remove Job
-                                        </span>
-                                    </DropdownMenuPrimitive.Item>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onSelect={() => setIsRemoveConfirmOpen(true)}
+                                        disabled={removeMutation.isPending}
+                                        className="text-destructive focus:text-destructive focus:bg-destructive/10 dark:focus:bg-destructive/20"
+                                    >
+                                        {removeMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />} Remove Job
+                                    </DropdownMenuItem>
                                 </>
                             )}
-                        </DropdownMenuPrimitive.Content>
-                    </DropdownMenuPrimitive.Portal>
-                 </DropdownMenuPrimitive.Root>
+                        </DropdownMenuContent>
+                 </DropdownMenu>
 
             </div>
 
@@ -293,9 +306,10 @@ export default function JobActions({ job }: JobActionsProps) {
                     </div>
                     {/* Manual Close Button */}
                     <DialogFooter className="mt-4">
-                         <Button type="button" variant="outline" onClick={() => setIsDetailsOpen(false)}>
-                             Close
-                         </Button>
+                         {/* Use DialogClose for accessibility */}
+                         <DialogClose asChild>
+                             <Button type="button" variant="outline">Close</Button>
+                         </DialogClose>
                      </DialogFooter>
                 </DialogContent>
              </Dialog>
@@ -325,6 +339,16 @@ export default function JobActions({ job }: JobActionsProps) {
              <AlertDialog open={isRerunConfirmOpen} onOpenChange={setIsRerunConfirmOpen}>
                  <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Re-stage Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to re-stage job <span className="font-mono font-semibold">{job.id}</span>? This will create a new 'staged' job entry using the same parameters. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={rerunMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleRerun} disabled={rerunMutation.isPending}> {rerunMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Re-stage Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent>
              </AlertDialog>
+
+             {/* Log Viewer Dialog - Render conditionally or always and control via isOpen */}
+              {job && (
+                  <JobLogViewer
+                      jobId={logViewerJobId} // Use state variable for ID
+                      isOpen={isLogViewerOpen}
+                      onOpenChange={setIsLogViewerOpen} // Function to close the dialog
+                      jobDescription={job.description} // Pass description for title
+                  />
+              )}
         </>
     );
 }
