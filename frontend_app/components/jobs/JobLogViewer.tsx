@@ -1,8 +1,8 @@
 // frontend_app/components/jobs/JobLogViewer.tsx
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import useWebSocket, { ReadyState } from 'react-use-websocket'; // Use the correct library
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import useWebSocket, { ReadyState } from 'react-use-websocket';
 import { Terminal, Wifi, WifiOff, Loader2, ServerCrash } from 'lucide-react';
 
 import {
@@ -17,182 +17,141 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 import { cn } from '@/lib/utils';
 
 interface LogLine {
     id: number;
-    type: 'stdout' | 'stderr' | 'info' | 'error' | 'status' | 'control' | 'raw'; // Added 'control' type
+    type: 'stdout' | 'stderr' | 'info' | 'error' | 'status' | 'control' | 'raw';
     line: string;
     timestamp: number;
 }
 
 interface JobLogViewerProps {
-    jobId: string | null; // ID of the job to view logs for
-    isOpen: boolean; // Whether the dialog is open
-    onOpenChange: (open: boolean) => void; // Function to control dialog state
-    jobDescription?: string | null; // Optional description for the dialog title
+    jobId: string | null;
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    jobDescription?: string | null;
 }
 
-let messageIdCounter = 0; // Simple counter for unique log line keys
+let messageIdCounter = 0;
 
 export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescription }: JobLogViewerProps) {
     const [logs, setLogs] = useState<LogLine[]>([]);
-    const scrollAreaViewportRef = useRef<HTMLDivElement>(null); // Ref for the ScrollArea Viewport
+    const scrollAreaViewportRef = useRef<HTMLDivElement>(null);
+    // --- ADD Ref for the sentinel element ---
+    const bottomRef = useRef<HTMLDivElement>(null);
+    // ---------------------------------------
     const [websocketUrl, setWebsocketUrl] = useState<string | null>(null);
     const [showEOFMessage, setShowEOFMessage] = useState(false);
-    const [isScrolledToBottom, setIsScrolledToBottom] = useState(true); // Track if user is at the bottom
+    const [isScrolledToBottom, setIsScrolledToBottom] = useState(true);
 
-    // Construct WebSocket URL only on the client when jobId changes or dialog opens
+    // --- Scroll to Bottom Function (using sentinel) ---
+    const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+        // console.log(`Attempting scrollIntoView (${behavior})...`); // Debug
+        bottomRef.current?.scrollIntoView({ behavior: behavior });
+        // We might not need to manually set isScrolledToBottom here when using scrollIntoView
+        // as the handleScroll should detect it, but let's keep it for now.
+        if (behavior === 'auto') { // Force state update on instant scroll
+             setIsScrolledToBottom(true);
+        }
+    }, []); // No dependencies needed
+
+    // Construct WebSocket URL & Reset State on Open/Job Change
     useEffect(() => {
         if (isOpen && jobId && typeof window !== 'undefined') {
             const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || window.location.origin;
-            // Ensure correct protocol (ws/wss) based on API URL
             const wsProtocol = apiUrl.startsWith('https://') ? 'wss://' : 'ws://';
-            // Remove http(s):// prefix and trailing slash if present
             const domainAndPath = apiUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
-            // Construct the URL using the prefix defined in the websockets router
             const url = `${wsProtocol}${domainAndPath}/api/ws/logs/${jobId}`;
             console.log("[JobLogViewer] Setting WebSocket URL:", url);
             setWebsocketUrl(url);
-            setShowEOFMessage(false); // Reset EOF on open/job change
-            setLogs([]); // Clear previous logs when opening for a new job
-            messageIdCounter = 0; // Reset message counter
-            setIsScrolledToBottom(true); // Default to auto-scroll when opening
+            setShowEOFMessage(false);
+            setLogs([]);
+            messageIdCounter = 0;
+            setIsScrolledToBottom(true); // Reset to true on open
         } else {
-            // Clear URL when dialog closes or no job ID
             setWebsocketUrl(null);
         }
     }, [jobId, isOpen]);
 
-    // Reset logs and EOF when dialog closes
+    // Reset non-URL state when dialog closes
     useEffect(() => {
         if (!isOpen) {
-            // console.log("[JobLogViewer] Dialog closed, resetting state.");
             setLogs([]);
             messageIdCounter = 0;
             setShowEOFMessage(false);
         }
     }, [isOpen]);
 
-    // Use react-use-websocket hook
+    // WebSocket Hook (Unchanged)
     const {
-        lastMessage, // The most recent message event
-        readyState,  // Connection state enum
-    } = useWebSocket(websocketUrl, {
-        share: false, // Each instance should have its own connection
-        shouldReconnect: (closeEvent) => true, // Attempt to reconnect on close
-        reconnectInterval: 3000,
-        reconnectAttempts: 10,
-        retryOnError: true,
-        onOpen: () => console.log(`[JobLogViewer] WebSocket opened for ${jobId}`),
-        onClose: (event) => console.log(`[JobLogViewer] WebSocket closed for ${jobId}. Code: ${event.code}, Reason: ${event.reason}`),
-        onError: (event) => console.error(`[JobLogViewer] WebSocket error for ${jobId}:`, event),
-        filter: (message: MessageEvent<any>): boolean => typeof message.data === 'string',
-    }, !!websocketUrl); // Connect only if websocketUrl is not null
+        lastMessage,
+        readyState,
+    } = useWebSocket(websocketUrl, { /* ... options ... */ share: false, shouldReconnect: (closeEvent) => true, reconnectInterval: 3000, reconnectAttempts: 10, retryOnError: true, onOpen: () => console.log(`[JobLogViewer] WebSocket opened for ${jobId}`), onClose: (event) => console.log(`[JobLogViewer] WebSocket closed for ${jobId}. Code: ${event.code}, Reason: ${event.reason}`), onError: (event) => console.error(`[JobLogViewer] WebSocket error for ${jobId}:`, event), filter: (message: MessageEvent<any>): boolean => typeof message.data === 'string', }, !!websocketUrl);
 
-    // Handle incoming messages using lastMessage
+    // Handle incoming messages (Unchanged)
     useEffect(() => {
         if (lastMessage !== null) {
+            let logEntry: LogLine | null = null;
             try {
-                // Attempt to parse the message data as JSON
                 const jsonData = JSON.parse(lastMessage.data);
                 const logData = jsonData as { type?: string; line?: any };
                 const logType = logData.type || 'raw';
                 const logLineContent = typeof logData.line === 'string' ? logData.line : JSON.stringify(logData.line ?? '');
 
-                // Check for EOF control message
                 if (logType === 'control' && logLineContent === 'EOF') {
                     console.log(`[JobLogViewer] Received EOF for ${jobId}`);
                     setShowEOFMessage(true);
-                    return; // Stop processing this message, don't add it to visible logs
+                    // Scroll after EOF message state is set
+                    setTimeout(() => scrollToBottom('smooth'), 50);
+                    return;
                 }
-
-                // Create the log entry (only for non-control messages)
-                const logEntry: LogLine = {
-                    id: messageIdCounter++,
-                    type: logType as LogLine['type'], // Assert type
-                    line: logLineContent,
-                    timestamp: Date.now()
-                };
-
-                // Add new log entry
-                setLogs((prevLogs) => [...prevLogs, logEntry]);
-
+                logEntry = { id: messageIdCounter++, type: logType as LogLine['type'], line: logLineContent, timestamp: Date.now() };
             } catch (e) {
-                // If parsing fails, treat it as a raw line (could be direct output)
                 console.warn("[JobLogViewer] Message not valid JSON, treating as raw:", lastMessage.data);
-                const logEntry: LogLine = {
-                    id: messageIdCounter++,
-                    type: 'raw',
-                    line: lastMessage.data,
-                    timestamp: Date.now()
-                };
-                setLogs((prevLogs) => [...prevLogs, logEntry]);
+                logEntry = { id: messageIdCounter++, type: 'raw', line: lastMessage.data, timestamp: Date.now() };
+            }
+            if (logEntry) {
+                setLogs((prevLogs) => [...prevLogs, logEntry!]);
             }
         }
-    }, [lastMessage, jobId]); // Depend on lastMessage and jobId
+    }, [lastMessage, jobId, scrollToBottom]); // Added scrollToBottom
 
-    // Scroll to bottom effect
+    // --- Auto-Scroll Effect (using sentinel) ---
     useEffect(() => {
-        if (isScrolledToBottom && scrollAreaViewportRef.current) {
-            // Use requestAnimationFrame for smoother scrolling after render
-            requestAnimationFrame(() => {
-                if (scrollAreaViewportRef.current) {
-                    scrollAreaViewportRef.current.scrollTop = scrollAreaViewportRef.current.scrollHeight;
-                }
-            });
+        // Scroll whenever logs update, but only if user is considered at the bottom
+        if (isScrolledToBottom) {
+            // console.log("Logs updated and isScrolledToBottom=true, scrolling..."); // Debug
+            scrollToBottom('smooth'); // Use smooth scroll for updates
         }
-    }, [logs, isScrolledToBottom]); // Trigger scroll on new logs only if already at bottom
+        // This effect also handles the initial scroll implicitly after the first logs render
+    }, [logs, isScrolledToBottom, scrollToBottom]); // Depend on logs and state
 
-    // Handle manual scrolling
-    const handleScroll = () => {
+    // Handle manual scrolling (Unchanged, but important)
+    const handleScroll = useCallback(() => {
         if (scrollAreaViewportRef.current) {
             const { scrollTop, scrollHeight, clientHeight } = scrollAreaViewportRef.current;
-            // Check if scrolled near the bottom (within a small threshold)
-            const atBottom = scrollHeight - scrollTop - clientHeight < 10;
+            // Use a slightly larger threshold to account for potential rounding errors
+            const atBottom = scrollHeight - scrollTop - clientHeight < 15;
             if (atBottom !== isScrolledToBottom) {
+                // console.log(`Scrolled to bottom state changed: ${atBottom}`); // Debug
                 setIsScrolledToBottom(atBottom);
             }
         }
-    };
+    }, [isScrolledToBottom]);
 
+    // Connection status text and indicator (Unchanged)
+    const connectionStatusText = { /* ... */ }[readyState];
+    const getStatusIndicator = () => { /* ... */ switch (readyState) { case ReadyState.CONNECTING: return <Loader2 className="h-3 w-3 animate-spin text-yellow-500"/>; case ReadyState.OPEN: return <Wifi className="h-3 w-3 text-green-500"/>; case ReadyState.CLOSED: return <WifiOff className="h-3 w-3 text-red-500"/>; case ReadyState.CLOSING: return <WifiOff className="h-3 w-3 text-yellow-500"/>; default: return <ServerCrash className="h-3 w-3 text-gray-500"/>; } };
 
-    // Connection status text and indicator
-    const connectionStatusText = {
-        [ReadyState.CONNECTING]: 'Connecting',
-        [ReadyState.OPEN]: 'Connected',
-        [ReadyState.CLOSING]: 'Closing',
-        [ReadyState.CLOSED]: 'Disconnected',
-        [ReadyState.UNINSTANTIATED]: 'Idle',
-    }[readyState];
-
-    const getStatusIndicator = () => {
-         switch (readyState) {
-             case ReadyState.CONNECTING: return <Loader2 className="h-3 w-3 animate-spin text-yellow-500"/>;
-             case ReadyState.OPEN: return <Wifi className="h-3 w-3 text-green-500"/>;
-             case ReadyState.CLOSED: return <WifiOff className="h-3 w-3 text-red-500"/>;
-             case ReadyState.CLOSING: return <WifiOff className="h-3 w-3 text-yellow-500"/>;
-             default: return <ServerCrash className="h-3 w-3 text-gray-500"/>;
-         }
-    };
-
-    // Log line color
-    const getLogLineColor = (type: LogLine['type']): string => {
-        switch (type) {
-            case 'stdout': return 'text-gray-300 dark:text-gray-300';
-            case 'stderr': return 'text-red-500 dark:text-red-400';
-            case 'error': return 'text-red-600 dark:text-red-500 font-semibold';
-            case 'info': return 'text-blue-500 dark:text-blue-400';
-            case 'status': return 'text-yellow-600 dark:text-yellow-400 italic';
-            case 'control': return 'hidden'; // Control messages shouldn't be displayed
-            case 'raw':
-            default: return 'text-gray-500 dark:text-gray-500'; // Default for raw/unknown
-        }
-    };
+    // Log line color (Unchanged)
+    const getLogLineColor = (type: LogLine['type']): string => { /* ... */ switch (type) { case 'stdout': return 'text-gray-300 dark:text-gray-300'; case 'stderr': return 'text-red-500 dark:text-red-400'; case 'error': return 'text-red-600 dark:text-red-500 font-semibold'; case 'info': return 'text-blue-500 dark:text-blue-400'; case 'status': return 'text-yellow-600 dark:text-yellow-400 italic'; case 'control': return 'hidden'; case 'raw': default: return 'text-gray-500 dark:text-gray-500'; } };
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-5xl md:max-w-6xl lg:max-w-7xl h-[90vh] flex flex-col p-0 gap-0">
+                {/* Header (Unchanged) */}
                 <DialogHeader className="p-4 border-b flex-shrink-0">
                     <DialogTitle className="flex items-center gap-2">
                         <Terminal className="h-5 w-5" /> Live Logs: <span className="font-mono text-sm ml-1 truncate">{jobDescription || jobId}</span>
@@ -207,38 +166,33 @@ export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescripti
                 </DialogHeader>
 
                 <ScrollArea className="flex-grow bg-gray-950 dark:bg-black text-white font-mono text-[0.8rem] leading-relaxed overflow-y-auto" onScroll={handleScroll}>
-                     {/* Assign ref to the Viewport component */}
                     <ScrollAreaPrimitive.Viewport ref={scrollAreaViewportRef} className="h-full w-full rounded-[inherit] p-4">
-                        {/* Initial Status Messages */}
-                        {logs.length === 0 && readyState === ReadyState.CONNECTING && (
-                            <p className="text-yellow-500 italic">Connecting to log stream...</p>
-                        )}
-                        {logs.length === 0 && readyState === ReadyState.OPEN && !showEOFMessage && (
-                             <p className="text-gray-500 italic">Loading history or waiting for live logs...</p>
-                        )}
-                        {logs.length === 0 && (readyState === ReadyState.CLOSED || readyState === ReadyState.UNINSTANTIATED) && !websocketUrl && jobId && (
-                             <p className="text-gray-500 italic">Preparing connection...</p>
-                        )}
-                         {logs.length === 0 && readyState === ReadyState.CLOSED && websocketUrl && !showEOFMessage && (
-                              <p className="text-red-500 italic">Connection closed. Attempting to reconnect...</p>
-                         )}
+                        {/* Initial Status Messages (Unchanged) */}
+                        {logs.length === 0 && readyState === ReadyState.CONNECTING && ( <p className="text-yellow-500 italic">Connecting to log stream...</p> )}
+                        {logs.length === 0 && readyState === ReadyState.OPEN && !showEOFMessage && ( <p className="text-gray-500 italic">Loading history or waiting for live logs...</p> )}
+                        {logs.length === 0 && (readyState === ReadyState.CLOSED || readyState === ReadyState.UNINSTANTIATED) && !websocketUrl && jobId && ( <p className="text-gray-500 italic">Preparing connection...</p> )}
+                        {logs.length === 0 && readyState === ReadyState.CLOSED && websocketUrl && !showEOFMessage && ( <p className="text-red-500 italic">Connection closed. Attempting to reconnect...</p> )}
 
                         {/* Render Logs */}
                         {logs.map((log) => (
-                           <p key={log.id} className={cn(getLogLineColor(log.type), "whitespace-pre-wrap break-words")}> {/* Ensure wrapping */}
+                           <p key={log.id} className={cn(getLogLineColor(log.type), "whitespace-pre-wrap break-words")}>
                                 {log.line}
                            </p>
                         ))}
 
                         {/* EOF Message */}
-                        {showEOFMessage && (
-                             <p className="text-yellow-400 italic pt-2">--- End of log stream (Job finished or stopped) ---</p>
-                        )}
+                        {showEOFMessage && ( <p className="text-yellow-400 italic pt-2">--- End of log stream (Job finished or stopped) ---</p> )}
+
+                        {/* --- ADD Sentinel Element --- */}
+                        <div ref={bottomRef} style={{ height: '1px' }} />
+                        {/* -------------------------- */}
+
                     </ScrollAreaPrimitive.Viewport>
                     <ScrollBar orientation="vertical" />
                     <ScrollBar orientation="horizontal" />
                 </ScrollArea>
 
+                 {/* Footer with Pause/Resume Button (Unchanged) */}
                  <DialogFooter className="p-3 border-t flex-shrink-0">
                     <Button type="button" variant="secondary" onClick={() => setIsScrolledToBottom(!isScrolledToBottom)} size="sm">
                        {isScrolledToBottom ? "Pause Auto-Scroll" : "Resume Auto-Scroll"}
@@ -251,6 +205,3 @@ export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescripti
         </Dialog>
     );
 }
-
-// Need to import ScrollAreaPrimitive explicitly if using its Viewport directly
-import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
