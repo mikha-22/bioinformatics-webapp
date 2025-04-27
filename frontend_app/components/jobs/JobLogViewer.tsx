@@ -1,4 +1,5 @@
-// frontend_app/components/jobs/JobLogViewer.tsx
+// File: frontend_app/components/jobs/JobLogViewer.tsx
+// --- START OF FILE ---
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -39,19 +40,16 @@ let messageIdCounter = 0;
 export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescription }: JobLogViewerProps) {
     const [logs, setLogs] = useState<LogLine[]>([]);
     const scrollAreaViewportRef = useRef<HTMLDivElement>(null);
-    // --- ADD Ref for the sentinel element ---
     const bottomRef = useRef<HTMLDivElement>(null);
-    // ---------------------------------------
     const [websocketUrl, setWebsocketUrl] = useState<string | null>(null);
     const [showEOFMessage, setShowEOFMessage] = useState(false);
     const [isScrolledToBottom, setIsScrolledToBottom] = useState(true);
 
     // --- Scroll to Bottom Function (using sentinel) ---
-    const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    // <<< CHANGE: Changed default behavior to 'auto' for instant scroll >>>
+    const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
         // console.log(`Attempting scrollIntoView (${behavior})...`); // Debug
         bottomRef.current?.scrollIntoView({ behavior: behavior });
-        // We might not need to manually set isScrolledToBottom here when using scrollIntoView
-        // as the handleScroll should detect it, but let's keep it for now.
         if (behavior === 'auto') { // Force state update on instant scroll
              setIsScrolledToBottom(true);
         }
@@ -70,10 +68,13 @@ export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescripti
             setLogs([]);
             messageIdCounter = 0;
             setIsScrolledToBottom(true); // Reset to true on open
+             // --- ADDED: Scroll to bottom instantly when opening/switching job ---
+             setTimeout(() => scrollToBottom('auto'), 50);
+             // --------------------------------------------------------------------
         } else {
             setWebsocketUrl(null);
         }
-    }, [jobId, isOpen]);
+    }, [jobId, isOpen, scrollToBottom]); // Added scrollToBottom dependency
 
     // Reset non-URL state when dialog closes
     useEffect(() => {
@@ -84,13 +85,23 @@ export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescripti
         }
     }, [isOpen]);
 
-    // WebSocket Hook (Unchanged)
+    // WebSocket Hook
     const {
         lastMessage,
         readyState,
-    } = useWebSocket(websocketUrl, { /* ... options ... */ share: false, shouldReconnect: (closeEvent) => true, reconnectInterval: 3000, reconnectAttempts: 10, retryOnError: true, onOpen: () => console.log(`[JobLogViewer] WebSocket opened for ${jobId}`), onClose: (event) => console.log(`[JobLogViewer] WebSocket closed for ${jobId}. Code: ${event.code}, Reason: ${event.reason}`), onError: (event) => console.error(`[JobLogViewer] WebSocket error for ${jobId}:`, event), filter: (message: MessageEvent<any>): boolean => typeof message.data === 'string', }, !!websocketUrl);
+    } = useWebSocket(websocketUrl, {
+         share: false,
+         shouldReconnect: (closeEvent) => true,
+         reconnectInterval: 3000,
+         reconnectAttempts: 10,
+         retryOnError: true,
+         onOpen: () => console.log(`[JobLogViewer] WebSocket opened for ${jobId}`),
+         onClose: (event) => console.log(`[JobLogViewer] WebSocket closed for ${jobId}. Code: ${event.code}, Reason: ${event.reason}`),
+         onError: (event) => console.error(`[JobLogViewer] WebSocket error for ${jobId}:`, event),
+         filter: (message: MessageEvent<any>): boolean => typeof message.data === 'string',
+     }, !!websocketUrl);
 
-    // Handle incoming messages (Unchanged)
+    // Handle incoming messages
     useEffect(() => {
         if (lastMessage !== null) {
             let logEntry: LogLine | null = null;
@@ -104,7 +115,8 @@ export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescripti
                     console.log(`[JobLogViewer] Received EOF for ${jobId}`);
                     setShowEOFMessage(true);
                     // Scroll after EOF message state is set
-                    setTimeout(() => scrollToBottom('smooth'), 50);
+                    // <<< CHANGE: Use 'auto' for instant scroll on EOF >>>
+                    setTimeout(() => scrollToBottom('auto'), 50);
                     return;
                 }
                 logEntry = { id: messageIdCounter++, type: logType as LogLine['type'], line: logLineContent, timestamp: Date.now() };
@@ -123,12 +135,13 @@ export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescripti
         // Scroll whenever logs update, but only if user is considered at the bottom
         if (isScrolledToBottom) {
             // console.log("Logs updated and isScrolledToBottom=true, scrolling..."); // Debug
-            scrollToBottom('smooth'); // Use smooth scroll for updates
+            // <<< CHANGE: Use 'auto' for instant scroll on new logs >>>
+            scrollToBottom('auto');
         }
         // This effect also handles the initial scroll implicitly after the first logs render
     }, [logs, isScrolledToBottom, scrollToBottom]); // Depend on logs and state
 
-    // Handle manual scrolling (Unchanged, but important)
+    // Handle manual scrolling
     const handleScroll = useCallback(() => {
         if (scrollAreaViewportRef.current) {
             const { scrollTop, scrollHeight, clientHeight } = scrollAreaViewportRef.current;
@@ -141,17 +154,43 @@ export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescripti
         }
     }, [isScrolledToBottom]);
 
-    // Connection status text and indicator (Unchanged)
-    const connectionStatusText = { /* ... */ }[readyState];
-    const getStatusIndicator = () => { /* ... */ switch (readyState) { case ReadyState.CONNECTING: return <Loader2 className="h-3 w-3 animate-spin text-yellow-500"/>; case ReadyState.OPEN: return <Wifi className="h-3 w-3 text-green-500"/>; case ReadyState.CLOSED: return <WifiOff className="h-3 w-3 text-red-500"/>; case ReadyState.CLOSING: return <WifiOff className="h-3 w-3 text-yellow-500"/>; default: return <ServerCrash className="h-3 w-3 text-gray-500"/>; } };
+    // Connection status text and indicator
+    const connectionStatusText = {
+        [ReadyState.CONNECTING]: 'Connecting...',
+        [ReadyState.OPEN]: 'Connected',
+        [ReadyState.CLOSING]: 'Closing...',
+        [ReadyState.CLOSED]: 'Disconnected',
+        [ReadyState.UNINSTANTIATED]: 'Idle',
+    }[readyState];
 
-    // Log line color (Unchanged)
-    const getLogLineColor = (type: LogLine['type']): string => { /* ... */ switch (type) { case 'stdout': return 'text-gray-300 dark:text-gray-300'; case 'stderr': return 'text-red-500 dark:text-red-400'; case 'error': return 'text-red-600 dark:text-red-500 font-semibold'; case 'info': return 'text-blue-500 dark:text-blue-400'; case 'status': return 'text-yellow-600 dark:text-yellow-400 italic'; case 'control': return 'hidden'; case 'raw': default: return 'text-gray-500 dark:text-gray-500'; } };
+    const getStatusIndicator = () => {
+        switch (readyState) {
+            case ReadyState.CONNECTING: return <Loader2 className="h-3 w-3 animate-spin text-yellow-500"/>;
+            case ReadyState.OPEN: return <Wifi className="h-3 w-3 text-green-500"/>;
+            case ReadyState.CLOSED: return <WifiOff className="h-3 w-3 text-red-500"/>;
+            case ReadyState.CLOSING: return <WifiOff className="h-3 w-3 text-yellow-500"/>;
+            default: return <ServerCrash className="h-3 w-3 text-gray-500"/>;
+        }
+    };
+
+    // Log line color
+    const getLogLineColor = (type: LogLine['type']): string => {
+        switch (type) {
+            case 'stdout': return 'text-gray-300 dark:text-gray-300';
+            case 'stderr': return 'text-red-500 dark:text-red-400';
+            case 'error': return 'text-red-600 dark:text-red-500 font-semibold';
+            case 'info': return 'text-blue-500 dark:text-blue-400';
+            case 'status': return 'text-yellow-600 dark:text-yellow-400 italic';
+            case 'control': return 'hidden'; // Hide control messages like EOF
+            case 'raw':
+            default: return 'text-gray-500 dark:text-gray-500';
+        }
+    };
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-5xl md:max-w-6xl lg:max-w-7xl h-[90vh] flex flex-col p-0 gap-0">
-                {/* Header (Unchanged) */}
+                {/* Header */}
                 <DialogHeader className="p-4 border-b flex-shrink-0">
                     <DialogTitle className="flex items-center gap-2">
                         <Terminal className="h-5 w-5" /> Live Logs: <span className="font-mono text-sm ml-1 truncate">{jobDescription || jobId}</span>
@@ -167,7 +206,7 @@ export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescripti
 
                 <ScrollArea className="flex-grow bg-gray-950 dark:bg-black text-white font-mono text-[0.8rem] leading-relaxed overflow-y-auto" onScroll={handleScroll}>
                     <ScrollAreaPrimitive.Viewport ref={scrollAreaViewportRef} className="h-full w-full rounded-[inherit] p-4">
-                        {/* Initial Status Messages (Unchanged) */}
+                        {/* Initial Status Messages */}
                         {logs.length === 0 && readyState === ReadyState.CONNECTING && ( <p className="text-yellow-500 italic">Connecting to log stream...</p> )}
                         {logs.length === 0 && readyState === ReadyState.OPEN && !showEOFMessage && ( <p className="text-gray-500 italic">Loading history or waiting for live logs...</p> )}
                         {logs.length === 0 && (readyState === ReadyState.CLOSED || readyState === ReadyState.UNINSTANTIATED) && !websocketUrl && jobId && ( <p className="text-gray-500 italic">Preparing connection...</p> )}
@@ -183,16 +222,15 @@ export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescripti
                         {/* EOF Message */}
                         {showEOFMessage && ( <p className="text-yellow-400 italic pt-2">--- End of log stream (Job finished or stopped) ---</p> )}
 
-                        {/* --- ADD Sentinel Element --- */}
+                        {/* Sentinel Element for scrolling */}
                         <div ref={bottomRef} style={{ height: '1px' }} />
-                        {/* -------------------------- */}
 
                     </ScrollAreaPrimitive.Viewport>
                     <ScrollBar orientation="vertical" />
                     <ScrollBar orientation="horizontal" />
                 </ScrollArea>
 
-                 {/* Footer with Pause/Resume Button (Unchanged) */}
+                 {/* Footer with Pause/Resume Button */}
                  <DialogFooter className="p-3 border-t flex-shrink-0">
                     <Button type="button" variant="secondary" onClick={() => setIsScrolledToBottom(!isScrolledToBottom)} size="sm">
                        {isScrolledToBottom ? "Pause Auto-Scroll" : "Resume Auto-Scroll"}
@@ -205,3 +243,4 @@ export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescripti
         </Dialog>
     );
 }
+// --- END OF FILE ---
