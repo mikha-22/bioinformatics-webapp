@@ -64,3 +64,6 @@ logs_dev/
 # System files
 .DS_Store
 Thumbs.db
+
+# repomix output
+repomix-output.xml
