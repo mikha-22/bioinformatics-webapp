@@ -643,7 +643,7 @@ class SaveProfileRequest(BaseModel):
 
 --- END FILE: ./backend/app/models/pipeline.py ---
 
---- START FILE: ./backend/app/tasks.py (Size: 26727 bytes) ---
+--- START FILE: ./backend/app/tasks.py (Size: 24076 bytes) ---
 # backend/app/tasks.py
 import subprocess
 import logging
@@ -657,11 +657,19 @@ import select # Keep select module
 import redis # <--- IMPORT redis
 from typing import Optional, List, Dict, Any
 
-# --- RQ Import ---
-from rq import get_current_job
+# --- RQ Imports ---
+from rq import get_current_job, Queue
+
+# --- Import Config ---
+# --- CORRECTED RELATIVE IMPORT ---
+from .core.config import ( # Use ONE dot for sibling directory within the package
+    RESULTS_DIR, REDIS_HOST, REDIS_PORT, REDIS_DB,
+    LOG_CHANNEL_PREFIX, LOG_HISTORY_PREFIX,
+    DEFAULT_RESULT_TTL, DEFAULT_FAILURE_TTL
+)
+# --- END CORRECTION ---
 
 # --- Configure Logging ---
-# (Keep logging config as is)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(process)d - %(name)s - %(levelname)s - %(message)s',
@@ -672,64 +680,62 @@ logger = logging.getLogger(__name__)
 # --- Path Definitions ---
 MONITORING_INTERVAL_SECONDS = 5
 METADATA_FILENAME = "run_metadata.json"
+# LOG_HISTORY_PREFIX defined in config
 
-
-# --- Import Config ---
-from .core.config import RESULTS_DIR, REDIS_HOST, REDIS_PORT, REDIS_DB, LOG_CHANNEL_PREFIX # Import Redis config and prefix
-
-# --- Get Redis Connection for Publishing ---
-# Create a separate connection instance for publishing within the task
-# Use decode_responses=True here as we are publishing simple strings/JSON
+# --- Get Redis Connection for Publishing & List Operations ---
 try:
-    redis_publisher = redis.Redis(
+    redis_log_handler = redis.Redis(
         host=REDIS_HOST,
         port=REDIS_PORT,
         db=REDIS_DB,
-        decode_responses=True # Easier to publish strings
+        decode_responses=True
     )
-    redis_publisher.ping() # Check connection at module load time
-    logger.info("Redis publisher connection successful for tasks.")
+    redis_log_handler.ping()
+    logger.info("Redis log handler connection successful for tasks (Publish/List).")
 except redis.exceptions.ConnectionError as e:
-    logger.error(f"FATAL: Could not connect Redis publisher in tasks.py: {e}")
-    redis_publisher = None # Set to None if connection fails
+    logger.error(f"FATAL: Could not connect Redis log handler in tasks.py: {e}")
+    redis_log_handler = None
 except Exception as e:
-    logger.error(f"FATAL: Unexpected error connecting Redis publisher in tasks.py: {e}")
-    redis_publisher = None
+    logger.error(f"FATAL: Unexpected error connecting Redis log handler in tasks.py: {e}")
+    redis_log_handler = None
 
 def get_current_job_id():
+    """Safely gets the current RQ job ID, returns 'N/A...' if not in context."""
     job = get_current_job()
     return job.id if job else "N/A (Not in RQ context)"
 
-# --- Publish Log Helper ---
-def publish_log(job_id: str, log_type: str, line: str):
-    """Publishes a log line to the job's Redis channel."""
-    if not redis_publisher:
-        logger.warning(f"[Job {job_id}] Cannot publish log, Redis publisher not available.")
+# --- UPDATED Publish Log Helper (Handles Pub/Sub and List) ---
+def publish_and_store_log(job_id: str, log_type: str, line: str):
+    """Publishes log to Redis channel AND stores it in Redis List."""
+    if not redis_log_handler:
+        logger.warning(f"[Job {job_id}] Cannot publish/store log, Redis log handler not available.")
         return
+
     if not job_id or job_id.startswith("N/A"):
-        # This might happen if run outside RQ context for testing, log locally only
-        logger.debug(f"Skipping Redis publish, invalid job_id: {job_id} [TYPE: {log_type}] {line.strip()}")
+        logger.debug(f"Skipping Redis publish/store, invalid job_id: {job_id} [TYPE: {log_type}] {line.strip()}")
         return
 
     channel = f"{LOG_CHANNEL_PREFIX}{job_id}"
+    list_key = f"{LOG_HISTORY_PREFIX}{job_id}"
+    message = json.dumps({"type": log_type, "line": line.strip()})
+
     try:
-        # Publish as JSON for structure
-        message = json.dumps({"type": log_type, "line": line.strip()})
-        redis_publisher.publish(channel, message)
-        # logger.debug(f"[Job {job_id}] Published to {channel}: {message}") # Optional: Verbose logging
+        pipe = redis_log_handler.pipeline()
+        pipe.publish(channel, message)
+        pipe.rpush(list_key, message)
+        results = pipe.execute()
     except redis.exceptions.RedisError as e:
-        logger.error(f"[Job {job_id}] Redis error publishing log to {channel}: {e}")
+        logger.error(f"[Job {job_id}] Redis error publishing/storing log to {channel}/{list_key}: {e}")
     except Exception as e:
-        logger.error(f"[Job {job_id}] Unexpected error publishing log: {e}")
+        logger.error(f"[Job {job_id}] Unexpected error publishing/storing log: {e}")
 
 
-# --- Updated Function Signature ---
-# (Keep function signature as is)
+# --- Updated Function Signature (remains same) ---
 def run_pipeline_task(
     input_csv_path_str: str,
     outdir_base_path_str: str,
     genome: str,
-    tools: Optional[str],
+    tools: Optional[str], # Comma-separated string or None
     step: Optional[str],
     profile: Optional[str],
     intervals_path_str: Optional[str] = None,
@@ -743,61 +749,49 @@ def run_pipeline_task(
     skip_qc: bool = False,
     skip_annotation: bool = False,
     skip_baserecalibrator: bool = False,
-    is_rerun: bool = False, # Keep is_rerun
+    is_rerun: bool = False,
 ) -> Dict[str, Any]:
     job = get_current_job()
-    # Ensure we always have a job_id string, even if 'N/A...'
     job_id = job.id if job else get_current_job_id()
     final_results_dir = None
+    job_succeeded = False # Track success for final TTL setting
 
-    # --- Logging Parameters (Keep as is, but maybe log job_id earlier) ---
     logger.info(f"[Job {job_id}] Starting Sarek pipeline task...")
-    # (Keep other parameter logging)
+    publish_and_store_log(job_id, "info", f"Starting Sarek task (Input: {Path(input_csv_path_str).name}, Genome: {genome}, Step: {step})")
+    logger.info(f"[Job {job_id}] Input CSV: {input_csv_path_str}")
+    logger.info(f"[Job {job_id}] Output Base: {outdir_base_path_str}")
 
-
-    # --- Command Construction (Keep as is) ---
+    # --- Command Construction (remains same) ---
     script_path = Path(__file__).resolve().parent / "sarek_pipeline.sh"
     if not script_path.exists():
          error_msg = f"CRITICAL: Sarek wrapper script not found at {script_path}"
          logger.error(f"[Job {job_id}] {error_msg}")
-         publish_log(job_id, "error", error_msg)
+         publish_and_store_log(job_id, "error", error_msg)
          raise FileNotFoundError(f"Sarek wrapper script not found: {script_path}")
     if not os.access(script_path, os.X_OK):
         error_msg = f"CRITICAL: Sarek wrapper script is not executable: {script_path}"
         logger.error(f"[Job {job_id}] {error_msg}")
-        publish_log(job_id, "error", error_msg)
+        publish_and_store_log(job_id, "error", error_msg)
         raise PermissionError(f"Sarek wrapper script not executable: {script_path}")
-
 
     command = [
         "bash", str(script_path),
-        input_csv_path_str,       # $1
-        outdir_base_path_str,     # $2
-        genome,                   # $3
-        tools if tools else "",   # $4
-        step if step else "",     # $5
-        profile if profile else "", # $6
-        aligner if aligner else "", # $7
-        intervals_path_str if intervals_path_str else "", # $8
-        dbsnp_path_str if dbsnp_path_str else "",         # $9
-        known_indels_path_str if known_indels_path_str else "", # $10
-        pon_path_str if pon_path_str else "",             # $11
-        "true" if joint_germline else "false",  # $12
-        "true" if wes else "false",            # $13
-        "true" if trim_fastq else "false",     # $14
-        "true" if skip_qc else "false",        # $15
-        "true" if skip_annotation else "false", # $16
-        "true" if skip_baserecalibrator else "false",  # $17
-        "true" if is_rerun else "false",       # $18
+        input_csv_path_str, outdir_base_path_str, genome,
+        tools if tools else "", step if step else "", profile if profile else "",
+        aligner if aligner else "", intervals_path_str if intervals_path_str else "",
+        dbsnp_path_str if dbsnp_path_str else "", known_indels_path_str if known_indels_path_str else "",
+        pon_path_str if pon_path_str else "", "true" if joint_germline else "false",
+        "true" if wes else "false", "true" if trim_fastq else "false",
+        "true" if skip_qc else "false", "true" if skip_annotation else "false",
+        "true" if skip_baserecalibrator else "false", "true" if is_rerun else "false",
     ]
     script_working_dir = script_path.parent
     logger.info(f"[Job {job_id}] Running command in directory: {script_working_dir}")
     command_str = ' '.join(command)
     logger.info(f"[Job {job_id}] Command: {command_str}")
-    publish_log(job_id, "info", f"Executing: {command_str}") # Publish command
+    publish_and_store_log(job_id, "info", f"Executing: {command_str}")
 
-
-    # Set HOME and NXF_HOME environment variables for the subprocess
+    # Set Environment (remains same)
     subprocess_env = os.environ.copy()
     user_home = os.path.expanduser("~")
     subprocess_env["HOME"] = user_home
@@ -805,50 +799,39 @@ def run_pipeline_task(
     logger.info(f"[Job {job_id}] Setting HOME={subprocess_env['HOME']} and NXF_HOME={subprocess_env['NXF_HOME']} for subprocess.")
     subprocess_env["NXF_ANSI_LOG"] = "false"
 
-
-    # --- Resource Monitoring Variables (Keep as is) ---
+    # Resource Monitoring Variables (remains same)
     peak_memory_mb = 0
     cpu_percentages = []
     process_psutil = None
     start_time = time.time()
-    process = None # Initialize process variable
+    process = None
 
     try:
-        # --- Process Execution (Use subprocess_env) ---
+        # --- Process Execution ---
         logger.info(f"[Job {job_id}] Preparing to execute Popen...")
-        publish_log(job_id, "info", "Pipeline process starting...")
+        publish_and_store_log(job_id, "info", "Pipeline process starting...")
         try:
             process = subprocess.Popen(
-                command,
-                cwd=str(script_working_dir),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True, # Keep text mode for easier handling
-                bufsize=1, # Line buffering
-                env=subprocess_env # Pass the modified environment
+                command, cwd=str(script_working_dir), stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, bufsize=1, env=subprocess_env
             )
             logger.info(f"[Job {job_id}] Popen successful. PID: {process.pid}")
-            publish_log(job_id, "info", f"Pipeline process started (PID: {process.pid}).")
-            # Check streams
-            if process.stdout: logger.info(f"[Job {job_id}] stdout available (fd: {process.stdout.fileno()})")
-            else: logger.error(f"[Job {job_id}] process.stdout is None!")
-            if process.stderr: logger.info(f"[Job {job_id}] stderr available (fd: {process.stderr.fileno()})")
-            else: logger.error(f"[Job {job_id}] process.stderr is None!")
-
+            publish_and_store_log(job_id, "info", f"Pipeline process started (PID: {process.pid}).")
+            if not process.stdout: logger.error(f"[Job {job_id}] process.stdout is None!")
+            if not process.stderr: logger.error(f"[Job {job_id}] process.stderr is None!")
         except Exception as popen_err:
             error_msg = f"CRITICAL ERROR starting pipeline process: {popen_err}"
             logger.exception(f"[Job {job_id}] {error_msg}")
-            publish_log(job_id, "error", error_msg)
-            raise popen_err # Re-raise to fail the job
+            publish_and_store_log(job_id, "error", error_msg)
+            raise popen_err
 
-        # --- Initialize psutil (Keep as is) ---
+        # Initialize psutil (remains same)
         try:
             process_psutil = psutil.Process(process.pid)
-            process_psutil.cpu_percent(interval=None) # Initialize
-            time.sleep(0.1) # Allow slight delay
+            process_psutil.cpu_percent(interval=None)
+            time.sleep(0.1)
         except psutil.NoSuchProcess: logger.warning(f"[Job {job_id}] Process {process.pid} finished before monitoring could start."); process_psutil = None
         except Exception as init_monitor_err: logger.error(f"[Job {job_id}] Error initializing resource monitor for PID {process.pid}: {init_monitor_err}"); process_psutil = None
-
 
         # --- Non-Blocking Read Loop using select ---
         stdout_lines = []
@@ -861,14 +844,12 @@ def run_pipeline_task(
         if process.stderr: streams_to_select.append(process.stderr)
 
         if not streams_to_select:
-             error_msg = "Both stdout and stderr are None/invalid after Popen. Cannot read output."
+             error_msg = "Both stdout and stderr are None/invalid after Popen."
              logger.error(f"[Job {job_id}] {error_msg}")
-             publish_log(job_id, "error", "Pipeline streams unavailable after start.")
+             publish_and_store_log(job_id, "error", "Pipeline streams unavailable after start.")
              raise IOError("Subprocess streams are not available.")
 
-
         while streams_to_select:
-            # Check if process has finished
             return_code = process.poll()
             if return_code is not None and not streams_to_select:
                  logger.debug(f"[Job {job_id}] Process finished and streams closed, exiting read loop.")
@@ -879,159 +860,127 @@ def run_pipeline_task(
             except ValueError as select_err:
                  error_msg = f"Error during select (stream likely closed unexpectedly): {select_err}"
                  logger.error(f"[Job {job_id}] {error_msg}")
-                 publish_log(job_id, "warning", f"Stream error during log capture: {select_err}")
-                 # Attempt to clean up streams and break
+                 publish_and_store_log(job_id, "warning", f"Stream error during log capture: {select_err}")
+                 # Attempt cleanup (remains same)
                  for stream in streams_to_select[:]:
                      if stream and not stream.closed:
                          try:
-                             if stream.fileno() < 0: # Check for invalid fd
-                                 logger.warning(f"[Job {job_id}] Removing stream with invalid fileno from select list.")
-                                 streams_to_select.remove(stream)
-                             else:
-                                 logger.warning(f"[Job {job_id}] Stream {stream.fileno()} caused select error, closing it.")
-                                 stream.close()
-                                 streams_to_select.remove(stream)
-                         except Exception as close_err:
-                             logger.error(f"[Job {job_id}] Error closing stream during select error handling: {close_err}")
-                             if stream in streams_to_select: streams_to_select.remove(stream) # Ensure removal
-                     elif stream in streams_to_select:
-                         streams_to_select.remove(stream) # Remove if already closed or None
-                 if not streams_to_select: break # Exit loop if no valid streams left
-                 continue # Try select again if some streams remain
-
+                             if stream.fileno() < 0: streams_to_select.remove(stream)
+                             else: stream.close(); streams_to_select.remove(stream)
+                         except Exception as close_err: logger.error(f"[Job {job_id}] Error closing stream: {close_err}"); streams_to_select.remove(stream)
+                     elif stream in streams_to_select: streams_to_select.remove(stream)
+                 if not streams_to_select: break
+                 continue
 
             if not readable and return_code is not None:
-                 # Process finished, and no more data to read from open streams in this timeout cycle
-                 logger.debug(f"[Job {job_id}] Process finished, select timed out, checking stream closure.")
-                 # Check if streams are actually closed now
+                 logger.debug(f"[Job {job_id}] Process finished, select timed out, checking streams.")
+                 # Final read attempt (remains same)
                  all_closed = True
                  for stream in streams_to_select[:]:
                      if stream and not stream.closed:
                          all_closed = False
-                         # Try one last read attempt
                          try:
                              data = stream.read()
                              if data:
                                  logger.warning(f"[Job {job_id}] Read remaining data after process end: {len(data)} bytes from stream {stream.fileno()}")
                                  if stream is process.stdout: stdout_buffer += data
                                  elif stream is process.stderr: stderr_buffer += data
-                             stream.close()
-                             streams_to_select.remove(stream)
-                         except Exception as final_read_err:
-                             logger.error(f"[Job {job_id}] Error during final read: {final_read_err}")
-                             if stream in streams_to_select:
-                                 try: stream.close()
-                                 except: pass
-                                 streams_to_select.remove(stream)
-
-                     elif stream in streams_to_select: # Remove if None or already closed
-                         streams_to_select.remove(stream)
-
-                 if all_closed or not streams_to_select:
-                     break # Exit loop
+                             stream.close(); streams_to_select.remove(stream)
+                         except Exception as final_read_err: logger.error(f"[Job {job_id}] Error during final read: {final_read_err}"); streams_to_select.remove(stream)
+                     elif stream in streams_to_select: streams_to_select.remove(stream)
+                 if all_closed or not streams_to_select: break
 
             for stream in readable:
-                if not stream or stream.closed: # Double check stream validity
+                if not stream or stream.closed:
                     if stream in streams_to_select: streams_to_select.remove(stream)
                     continue
 
                 try:
-                    # Read available data (might be partial line)
-                    data = stream.read(4096) # Read in chunks
+                    data = stream.read(4096)
                     if not data:
-                        # End of stream reached, remove it from select list
                         logger.debug(f"[Job {job_id}] EOF reached for stream {stream.fileno()}. Closing.")
-                        stream.close()
-                        streams_to_select.remove(stream)
+                        stream.close(); streams_to_select.remove(stream)
                         continue
 
                     if stream is process.stdout:
                         stdout_buffer += data
                         while '\n' in stdout_buffer:
                             line, stdout_buffer = stdout_buffer.split('\n', 1)
-                            # No need to add newline back for publish_log
-                            stdout_lines.append(line + '\n') # Add back for internal logging/storage
+                            stdout_lines.append(line + '\n')
                             log_line = line.strip()
                             logger.info(f"[Job {job_id}][STDOUT] {log_line}")
-                            publish_log(job_id, "stdout", log_line) # <--- PUBLISH STDOUT
+                            publish_and_store_log(job_id, "stdout", log_line)
                             if "Results directory:" in line:
                                 try: final_results_dir = line.split("Results directory:", 1)[1].strip()
-                                except IndexError: logger.warning(f"[Job {job_id}] Could not parse results directory from line: {log_line}")
+                                except IndexError: logger.warning(f"[Job {job_id}] Could not parse results dir: {log_line}")
                     elif stream is process.stderr:
                         stderr_buffer += data
                         while '\n' in stderr_buffer:
                             line, stderr_buffer = stderr_buffer.split('\n', 1)
-                            stderr_lines.append(line + '\n') # Add back for internal logging/storage
+                            stderr_lines.append(line + '\n')
                             log_line = line.strip()
                             logger.warning(f"[Job {job_id}][STDERR] {log_line}")
-                            publish_log(job_id, "stderr", log_line) # <--- PUBLISH STDERR
+                            publish_and_store_log(job_id, "stderr", log_line)
 
-                except (OSError, ValueError) as e: # Handle potential errors during read/close
+                except (OSError, ValueError) as e:
                      error_msg = f"Error reading from stream {stream.fileno()}: {e}"
                      logger.error(f"[Job {job_id}] {error_msg}")
-                     publish_log(job_id, "warning", f"Error reading log stream: {e}")
+                     publish_and_store_log(job_id, "warning", f"Error reading log stream: {e}")
                      if stream in streams_to_select:
-                         try: stream.close()
-                         except: pass
+                         try:
+                             stream.close()
+                         except Exception:
+                             pass
                          streams_to_select.remove(stream)
 
 
-            # --- Resource Monitoring (executed periodically due to select timeout) ---
-            if process_psutil and process.poll() is None: # Check if process still running
+            # Resource Monitoring (remains same)
+            if process_psutil and process.poll() is None:
                  try:
-                     cpu = process_psutil.cpu_percent(interval=0.1) # Non-blocking after first call
+                     cpu = process_psutil.cpu_percent(interval=0.1)
                      if cpu is not None: cpu_percentages.append(cpu)
                      mem_info = process_psutil.memory_info()
                      current_memory_mb = mem_info.rss / (1024 * 1024)
                      peak_memory_mb = max(peak_memory_mb, current_memory_mb)
-                 except psutil.NoSuchProcess:
-                     logger.warning(f"[Job {job_id}] Process {process.pid} ended during monitoring check.")
-                     process_psutil = None # Stop monitoring
-                 except Exception as monitor_err:
-                     logger.error(f"[Job {job_id}] Error during resource monitoring: {monitor_err}")
-                     # Optionally stop monitoring if errors persist
+                 except psutil.NoSuchProcess: logger.warning(f"[Job {job_id}] Process {process.pid} ended during monitoring."); process_psutil = None
+                 except Exception as monitor_err: logger.error(f"[Job {job_id}] Error during resource monitoring: {monitor_err}")
 
-            # Final check if process finished after reading round
-            if return_code is None:
-                 return_code = process.poll()
-            if return_code is not None and not streams_to_select:
-                 logger.debug(f"[Job {job_id}] Process finished and streams list empty, exiting read loop.")
-                 break # Ensure exit if process finished and streams closed
-
+            # Final check if process finished (remains same)
+            if return_code is None: return_code = process.poll()
+            if return_code is not None and not streams_to_select: break
 
         # --- Process Finished ---
         logger.info(f"[Job {job_id}] Exited read loop.")
-        # Capture any remaining buffered data after loop exits
+        # Capture remaining buffered data
         if stdout_buffer:
             log_line = stdout_buffer.strip()
             logger.info(f"[Job {job_id}][STDOUT] {log_line}")
             stdout_lines.append(stdout_buffer)
-            publish_log(job_id, "stdout", log_line) # Publish remaining stdout
+            publish_and_store_log(job_id, "stdout", log_line)
             if not final_results_dir and "Results directory:" in stdout_buffer:
                  for rem_line in stdout_buffer.splitlines():
                      if "Results directory:" in rem_line:
                           try: final_results_dir = rem_line.split("Results directory:", 1)[1].strip(); break
-                          except IndexError: logger.warning(f"[Job {job_id}] Could not parse results directory from final stdout buffer line: {rem_line.strip()}")
+                          except IndexError: pass
         if stderr_buffer:
              log_line = stderr_buffer.strip()
              logger.warning(f"[Job {job_id}][STDERR] {log_line}")
              stderr_lines.append(stderr_buffer)
-             publish_log(job_id, "stderr", log_line) # Publish remaining stderr
+             publish_and_store_log(job_id, "stderr", log_line)
 
-        # Get final return code if not already set
         if return_code is None:
             logger.warning(f"[Job {job_id}] Process return code was None after loop, calling process.wait().")
-            return_code = process.wait() # Final blocking wait if needed
+            return_code = process.wait()
 
         end_time = time.time()
         duration_seconds = end_time - start_time
         log_message = f"Pipeline process {process.pid} finished with code {return_code} after {duration_seconds:.2f}s."
         logger.info(f"[Job {job_id}] {log_message}")
-        publish_log(job_id, "info", log_message) # Publish final status
+        publish_and_store_log(job_id, "info", log_message)
 
         average_cpu = sum(cpu_percentages) / len(cpu_percentages) if cpu_percentages else 0
 
-        # --- Update Job Meta with Final Stats ---
+        # Update Job Meta (remains same)
         if job:
             job.meta['peak_memory_mb'] = round(peak_memory_mb, 1)
             job.meta['average_cpu_percent'] = round(average_cpu, 1)
@@ -1039,123 +988,119 @@ def run_pipeline_task(
             job.save_meta()
             logger.info(f"[Job {job_id}] Saved final resource stats to job meta.")
 
-        # --- Success/Failure Check ---
+        # --- Success/Failure Check (remains same) ---
         full_stdout = "".join(stdout_lines)
         full_stderr = "".join(stderr_lines)
-
-        # Check for known critical error patterns in stdout or stderr
-        script_reported_error = "ERROR ~" in full_stderr or \
-                                "Validation of pipeline parameters failed" in full_stderr or \
-                                "[SCRIPT DETECTED ERROR]" in full_stderr or \
-                                "ERROR ~" in full_stdout or \
-                                "Validation of pipeline parameters failed" in full_stdout or \
-                                "ERROR:" in full_stderr # Added generic ERROR check for script errors
-
-        # Check for specific status markers from the simplified script
+        script_reported_error = "[SCRIPT DETECTED ERROR]" in full_stderr or "ERROR ~" in full_stderr or "Validation of pipeline parameters failed" in full_stderr or "ERROR:" in full_stderr
         script_reported_success = "status::success" in full_stdout
         script_reported_failure = "status::failed" in full_stdout
+        final_status_success = (script_reported_success and return_code == 0) or \
+                               (not script_reported_failure and return_code == 0 and not script_reported_error)
 
-        # Determine final status
-        final_status_success = False # Default to failure
-        if script_reported_success and return_code == 0:
-            final_status_success = True
-        elif script_reported_failure or return_code != 0:
-            final_status_success = False
-        elif not script_reported_success and not script_reported_failure:
-            # Fallback to exit code if no status:: marker found
-             final_status_success = (return_code == 0 and not script_reported_error)
-        else: # Should not happen unless status markers are inconsistent with exit code
-             logger.warning(f"[Job {job_id}] Inconsistent status markers and exit code ({return_code}). Assuming failure.")
-             final_status_success = False
-
+        job_succeeded = final_status_success # Set flag for finally block
 
         if final_status_success:
             success_message = f"Sarek pipeline finished successfully (Exit Code {return_code})."
             logger.info(f"[Job {job_id}] {success_message}")
-            publish_log(job_id, "info", success_message)
+            publish_and_store_log(job_id, "info", success_message)
             if final_results_dir:
                 results_path_obj = Path(final_results_dir)
                 if results_path_obj.is_dir():
                      logger.info(f"[Job {job_id}] Confirmed results directory exists: {final_results_dir}")
-                     publish_log(job_id, "info", f"Results directory: {final_results_dir}")
+                     publish_and_store_log(job_id, "info", f"Results directory: {final_results_dir}")
                      if job:
                           job.meta['results_path'] = final_results_dir
                           job.save_meta()
-                          # Save Metadata File
+                          # Save Metadata File (remains same)
                           try:
                               metadata_to_save = job.meta
                               metadata_file_path = results_path_obj / METADATA_FILENAME
-                              with open(metadata_file_path, 'w') as f:
-                                  json.dump(metadata_to_save, f, indent=4)
+                              with open(metadata_file_path, 'w') as f: json.dump(metadata_to_save, f, indent=4)
                               logger.info(f"[Job {job_id}] Saved run metadata to {metadata_file_path}")
-                          except Exception as meta_err:
-                               logger.error(f"[Job {job_id}] Failed to save run metadata file: {meta_err}")
+                          except Exception as meta_err: logger.error(f"[Job {job_id}] Failed to save run metadata file: {meta_err}")
                      return { "status": "success", "results_path": final_results_dir, "resources": job.meta if job else {} }
                 else:
                      error_message = f"Pipeline reported success, but results directory '{final_results_dir}' not found!"
                      logger.error(f"[Job {job_id}] {error_message}")
-                     publish_log(job_id, "error", error_message)
+                     publish_and_store_log(job_id, "error", error_message)
                      if job: job.meta['error_message'] = error_message; job.save_meta()
                      raise RuntimeError(error_message)
             else:
                 warn_message = "Pipeline finished successfully, but could not determine results directory from output."
                 logger.warning(f"[Job {job_id}] {warn_message}")
-                publish_log(job_id, "warning", warn_message)
+                publish_and_store_log(job_id, "warning", warn_message)
                 if job: job.meta['warning_message'] = "Pipeline finished, results dir unclear."; job.save_meta()
                 return { "status": "success", "message": "Pipeline finished, results directory unclear.", "resources": job.meta if job else {} }
         else:
             # Failure Path
             error_message = f"Sarek pipeline failed. Exit Code: {return_code}."
-            if script_reported_error: error_message += " Critical error detected in logs."
+            if script_reported_error: error_message += " Critical error detected in script logs."
             elif script_reported_failure: error_message += " Script reported status::failed."
-
             logger.error(f"[Job {job_id}] {error_message}")
-            publish_log(job_id, "error", error_message) # Publish failure message
-            # Log more stderr on failure
-            stderr_to_log = full_stderr[-2000:] # Log last 2000 chars of stderr
+            publish_and_store_log(job_id, "error", error_message)
+
+            # Log/publish more stderr on failure
+            stderr_to_log = full_stderr[-2000:]
             logger.error(f"[Job {job_id}] STDERR Tail:\n{stderr_to_log}")
-            # Publish multiple lines if stderr_to_log contains newlines
             for err_line in stderr_to_log.strip().split('\n'):
-                publish_log(job_id, "stderr", err_line)
+                publish_and_store_log(job_id, "stderr", err_line)
 
             if job:
                 job.meta['error_message'] = error_message
-                job.meta['stderr_snippet'] = stderr_to_log # Store more stderr
+                job.meta['stderr_snippet'] = stderr_to_log
                 job.save_meta()
             raise subprocess.CalledProcessError(return_code or 1, command, output=full_stdout, stderr=full_stderr)
 
-    # --- Exception Handling ---
+    # --- Exception Handling (remains same) ---
     except subprocess.TimeoutExpired as e:
         error_msg = "Sarek pipeline timed out."
         logger.error(f"[Job {job_id}] {error_msg}")
-        publish_log(job_id, "error", error_msg)
+        publish_and_store_log(job_id, "error", error_msg)
         stderr_output = e.stderr if e.stderr else 'N/A'
         if job: job.meta['error_message'] = error_msg; job.meta['stderr_snippet'] = stderr_output[:1000]; job.save_meta()
-        raise # Re-raise to fail the RQ job
+        raise
     except FileNotFoundError as e:
          error_msg = f"Error executing pipeline: {e}"
          logger.error(f"[Job {job_id}] {error_msg}")
-         publish_log(job_id, "error", error_msg)
+         publish_and_store_log(job_id, "error", error_msg)
          if job: job.meta['error_message'] = f"Task execution error: {e}"; job.save_meta()
-         raise # Re-raise to fail the RQ job
+         raise
     except Exception as e:
-        # Catch any other unexpected error during execution or result processing
         error_msg = f"An unexpected error occurred during pipeline execution: {type(e).__name__}"
         logger.exception(f"[Job {job_id}] {error_msg}")
-        publish_log(job_id, "error", f"{error_msg}: {e}")
+        publish_and_store_log(job_id, "error", f"{error_msg}: {e}")
         if job:
             job.meta['error_message'] = error_msg
             job.meta['error_details'] = str(e)
             job.save_meta()
-        # Re-raise the original exception to ensure RQ marks the job as failed
-        raise e
+        raise
     finally:
-        # Publish end marker ONLY IF we have a valid job ID
-        if job_id and not job_id.startswith("N/A"):
-            publish_log(job_id, "control", "EOF")
-            logger.info(f"[Job {job_id}] Published EOF marker.")
+        # --- Final Log Handling (remains same) ---
+        list_key = f"{LOG_HISTORY_PREFIX}{job_id}"
+        try:
+            # Always publish EOF marker
+            if job_id and not job_id.startswith("N/A") and redis_log_handler:
+                publish_and_store_log(job_id, "control", "EOF")
+                logger.info(f"[Job {job_id}] Published EOF marker to channel and list.")
 
-        # --- Cleanup temporary CSV file (Keep as is) ---
+                # Set TTL on the log history list based on job outcome
+                final_ttl = DEFAULT_RESULT_TTL if job_succeeded else DEFAULT_FAILURE_TTL
+                if job:
+                    ttl_to_use = job.result_ttl if job_succeeded else job.failure_ttl
+                    if ttl_to_use is not None and ttl_to_use >= 0: final_ttl = ttl_to_use
+                    elif ttl_to_use == -1: final_ttl = -1
+
+                if final_ttl > 0:
+                    redis_log_handler.expire(list_key, final_ttl)
+                    logger.info(f"[Job {job_id}] Set TTL={final_ttl}s for log history list: {list_key}")
+                elif final_ttl == -1:
+                     redis_log_handler.persist(list_key); logger.info(f"[Job {job_id}] Persisted log history list (infinite TTL): {list_key}")
+                else: logger.warning(f"[Job {job_id}] Invalid final TTL calculated ({final_ttl}). Deleting log history list: {list_key}"); redis_log_handler.delete(list_key)
+
+        except redis.exceptions.RedisError as e: logger.error(f"[Job {job_id}] Redis error during final log cleanup/TTL setting for {list_key}: {e}")
+        except Exception as e: logger.error(f"[Job {job_id}] Unexpected error during final log cleanup/TTL setting: {e}")
+
+        # --- Cleanup temporary CSV file (remains same) ---
         if input_csv_path_str and Path(input_csv_path_str).exists():
             try:
                 os.remove(input_csv_path_str)
@@ -1165,7 +1110,7 @@ def run_pipeline_task(
 
 --- END FILE: ./backend/app/tasks.py ---
 
---- START FILE: ./backend/app/core/config.py (Size: 3301 bytes) ---
+--- START FILE: ./backend/app/core/config.py (Size: 4156 bytes) ---
 # backend/app/core/config.py
 import logging
 from pathlib import Path
@@ -1222,15 +1167,35 @@ REDIS_DB = int(os.getenv("REDIS_DB", 0))         # Ensure db is integer
 PIPELINE_QUEUE_NAME = "pipeline_tasks"
 STAGED_JOBS_KEY = "staged_pipeline_jobs" # Key for Redis Hash storing staged jobs
 PIPELINE_PROFILES_KEY = "pipeline_profiles" # Key for storing profiles
-LOG_CHANNEL_PREFIX = "logs:" # <--- ADDED: Prefix for log Pub/Sub channels
-
+LOG_CHANNEL_PREFIX = "logs:"
+# --- ADD THIS LINE ---
+LOG_HISTORY_PREFIX = "log_history:" # Prefix for Redis List storing log history
+# --- END ADD ---
 
 logger.info(f"Using REDIS_HOST: {REDIS_HOST}:{REDIS_PORT} DB:{REDIS_DB}")
 
 # --- Job Settings ---
-DEFAULT_JOB_TIMEOUT = '2h' # Default timeout for RQ job itself
-DEFAULT_RESULT_TTL = 86400  # Keep successful job result 1 day
-DEFAULT_FAILURE_TTL = 604800 # Keep failed job result 1 week
+# Convert TTL strings from environment or use defaults (make sure they are integers)
+try:
+    DEFAULT_RESULT_TTL = int(os.getenv("DEFAULT_RESULT_TTL", 86400)) # Keep successful job result 1 day
+except ValueError:
+    logger.warning("Invalid DEFAULT_RESULT_TTL environment variable. Using default: 86400")
+    DEFAULT_RESULT_TTL = 86400
+
+try:
+    DEFAULT_FAILURE_TTL = int(os.getenv("DEFAULT_FAILURE_TTL", 604800)) # Keep failed job result 1 week
+except ValueError:
+    logger.warning("Invalid DEFAULT_FAILURE_TTL environment variable. Using default: 604800")
+    DEFAULT_FAILURE_TTL = 604800
+
+try:
+    # Ensure timeout is a string for RQ or an integer in seconds (RQ handles '1h' etc.)
+    # Let's keep it as a string compatible with RQ, defaulting to '2h'
+    DEFAULT_JOB_TIMEOUT = os.getenv("DEFAULT_JOB_TIMEOUT", '2h')
+except ValueError:
+     logger.warning("Invalid DEFAULT_JOB_TIMEOUT environment variable. Using default: '2h'")
+     DEFAULT_JOB_TIMEOUT = '2h'
+
 MAX_REGISTRY_JOBS = 50 # Max finished/failed jobs to fetch for the list view
 
 # --- Sarek Pipeline Configuration ---
@@ -1704,8 +1669,9 @@ fi
 
 --- END FILE: ./backend/app/sarek_pipeline.sh ---
 
---- START FILE: ./backend/app/app.py (Size: 2610 bytes) ---
-# backend/app/app.py
+--- START FILE: ./backend/app/app.py (Size: 2831 bytes) ---
+# File: backend/app/app.py
+# --- START OF FILE ---
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -1729,14 +1695,14 @@ tags_metadata = [
     {"name": "Data Access", "description": "API endpoints for retrieving file/result lists."},
     {"name": "Jobs Management", "description": "API endpoints for staging, starting, monitoring, and managing pipeline jobs."},
     {"name": "Profiles Management", "description": "API endpoints for saving and loading pipeline configuration profiles."},
-    {"name": "WebSocket", "description": "Endpoints for real-time communication (e.g., logs)."}, # <<< ADDED
+    {"name": "WebSocket", "description": "Endpoints for real-time communication (e.g., logs)."}, # <<< ADDED WebSocket Tag
     {"name": "Health Check", "description": "Basic application health status."},
 ]
 
 app = FastAPI(
     title="Bioinformatics Webapp API",
-    description="Backend API for staging, running, and managing Sarek bioinformatics pipelines using FastAPI and RQ.",
-    version="0.5.0", # <<< Version Bump
+    description="Backend API for staging, running, and managing Sarek bioinformatics pipelines using FastAPI and RQ. Includes WebSocket for live logs.", # Updated description
+    version="0.6.0", # <<< Version Bump for WebSocket feature
     openapi_tags=tags_metadata
 )
 
@@ -1754,10 +1720,12 @@ logger.info(f"CORS middleware configured. Allowed origins: {allowed_origins}")
 # --- Include Routers ---
 app.include_router(data.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
-app.include_router(profiles.router) # Already has /api/profiles prefix
+# --- >>> Add /api prefix here <<< ---
+app.include_router(profiles.router, prefix="/api") # Profiles router defines /profiles internally
+# ----------------------------------
 # Include the WebSocket router - the prefix is defined *within* websockets.py
 app.include_router(websockets.router)
-logger.info("Included API routers: data, jobs, profiles, websockets.") # <<< Updated log message
+logger.info("Included API routers: data, jobs, profiles, websockets.")
 
 # --- Root endpoint for health check ---
 @app.get("/health", tags=["Health Check"], summary="Basic Health Check")
@@ -1766,6 +1734,7 @@ async def health_check():
     return {"status": "ok", "message": "Backend API is running"}
 
 logger.info("--- Bioinformatics Webapp Backend API Initialization Complete. Ready to serve requests. ---")
+# --- END OF FILE ---
 
 --- END FILE: ./backend/app/app.py ---
 
@@ -2544,8 +2513,9 @@ async def download_result_file(run_dir_name: str, file_path: str):
 
 --- END FILE: ./backend/app/routers/data.py ---
 
---- START FILE: ./backend/app/routers/profiles.py (Size: 6486 bytes) ---
-# backend/app/routers/profiles.py
+--- START FILE: ./backend/app/routers/profiles.py (Size: 6608 bytes) ---
+# File: backend/app/routers/profiles.py
+# --- START OF FILE ---
 import logging
 import json
 import re # For name validation
@@ -2558,14 +2528,19 @@ from ..core.redis_rq import get_redis_connection
 from ..models.pipeline import ProfileData, SaveProfileRequest # Import updated models
 
 logger = logging.getLogger(__name__)
+
+# --- MODIFIED PREFIX ---
 router = APIRouter(
-    tags=["Profiles Management"], # Tag for OpenAPI docs
-    prefix="/api/profiles"        # Prefix for all routes in this router
+    tags=["Profiles Management"],
+    prefix="/profiles"        # <<< CHANGED: Remove /api from here
 )
+# --- END MODIFICATION ---
 
 # Basic validation for profile names (alphanumeric, underscore, dash)
 VALID_PROFILE_NAME_REGEX = re.compile(r"^[a-zA-Z0-9_\-]+$")
 MAX_PROFILE_NAME_LENGTH = 50
+
+# --- Rest of the file remains the same ---
 
 @router.get("", response_model=List[str], summary="List Saved Profile Names")
 async def list_profile_names(
@@ -2669,27 +2644,29 @@ async def delete_profile(
     except Exception as e:
         logger.exception(f"Unexpected error deleting profile '{profile_name}'.")
         raise HTTPException(status_code=500, detail="Internal server error deleting profile.")
+# --- END OF FILE ---
 
 --- END FILE: ./backend/app/routers/profiles.py ---
 
---- START FILE: ./backend/app/routers/websockets.py (Size: 15572 bytes) ---
+--- START FILE: ./backend/app/routers/websockets.py (Size: 17278 bytes) ---
 # backend/app/routers/websockets.py
 import asyncio
 import logging
 import json
-import redis # <--- ADD THIS IMPORT
-import redis.asyncio as aioredis # Use async redis client
+import redis # Sync redis for initial job check (optional)
+import redis.asyncio as aioredis # Use async redis client for pub/sub and list fetching
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
 
 # Import WebSocketState for checking connection status
-from starlette.websockets import WebSocketState # <--- Ensure this import is present
+from starlette.websockets import WebSocketState
 
 from rq.job import Job
 from rq.exceptions import NoSuchJobError
 from rq import Queue
 
-from ..core.redis_rq import get_pipeline_queue, get_redis_connection # Sync connection for initial check
-from ..core.config import LOG_CHANNEL_PREFIX, REDIS_HOST, REDIS_PORT, REDIS_DB
+# Import config and sync redis connection getter
+from ..core.redis_rq import get_pipeline_queue, get_redis_connection
+from ..core.config import LOG_CHANNEL_PREFIX, REDIS_HOST, REDIS_PORT, REDIS_DB, LOG_HISTORY_PREFIX # Add LOG_HISTORY_PREFIX
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -2708,15 +2685,14 @@ class ConnectionManager:
         self.listener_tasks: dict[str, asyncio.Task] = {}
 
     async def connect(self, websocket: WebSocket, job_id: str):
-        """Accepts WebSocket connection, creates Redis listener, and starts listening."""
+        """Accepts WebSocket, fetches history, creates Redis listener, and starts listening."""
         await websocket.accept()
         self.active_connections[job_id] = websocket
         logger.info(f"WebSocket connected for job {job_id}")
 
-        # Create dedicated async Redis connection for Pub/Sub
         redis_client = None
         try:
-            # Ensure correct types for Redis connection params
+            # Create dedicated async Redis connection for Pub/Sub and List operations
             redis_client = aioredis.Redis(
                 host=str(REDIS_HOST), port=int(REDIS_PORT), db=int(REDIS_DB), decode_responses=True
             )
@@ -2724,25 +2700,88 @@ class ConnectionManager:
             self.pubsub_clients[job_id] = redis_client
             logger.info(f"Async Redis client created and connected for job {job_id}")
 
-            # Start listener task
+            # --- Fetch and send log history ---
+            await self.send_history(websocket, job_id, redis_client)
+            # --- End history sending ---
+
+            # Start listener task AFTER sending history
             task = asyncio.create_task(self._redis_listener(websocket, job_id))
             self.listener_tasks[job_id] = task
             logger.info(f"Started Redis listener task for job {job_id}")
 
+        except WebSocketDisconnect:
+             logger.warning(f"WebSocket disconnected during history sending for job {job_id}. Aborting listener setup.")
+             # Clean up potentially created Redis client
+             if redis_client: await self._close_redis_client(redis_client, job_id)
+             # Ensure connection is removed
+             if job_id in self.active_connections: del self.active_connections[job_id]
         except Exception as e:
-            logger.error(f"Failed to setup Redis listener for job {job_id}: {e}", exc_info=True)
-            # Clean up potentially created Redis client if listener setup failed
-            if redis_client:
-                try:
-                    await redis_client.close()
-                    # Check if connection_pool exists before trying to disconnect it
-                    if hasattr(redis_client, 'connection_pool'):
-                        await redis_client.connection_pool.disconnect()
-                except Exception as close_err:
-                     logger.error(f"Error closing redis client during connect failure for {job_id}: {close_err}")
-
+            logger.error(f"Failed to setup Redis connection/send history for job {job_id}: {e}", exc_info=True)
+            # Clean up potentially created Redis client if setup failed
+            if redis_client: await self._close_redis_client(redis_client, job_id)
             # Disconnect websocket if setup fails
-            await self.disconnect(websocket, job_id, code=status.WS_1011_INTERNAL_ERROR, reason="Redis setup failed")
+            await self.disconnect(websocket, job_id, code=status.WS_1011_INTERNAL_ERROR, reason="Redis setup or history send failed")
+
+    async def send_history(self, websocket: WebSocket, job_id: str, redis_client: aioredis.Redis):
+        """Fetches log history from Redis List and sends it to the WebSocket."""
+        list_key = f"{LOG_HISTORY_PREFIX}{job_id}"
+        logger.info(f"Fetching log history from list: {list_key}")
+        try:
+            # Fetch all items from the list
+            history = await redis_client.lrange(list_key, 0, -1)
+            logger.info(f"Retrieved {len(history)} historical log lines for job {job_id}.")
+
+            if not history:
+                 await websocket.send_text(json.dumps({"type": "status", "line": f"No history found. Listening for live logs..."}))
+                 return # No history to send
+
+            await websocket.send_text(json.dumps({"type": "status", "line": f"--- Start of history ({len(history)} lines) ---"}))
+            for log_message_json in history:
+                # Check connection before each send inside the loop
+                if websocket.client_state != WebSocketState.CONNECTED:
+                    logger.warning(f"WebSocket disconnected while sending history for job {job_id}.")
+                    raise WebSocketDisconnect(code=status.WS_1001_GOING_AWAY, reason="Client disconnected during history send")
+
+                try:
+                    # Send the raw JSON string from the list
+                    await websocket.send_text(log_message_json)
+                    # Slight pause to prevent overwhelming the client buffer? Optional.
+                    # await asyncio.sleep(0.001)
+                except WebSocketDisconnect:
+                     raise # Re-raise to be caught by the outer handler
+                except Exception as send_err:
+                    logger.error(f"Error sending historical log line to WebSocket for job {job_id}: {send_err}")
+                    # Decide whether to continue or break on send error
+                    # break
+
+            await websocket.send_text(json.dumps({"type": "status", "line": f"--- End of history. Listening for live logs... ---"}))
+            logger.info(f"Finished sending history for job {job_id}")
+
+        except redis.exceptions.RedisError as e:
+            logger.error(f"Redis error fetching history for job {job_id} from {list_key}: {e}")
+            await websocket.send_text(json.dumps({"type": "error", "line": f"Error fetching log history: {e}"}))
+            # Continue to live listening even if history fails? Or disconnect? For now, continue.
+        except WebSocketDisconnect:
+            raise # Propagate disconnect upwards
+        except Exception as e:
+            logger.error(f"Unexpected error sending history for job {job_id}: {e}", exc_info=True)
+            try:
+                 await websocket.send_text(json.dumps({"type": "error", "line": f"Unexpected server error sending history."}))
+            except WebSocketDisconnect:
+                logger.warning(f"WebSocket disconnected before error could be sent for job {job_id}.")
+
+
+    async def _close_redis_client(self, redis_client: aioredis.Redis, job_id: str):
+        """Safely closes an async Redis client and its pool."""
+        if not redis_client: return
+        try:
+            await redis_client.close()
+            # Check if connection_pool exists before trying to disconnect it
+            if hasattr(redis_client, 'connection_pool'):
+                await redis_client.connection_pool.disconnect()
+            logger.info(f"Closed async Redis client for job {job_id}")
+        except Exception as e:
+            logger.error(f"Error closing Redis client for job {job_id}: {e}", exc_info=True)
 
 
     async def disconnect(self, websocket: WebSocket, job_id: str, code: int = status.WS_1000_NORMAL_CLOSURE, reason: str | None = None):
@@ -2754,52 +2793,29 @@ class ConnectionManager:
         if task and not task.done():
             task.cancel()
             try:
-                await asyncio.wait_for(task, timeout=1.0) # Wait briefly for cancellation
+                await asyncio.wait_for(task, timeout=1.0)
                 logger.info(f"Listener task for job {job_id} cancelled.")
-            except asyncio.CancelledError:
-                logger.info(f"Listener task for job {job_id} cancellation confirmed.")
-            except asyncio.TimeoutError:
-                 logger.warning(f"Timeout waiting for listener task cancellation for job {job_id}.")
-            except Exception as e:
-                 logger.error(f"Error during listener task cancellation for job {job_id}: {e}", exc_info=True)
+            except asyncio.CancelledError: logger.info(f"Listener task for job {job_id} cancellation confirmed.")
+            except asyncio.TimeoutError: logger.warning(f"Timeout waiting for listener task cancellation for job {job_id}.")
+            except Exception as e: logger.error(f"Error during listener task cancellation for job {job_id}: {e}", exc_info=True)
 
         # Close Redis client
         redis_client = self.pubsub_clients.pop(job_id, None)
-        if redis_client:
-            try:
-                # Check if pool exists before disconnecting
-                if hasattr(redis_client, 'connection_pool'):
-                    await redis_client.close()
-                    await redis_client.connection_pool.disconnect()
-                else:
-                    await redis_client.close() # Fallback for older versions or different setups
-                logger.info(f"Closed async Redis client for job {job_id}")
-            except Exception as e:
-                logger.error(f"Error closing Redis client for job {job_id}: {e}", exc_info=True)
+        await self._close_redis_client(redis_client, job_id)
 
         # Remove active connection reference
-        if job_id in self.active_connections:
-             del self.active_connections[job_id]
+        if job_id in self.active_connections: del self.active_connections[job_id]
 
         # Close WebSocket connection if it's still open
         try:
-            # Check state before attempting close
             if hasattr(websocket, 'client_state') and websocket.client_state == WebSocketState.CONNECTED:
                 await websocket.close(code=code, reason=reason)
                 logger.info(f"WebSocket for job {job_id} closed from server.")
-            elif hasattr(websocket, 'client_state'): # Check if attribute exists before accessing
-                 logger.info(f"WebSocket for job {job_id} was already closed or in state {websocket.client_state}.")
-            else:
-                 logger.warning(f"WebSocket object for job {job_id} does not have 'client_state'. Cannot determine state before closing.")
-                 # Optionally try closing anyway, or just log
-                 # await websocket.close(code=code, reason=reason)
-        except AttributeError:
-             logger.warning(f"WebSocket object for job {job_id} lacks 'client_state'. Assuming closed or unable to check.")
-        except RuntimeError as e:
-            # Handles cases like trying to close an already closed socket
-            logger.warning(f"RuntimeError closing WebSocket for job {job_id} (likely already closed): {e}")
-        except Exception as e:
-            logger.error(f"Error closing WebSocket for job {job_id}: {e}", exc_info=True)
+            elif hasattr(websocket, 'client_state'): logger.info(f"WebSocket for job {job_id} was already in state {websocket.client_state}.")
+            else: logger.warning(f"WebSocket object for job {job_id} lacks 'client_state'. Cannot check state.")
+        except AttributeError: logger.warning(f"WebSocket object for job {job_id} lacks 'client_state'.")
+        except RuntimeError as e: logger.warning(f"RuntimeError closing WebSocket for job {job_id} (likely already closed): {e}")
+        except Exception as e: logger.error(f"Error closing WebSocket for job {job_id}: {e}", exc_info=True)
 
         logger.info(f"WebSocket disconnected cleanup complete for job {job_id}")
 
@@ -2811,36 +2827,22 @@ class ConnectionManager:
 
         if not redis_client:
             logger.error(f"No Redis client found for job {job_id} in listener task.")
-            # Attempt disconnect even if client is missing from dict
             await self.disconnect(websocket, job_id, status.WS_1011_INTERNAL_ERROR, "Internal error: Redis client missing")
             return
 
-        pubsub = None # Initialize pubsub to None
+        pubsub = None
         try:
-            pubsub = redis_client.pubsub() # Assign here
+            pubsub = redis_client.pubsub()
             await pubsub.subscribe(channel_name)
-            logger.info(f"Subscribed to Redis channel: {channel_name}")
+            logger.info(f"Subscribed to Redis channel: {channel_name} for live updates.")
 
-            # Send initial confirmation message
-            try:
-                await websocket.send_text(json.dumps({"type": "status", "line": f"Listening for logs..."}))
-            except WebSocketDisconnect:
-                logger.warning(f"WebSocket for job {job_id} disconnected before initial status message could be sent.")
-                return # Exit if disconnected immediately
-            except Exception as send_err:
-                logger.error(f"Failed to send initial status message for job {job_id}: {send_err}")
-                # Consider disconnecting if initial send fails
-                await self.disconnect(websocket, job_id, status.WS_1011_INTERNAL_ERROR, "Failed initial send")
-                return
+            # No initial confirmation message needed here, as history sending handles that
 
             while True:
-                # Check websocket state before waiting for message
-                 # Use the correct way to check WebSocket state
                 if not hasattr(websocket, 'client_state') or websocket.client_state != WebSocketState.CONNECTED:
                     logger.warning(f"WebSocket for job {job_id} disconnected, stopping listener.")
                     break
 
-                # Wait for a message with timeout
                 try:
                     message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
                 except redis.exceptions.ConnectionError as redis_conn_err:
@@ -2853,38 +2855,30 @@ class ConnectionManager:
                      continue
 
                 if message:
-                    # logger.debug(f"Received message from {channel_name}: {message}")
                     message_data = message['data']
                     if isinstance(message_data, str):
                          try:
-                              # Forward the raw JSON string received from Redis
+                              # Forward the raw JSON string received from Redis Pub/Sub
                               await websocket.send_text(message_data)
 
                               # Check for control messages like EOF *after* sending
                               try:
                                   log_data = json.loads(message_data)
                                   if log_data.get("type") == "control" and log_data.get("line") == "EOF":
-                                       logger.info(f"Received EOF marker for job {job_id}. Listener task ending.")
-                                       # Don't disconnect here, let the main loop or client handle closure
+                                       logger.info(f"Received EOF marker via Pub/Sub for job {job_id}. Listener task ending.")
+                                       # Don't disconnect here, just stop listening
                                        break # Exit listener loop naturally
-                              except json.JSONDecodeError:
-                                   # This is normal if the message wasn't the JSON control message
-                                   pass
-                              except Exception as parse_err:
-                                    logger.warning(f"Could not parse message data as JSON for EOF check: {message_data}, Error: {parse_err}")
-
+                              except Exception: pass # Ignore parsing errors for EOF check
 
                          except WebSocketDisconnect:
-                              logger.warning(f"WebSocket disconnected while trying to send message for job {job_id}. Listener stopping.")
+                              logger.warning(f"WebSocket disconnected while trying to send live message for job {job_id}. Listener stopping.")
                               break # Exit loop immediately
                          except Exception as send_err:
-                             logger.error(f"Error sending message to WebSocket for job {job_id}: {send_err}", exc_info=True)
-                             # Optional: break loop on send error, or add retry logic
+                             logger.error(f"Error sending live message to WebSocket for job {job_id}: {send_err}", exc_info=True)
                              await asyncio.sleep(0.1)
 
         except asyncio.CancelledError:
              logger.info(f"Redis listener task for {job_id} cancelled.")
-             # Do not re-raise, let disconnect handle cleanup
         except redis.exceptions.ConnectionError as e:
             logger.error(f"Redis connection error in listener setup for job {job_id}: {e}", exc_info=True)
             await self.disconnect(websocket, job_id, status.WS_1011_INTERNAL_ERROR, "Redis connection error")
@@ -2892,12 +2886,10 @@ class ConnectionManager:
             logger.exception(f"Unexpected error in Redis listener for job {job_id}: {e}")
             await self.disconnect(websocket, job_id, status.WS_1011_INTERNAL_ERROR, "Listener error")
         finally:
-             # Ensure unsubscribe happens only if pubsub was successfully created
-            if pubsub:
+            if pubsub and pubsub.subscribed:
                 try:
-                    if pubsub.subscribed:
-                        await pubsub.unsubscribe(channel_name)
-                        logger.info(f"Unsubscribed from Redis channel: {channel_name}")
+                    await pubsub.unsubscribe(channel_name)
+                    logger.info(f"Unsubscribed from Redis channel: {channel_name}")
                 except Exception as e:
                     logger.error(f"Error unsubscribing from {channel_name}: {e}", exc_info=True)
 
@@ -2905,7 +2897,7 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-@router.websocket("/logs/{job_id}") # Removed /api/ws prefix as it's added in app.py
+@router.websocket("/logs/{job_id}")
 async def websocket_log_endpoint(
     websocket: WebSocket,
     job_id: str,
@@ -2915,45 +2907,59 @@ async def websocket_log_endpoint(
 ):
     """Handles WebSocket connections for live job logs."""
     logger.info(f"WebSocket connection request for job ID: {job_id}")
-    # 1. Basic Job ID validation (optional, can connect anyway)
+
+    # 1. Basic Job ID validation
     if not job_id or job_id.startswith("staged_") or job_id == "N/A":
         logger.warning(f"Rejecting WebSocket connection for invalid job ID: {job_id}")
-        # Use await websocket.close() for FastAPI websockets
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION) # Removed reason for simplicity
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    # Optional: Check if job exists (using sync connection is okay here)
+    # 2. Optional: Check if job exists or log history list exists
+    job_exists_in_rq = False
+    log_history_exists = False
     try:
+        # Check RQ
         job = Job.fetch(job_id, connection=redis_conn)
+        job_exists_in_rq = True
         logger.info(f"Websocket connecting for existing job {job_id} (Status: {job.get_status()})")
     except NoSuchJobError:
-        logger.warning(f"Websocket connecting for job {job_id}, but job not found in RQ main queue (may be finished, failed, or not yet queued).")
+        logger.warning(f"Websocket connecting for job {job_id}, but job not found in RQ main queue (may be finished, failed, or never queued).")
     except Exception as e:
-        logger.error(f"Error checking job existence for {job_id} before WS connect: {e}", exc_info=True)
-        # Allow connection despite check error
+        logger.error(f"Error checking RQ job existence for {job_id}: {e}", exc_info=True)
 
-    # 2. Connect the WebSocket using the manager
+    try:
+        # Check if log history list exists (using sync conn is fine for EXISTS)
+        list_key = f"{LOG_HISTORY_PREFIX}{job_id}"
+        if redis_conn.exists(list_key):
+            log_history_exists = True
+            logger.info(f"Log history list found for job {job_id}: {list_key}")
+        else:
+             logger.warning(f"Log history list NOT found for job {job_id}: {list_key}")
+    except Exception as e:
+         logger.error(f"Error checking log history existence for {job_id}: {e}", exc_info=True)
+
+    # Decide whether to proceed (e.g., require either RQ job or history to exist)
+    # if not job_exists_in_rq and not log_history_exists:
+    #     logger.error(f"Rejecting WebSocket connection: Neither RQ job nor log history found for job ID: {job_id}")
+    #     await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Job or log history not found")
+    #     return
+    # For now, let's allow connection even if neither is found, it will just show "No history..."
+
+    # 3. Connect the WebSocket using the manager (fetches history, then starts listener)
     await manager.connect(websocket, job_id)
 
-    # 3. Keep the connection alive and detect client disconnect
+    # 4. Keep the connection alive and detect client disconnect
     try:
         while True:
-            # Wait for client messages (e.g., ping, close request)
             # This loop primarily serves to detect disconnection.
             # Log forwarding is handled by the background listener task.
-            # Use receive_text() for FastAPI websockets
             try:
                 data = await websocket.receive_text()
                 logger.debug(f"Received text from client {job_id}: {data}")
-                # Example: Handle a custom 'closeme' message from client
-                if data.lower() == 'closeme':
-                     logger.info(f"Client {job_id} requested WebSocket close.")
-                     await manager.disconnect(websocket, job_id, status.WS_1000_NORMAL_CLOSURE, "Client requested close")
-                     break # Exit the loop
+                # Handle potential client messages if needed (e.g., ping/pong)
+                if data.lower() == 'ping': await websocket.send_text('pong')
             except WebSocketDisconnect as e:
-                # This is the expected way to detect client-side disconnect
                 logger.info(f"WebSocket for job {job_id} disconnected by client. Code: {e.code}, Reason: {e.reason}")
-                # Ensure manager cleanup is called
                 await manager.disconnect(websocket, job_id, e.code, e.reason)
                 break # Exit the loop
 
@@ -2964,7 +2970,7 @@ async def websocket_log_endpoint(
 
 --- END FILE: ./backend/app/routers/websockets.py ---
 
---- START FILE: ./backend/app/routers/jobs.py (Size: 52819 bytes) ---
+--- START FILE: ./backend/app/routers/jobs.py (Size: 45829 bytes) ---
 # File: backend/app/routers/jobs.py
 import logging
 import json
@@ -2992,7 +2998,8 @@ from ..core.config import (
     STAGED_JOBS_KEY, DEFAULT_JOB_TIMEOUT,
     DEFAULT_RESULT_TTL, DEFAULT_FAILURE_TTL, MAX_REGISTRY_JOBS,
     SAREK_DEFAULT_PROFILE, SAREK_DEFAULT_TOOLS, SAREK_DEFAULT_STEP, SAREK_DEFAULT_ALIGNER,
-    RESULTS_DIR, DATA_DIR # Ensure DATA_DIR is imported
+    RESULTS_DIR, DATA_DIR,
+    LOG_HISTORY_PREFIX # <<< Import LOG_HISTORY_PREFIX
 )
 from ..core.redis_rq import get_redis_connection, get_pipeline_queue
 from ..models.pipeline import PipelineInput, SampleInfo, JobStatusDetails, JobResourceInfo
@@ -3009,7 +3016,7 @@ router = APIRouter(
 )
 
 # --- Job Staging and Control Routes ---
-# (stage_pipeline_job and start_job remain unchanged from the previous correct version)
+# (stage_pipeline_job and start_job remain unchanged)
 @router.post("/run_pipeline", status_code=200, summary="Stage Pipeline Job")
 async def stage_pipeline_job(
     input_data: PipelineInput,
@@ -3055,14 +3062,20 @@ async def stage_pipeline_job(
     except redis.exceptions.RedisError as e:
         logger.error(f"Redis error staging job: {e}")
         if input_csv_path and input_csv_path.exists():
-             try: os.remove(input_csv_path); logger.info(f"Cleaned up temporary CSV file due to Redis error: {input_csv_path}")
-             except OSError as remove_e: logger.warning(f"Could not clean up temporary CSV file {input_csv_path} after Redis error: {remove_e}")
+             try:
+                 os.remove(input_csv_path)
+                 logger.info(f"Cleaned up temporary CSV file due to Redis error: {input_csv_path}")
+             except OSError as remove_e:
+                 logger.warning(f"Could not clean up temporary CSV file {input_csv_path} after Redis error: {remove_e}")
         raise HTTPException(status_code=503, detail="Service unavailable: Could not stage job due to storage error.")
     except Exception as e:
          logger.exception(f"Unexpected error during job staging for input: {input_data}")
          if input_csv_path and input_csv_path.exists():
-             try: os.remove(input_csv_path); logger.info(f"Cleaned up temporary CSV file due to unexpected error: {input_csv_path}")
-             except OSError as remove_e: logger.warning(f"Could not clean up temporary CSV file {input_csv_path} after error: {remove_e}")
+             try:
+                 os.remove(input_csv_path)
+                 logger.info(f"Cleaned up temporary CSV file due to unexpected error: {input_csv_path}")
+             except OSError as remove_e:
+                 logger.warning(f"Could not clean up temporary CSV file {input_csv_path} after error: {remove_e}")
          raise HTTPException(status_code=500, detail="Internal server error during job staging.")
 
 
@@ -3105,7 +3118,6 @@ async def start_job(
 
 
 # --- Job Listing and Status Routes ---
-
 @router.get("/jobs_list", response_model=List[Dict[str, Any]], summary="List All Relevant Jobs (Staged & RQ)")
 async def get_jobs_list(
     redis_conn: redis.Redis = Depends(get_redis_connection),
@@ -3124,59 +3136,42 @@ async def get_jobs_list(
     except redis.exceptions.RedisError as e: logger.error(f"Redis error fetching staged jobs from '{STAGED_JOBS_KEY}': {e}")
 
     # 2. Get RQ Jobs
-    # Add CanceledJobRegistry to the list
     registries_to_check = {
-        "queued": queue,
-        "started": StartedJobRegistry(queue=queue),
-        "finished": FinishedJobRegistry(queue=queue),
-        "failed": FailedJobRegistry(queue=queue),
-        "canceled": CanceledJobRegistry(queue=queue), # Check canceled jobs too
+        "queued": queue, "started": StartedJobRegistry(queue=queue),
+        "finished": FinishedJobRegistry(queue=queue), "failed": FailedJobRegistry(queue=queue),
+        "canceled": CanceledJobRegistry(queue=queue),
     }
     rq_job_ids_to_fetch = set()
     for status_name, registry_or_queue in registries_to_check.items():
         try:
             job_ids = []
-            # Check if it's a registry first
             if isinstance(registry_or_queue, (StartedJobRegistry, FinishedJobRegistry, FailedJobRegistry, CanceledJobRegistry)):
                 limit = MAX_REGISTRY_JOBS if status_name in ["finished", "failed", "canceled"] else -1
                 total_count = registry_or_queue.count
                 start_index = max(0, total_count - limit) if limit > 0 else 0
                 end_index = total_count - 1
-                if start_index <= end_index:
-                     job_ids = registry_or_queue.get_job_ids(start_index, end_index)
-                     job_ids.reverse() # Show most recent first for registries
-            elif isinstance(registry_or_queue, Queue):
-                 job_ids = registry_or_queue.get_job_ids() # Get all queued IDs
-            else:
-                 logger.warning(f"Unsupported type for job fetching: {type(registry_or_queue)}")
-                 continue
-            if job_ids:
-                 rq_job_ids_to_fetch.update(job_ids)
-        except redis.exceptions.RedisError as e:
-            logger.error(f"Redis error fetching job IDs from {status_name} registry/queue: {e}")
-        except Exception as e:
-            logger.exception(f"Unexpected error fetching job IDs from {status_name} registry/queue.")
+                if start_index <= end_index: job_ids = registry_or_queue.get_job_ids(start_index, end_index); job_ids.reverse()
+            elif isinstance(registry_or_queue, Queue): job_ids = registry_or_queue.get_job_ids()
+            else: logger.warning(f"Unsupported type for job fetching: {type(registry_or_queue)}"); continue
+            if job_ids: rq_job_ids_to_fetch.update(job_ids)
+        except redis.exceptions.RedisError as e: logger.error(f"Redis error fetching job IDs from {status_name}: {e}")
+        except Exception as e: logger.exception(f"Unexpected error fetching job IDs from {status_name}.")
 
     if rq_job_ids_to_fetch:
         try:
-            # Use the queue's connection directly for fetching
             fetched_jobs = Job.fetch_many(list(rq_job_ids_to_fetch), connection=queue.connection, serializer=queue.serializer)
             for job in fetched_jobs:
                 if job:
-                    # No need to call refresh() explicitly here, fetch_many should provide current data
-                    current_status = job.get_status(refresh=False)
-                    error_summary = None
-                    job_meta = job.meta or {}
+                    current_status = job.get_status(refresh=False); error_summary = None; job_meta = job.meta or {}
                     if current_status == JobStatus.FAILED:
-                        error_summary = job_meta.get('error_message', "Job failed processing")
-                        stderr_snippet = job_meta.get('stderr_snippet')
+                        error_summary = job_meta.get('error_message', "Job failed processing"); stderr_snippet = job_meta.get('stderr_snippet')
                         if error_summary == "Job failed processing" and job.exc_info:
-                            try: error_summary = job.exc_info.strip().split('\n')[-1]
-                            except Exception: pass
-                        if stderr_snippet: error_summary += f" (stderr: {stderr_snippet}...)"
+                            try:
+                                error_summary = job.exc_info.strip().split('\n')[-1]
+                            except Exception:
+                                pass
+                        if stderr_snippet: error_summary += f" (stderr: ...{stderr_snippet[-100:]})" # Show tail of snippet
                     resources = { "peak_memory_mb": job_meta.get("peak_memory_mb"), "average_cpu_percent": job_meta.get("average_cpu_percent"), "duration_seconds": job_meta.get("duration_seconds") }
-                    # Overwrite staged entry if RQ job exists for the same ID root
-                    # Also update if the RQ status is different from a previously fetched status (e.g., moved from queued to started)
                     if job.id not in all_jobs_dict or all_jobs_dict[job.id].get('status') != current_status:
                          all_jobs_dict[job.id] = { "id": job.id, "status": current_status, "description": job_meta.get("description") or job.description or f"RQ job {job.id[:12]}...", "enqueued_at": dt_to_timestamp(job.enqueued_at), "started_at": dt_to_timestamp(job.started_at), "ended_at": dt_to_timestamp(job.ended_at), "result": job.result, "error": error_summary, "meta": job_meta, "staged_at": None, "resources": resources if any(v is not None for v in resources.values()) else None }
         except redis.exceptions.RedisError as e: logger.error(f"Redis error during Job.fetch_many: {e}")
@@ -3188,17 +3183,12 @@ async def get_jobs_list(
 
     # 4. Limit Finished/Failed/Canceled jobs
     if MAX_REGISTRY_JOBS > 0:
-        final_list = []
-        terminal_count = 0
+        final_list = []; terminal_count = 0
         for job_item in all_jobs_list:
-             status = job_item.get('status', '').lower()
-             is_terminal = status in ['finished', 'failed', 'stopped', 'canceled']
+             status = job_item.get('status', '').lower(); is_terminal = status in ['finished', 'failed', 'stopped', 'canceled']
              if is_terminal:
-                 if terminal_count < MAX_REGISTRY_JOBS:
-                     final_list.append(job_item)
-                     terminal_count += 1
-             else: # Always include non-terminal jobs
-                 final_list.append(job_item)
+                 if terminal_count < MAX_REGISTRY_JOBS: final_list.append(job_item); terminal_count += 1
+             else: final_list.append(job_item)
         all_jobs_list = final_list
 
     return all_jobs_list
@@ -3214,27 +3204,19 @@ async def get_job_status(
     try:
         if not job_id.startswith("staged_"):
             try:
-                # Use queue's connection for fetching single job too
-                job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer)
-                # No need for refresh() if just fetched
-                status = job.get_status(refresh=False)
-                result = None
-                meta_data = job.meta or {}
-                error_info_summary = None
+                job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer); status = job.get_status(refresh=False)
+                result = None; meta_data = job.meta or {}; error_info_summary = None
                 try:
-                    if status == JobStatus.FINISHED:
-                        result = job.result
+                    if status == JobStatus.FINISHED: result = job.result
                     elif status == JobStatus.FAILED:
-                        error_info_summary = meta_data.get('error_message', "Job failed processing")
-                        stderr_snippet = meta_data.get('stderr_snippet')
+                        error_info_summary = meta_data.get('error_message', "Job failed processing"); stderr_snippet = meta_data.get('stderr_snippet')
                         if error_info_summary == "Job failed processing" and job.exc_info:
-                            try: error_info_summary = job.exc_info.strip().split('\n')[-1]
-                            except Exception: pass
-                        if stderr_snippet: error_info_summary += f" (stderr: {stderr_snippet}...)"
-                except Exception as e:
-                    logger.exception(f"Error accessing result/error info for job {job_id} (status: {status}).")
-                    error_info_summary = error_info_summary or "Could not retrieve job result/error details."
-
+                            try:
+                                error_info_summary = job.exc_info.strip().split('\n')[-1]
+                            except Exception:
+                                pass
+                        if stderr_snippet: error_info_summary += f" (stderr: ...{stderr_snippet[-100:]})"
+                except Exception as e: logger.exception(f"Error accessing result/error info for job {job_id} (status: {status})."); error_info_summary = error_info_summary or "Could not retrieve job result/error details."
                 resource_stats = {"peak_memory_mb": meta_data.get("peak_memory_mb"), "average_cpu_percent": meta_data.get("average_cpu_percent"), "duration_seconds": meta_data.get("duration_seconds")}
                 return JobStatusDetails(job_id=job.id, status=status, description=meta_data.get("description") or job.description, enqueued_at=dt_to_timestamp(job.enqueued_at), started_at=dt_to_timestamp(job.started_at), ended_at=dt_to_timestamp(job.ended_at), result=result, error=error_info_summary, meta=meta_data, resources=JobResourceInfo(**resource_stats) if any(v is not None for v in resource_stats.values()) else None)
             except NoSuchJobError: logger.warning(f"RQ Job ID '{job_id}' not found.")
@@ -3270,50 +3252,24 @@ async def stop_job(
     message = f"Action processed for job {job_id}." # Default message
 
     try:
-        # Use the queue's connection for fetching
-        job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer)
-        status = job.get_status(refresh=True)
-
+        job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer); status = job.get_status(refresh=True)
         if job.is_finished or job.is_failed or job.is_stopped or job.is_canceled:
-            logger.warning(f"Attempted to stop/cancel job {job_id} which is already in terminal state: {status}")
-            message = f"Job already in terminal state: {status}."
+            logger.warning(f"Attempted to stop/cancel job {job_id} which is already in terminal state: {status}"); message = f"Job already in terminal state: {status}."
         elif status == JobStatus.QUEUED:
             logger.info(f"Job {job_id} is queued. Attempting to cancel...")
-            try:
-                job.cancel() # Cancel the job (removes from queue)
-                logger.info(f"Successfully canceled queued job {job_id}.")
-                message = f"Queued job {job_id} canceled successfully."
-            except Exception as cancel_err:
-                logger.error(f"Failed to cancel queued job {job_id}: {cancel_err}")
-                message = f"Failed to cancel queued job {job_id}."
-                # Optionally raise 500 if cancel fails critically
-                # raise HTTPException(status_code=500, detail=f"Failed to cancel queued job: {cancel_err}")
+            try: job.cancel(); logger.info(f"Successfully canceled queued job {job_id}."); message = f"Queued job {job_id} canceled successfully."
+            except Exception as cancel_err: logger.error(f"Failed to cancel queued job {job_id}: {cancel_err}"); message = f"Failed to cancel queued job {job_id}."
         elif status == JobStatus.STARTED or status == JobStatus.RUNNING:
             logger.info(f"Job {job_id} is {status}. Attempting to send stop signal...")
             try:
-                # Use bytes connection for send_stop_job_command
                 redis_conn_bytes = redis.Redis(host=redis_conn.connection_pool.connection_kwargs.get('host', 'localhost'), port=redis_conn.connection_pool.connection_kwargs.get('port', 6379), db=redis_conn.connection_pool.connection_kwargs.get('db', 0), decode_responses=False)
-                send_stop_job_command(redis_conn_bytes, job.id)
-                logger.info(f"Successfully sent stop signal command via RQ for job {job_id}.")
-                message = f"Stop signal sent to job {job_id}."
-            except Exception as sig_err:
-                logger.warning(f"Could not send stop signal command via RQ for job {job_id}. Worker may not stop immediately. Error: {sig_err}")
-                message = f"Stop signal attempted for job {job_id} (check worker logs)."
-        else:
-             logger.warning(f"Job {job_id} has unexpected status '{status}', cannot stop/cancel.")
-             message = f"Job {job_id} has status '{status}', cannot stop/cancel."
-
+                send_stop_job_command(redis_conn_bytes, job.id); logger.info(f"Successfully sent stop signal command via RQ for job {job_id}."); message = f"Stop signal sent to job {job_id}."
+            except Exception as sig_err: logger.warning(f"Could not send stop signal command via RQ for job {job_id}. Worker may not stop immediately. Error: {sig_err}"); message = f"Stop signal attempted for job {job_id} (check worker logs)."
+        else: logger.warning(f"Job {job_id} has unexpected status '{status}', cannot stop/cancel."); message = f"Job {job_id} has status '{status}', cannot stop/cancel."
         return JSONResponse(status_code=200, content={"message": message, "job_id": job_id})
-
-    except NoSuchJobError:
-        logger.warning(f"Stop/cancel job request failed: Job ID '{job_id}' not found.")
-        raise HTTPException(status_code=404, detail=f"Cannot stop/cancel job: Job '{job_id}' not found.")
-    except redis.exceptions.RedisError as e:
-        logger.error(f"Redis error interacting with job {job_id} for stopping/canceling: {e}")
-        raise HTTPException(status_code=503, detail="Service unavailable: Could not connect to job backend.")
-    except Exception as e:
-        logger.exception(f"Unexpected error stopping/canceling job {job_id}.")
-        raise HTTPException(status_code=500, detail="Internal server error attempting to stop/cancel job.")
+    except NoSuchJobError: logger.warning(f"Stop/cancel job request failed: Job ID '{job_id}' not found."); raise HTTPException(status_code=404, detail=f"Cannot stop/cancel job: Job '{job_id}' not found.")
+    except redis.exceptions.RedisError as e: logger.error(f"Redis error interacting with job {job_id} for stopping/canceling: {e}"); raise HTTPException(status_code=503, detail="Service unavailable: Could not connect to job backend.")
+    except Exception as e: logger.exception(f"Unexpected error stopping/canceling job {job_id}."); raise HTTPException(status_code=500, detail="Internal server error attempting to stop/cancel job.")
 
 
 @router.delete("/remove_job/{job_id}", status_code=200, summary="Remove Staged or RQ Job Data")
@@ -3325,133 +3281,76 @@ async def remove_job(
     logger.info(f"Request received to remove job/data for ID: {job_id}")
     csv_path_to_remove = None
     job_removed = False
+    log_history_key = f"{LOG_HISTORY_PREFIX}{job_id}" # Define log history key
 
     if job_id.startswith("staged_"):
         logger.info(f"Attempting to remove staged job '{job_id}' from hash '{STAGED_JOBS_KEY}'.")
         try:
-            # Check if job exists and get CSV path before deleting
             job_details_bytes = redis_conn.hget(STAGED_JOBS_KEY, job_id.encode('utf-8'))
             if job_details_bytes:
-                try:
-                    details = json.loads(job_details_bytes.decode('utf-8'))
-                    csv_path_to_remove = details.get("input_csv_path")
-                    logger.debug(f"Identified potential CSV path for staged job {job_id}: {csv_path_to_remove}")
-                except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as parse_err:
-                    logger.warning(f"Could not parse details for staged job {job_id} during removal, cannot identify CSV. Error: {parse_err}")
-            else:
-                 logger.warning(f"Staged job '{job_id}' not found in hash for removal.")
-                 raise HTTPException(status_code=404, detail=f"Staged job '{job_id}' not found.")
+                try: details = json.loads(job_details_bytes.decode('utf-8')); csv_path_to_remove = details.get("input_csv_path"); logger.debug(f"Identified potential CSV path for staged job {job_id}: {csv_path_to_remove}")
+                except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as parse_err: logger.warning(f"Could not parse details for staged job {job_id} during removal, cannot identify CSV. Error: {parse_err}")
+            else: logger.warning(f"Staged job '{job_id}' not found in hash for removal."); raise HTTPException(status_code=404, detail=f"Staged job '{job_id}' not found.")
 
-            # Attempt deletion
             num_deleted = redis_conn.hdel(STAGED_JOBS_KEY, job_id.encode('utf-8'))
-            if num_deleted == 1:
-                logger.info(f"Successfully removed staged job entry: {job_id}")
-                job_removed = True # Mark as removed
+            if num_deleted == 1: logger.info(f"Successfully removed staged job entry: {job_id}"); job_removed = True
             else:
-                # This case might occur if the job was deleted between the check and the hdel
                 logger.warning(f"Staged job '{job_id}' disappeared before hdel could complete.")
-                # Consider it removed if it's gone, but log the warning
-                if not redis_conn.hexists(STAGED_JOBS_KEY, job_id.encode('utf-8')):
-                    job_removed = True
-                else:
-                    # If it still exists after num_deleted was 0, something is wrong
-                     logger.error(f"Inconsistent state removing staged job {job_id}. HDEL returned 0 but job still exists?")
-                     raise HTTPException(status_code=500, detail="Inconsistent state during job removal.")
-
-        except redis.exceptions.RedisError as e:
-            logger.error(f"Redis error removing staged job {job_id}: {e}")
-            raise HTTPException(status_code=503, detail="Service unavailable: Could not remove job due to storage error.")
-        except HTTPException as e:
-            raise e
-        except Exception as e:
-            logger.exception(f"Unexpected error during staged job removal for {job_id}.")
-            raise HTTPException(status_code=500, detail="Internal server error removing staged job.")
+                if not redis_conn.hexists(STAGED_JOBS_KEY, job_id.encode('utf-8')): job_removed = True
+                else: logger.error(f"Inconsistent state removing staged job {job_id}. HDEL returned 0 but job still exists?"); raise HTTPException(status_code=500, detail="Inconsistent state during job removal.")
+        except redis.exceptions.RedisError as e: logger.error(f"Redis error removing staged job {job_id}: {e}"); raise HTTPException(status_code=503, detail="Service unavailable: Could not remove job due to storage error.")
+        except HTTPException as e: raise e
+        except Exception as e: logger.exception(f"Unexpected error during staged job removal for {job_id}."); raise HTTPException(status_code=500, detail="Internal server error removing staged job.")
     else:
         # Handle RQ Job Removal
         logger.info(f"Attempting to remove RQ job '{job_id}' data.")
         job = None
         try:
-            # Use the queue's connection
-            try:
-                job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer)
-                logger.debug(f"Fetched RQ job {job_id} successfully.")
-            except NoSuchJobError:
-                logger.warning(f"RQ Job '{job_id}' not found for removal.")
-                raise HTTPException(status_code=404, detail=f"RQ Job '{job_id}' not found.")
-            except Exception as fetch_err:
-                logger.error(f"Error fetching job {job_id}: {fetch_err}")
-                raise HTTPException(status_code=500, detail=f"Could not fetch job {job_id} for removal")
+            try: job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer); logger.debug(f"Fetched RQ job {job_id} successfully.")
+            except NoSuchJobError: logger.warning(f"RQ Job '{job_id}' not found for removal."); raise HTTPException(status_code=404, detail=f"RQ Job '{job_id}' not found.")
+            except Exception as fetch_err: logger.error(f"Error fetching job {job_id}: {fetch_err}"); raise HTTPException(status_code=500, detail=f"Could not fetch job {job_id} for removal")
 
-            # Get CSV path from metadata *before* deleting
-            if job.meta:
-                # Preferentially use the specific path used in the task execution if available
-                csv_path_to_remove = job.meta.get("input_csv_path_used") or job.meta.get("input_csv_path")
-                logger.debug(f"Identified potential CSV path for RQ job {job_id}: {csv_path_to_remove}")
+            if job.meta: csv_path_to_remove = job.meta.get("input_csv_path_used") or job.meta.get("input_csv_path"); logger.debug(f"Identified potential CSV path for RQ job {job_id}: {csv_path_to_remove}")
 
-            # *** Start Corrected Block ***
             # 1. Remove from queue and registries FIRST
             try:
-                logger.info(f"Attempting to remove job {job_id} from queue/registries...")
-                # Cancel removes from queue/started and moves to CanceledRegistry if applicable
-                job.cancel()
-                # Explicitly remove from terminal registries
-                FinishedJobRegistry(queue=queue).remove(job, delete_job=False)
-                FailedJobRegistry(queue=queue).remove(job, delete_job=False)
-                CanceledJobRegistry(queue=queue).remove(job, delete_job=False) # Also remove from canceled
-                # Add others if needed (Deferred, Scheduled)
-                # DeferredJobRegistry(queue=queue).remove(job, delete_job=False)
-                # ScheduledJobRegistry(queue=queue).remove(job, delete_job=False)
+                logger.info(f"Attempting to remove job {job_id} from queue/registries..."); job.cancel()
+                FinishedJobRegistry(queue=queue).remove(job, delete_job=False); FailedJobRegistry(queue=queue).remove(job, delete_job=False); CanceledJobRegistry(queue=queue).remove(job, delete_job=False)
                 logger.info(f"Successfully removed/cancelled job {job_id} from relevant registries/queue.")
-            except InvalidJobOperation as e:
-                # This might happen for jobs already finished/failed, which is okay.
-                logger.debug(f"Job {job_id} might have already been removed from registries/queue or in unexpected state: {e}")
-            except Exception as reg_remove_err:
-                # Log error but proceed to delete the job hash if possible
-                logger.warning(f"Error removing job {job_id} from registries/queue: {reg_remove_err}")
+            except InvalidJobOperation as e: logger.debug(f"Job {job_id} might have already been removed from registries/queue or in unexpected state: {e}")
+            except Exception as reg_remove_err: logger.warning(f"Error removing job {job_id} from registries/queue: {reg_remove_err}")
 
             # 2. Delete the job HASH itself
+            try: job.delete(); logger.info(f"Successfully deleted RQ job hash for {job_id}"); job_removed = True
+            except InvalidJobOperation as e: logger.warning(f"Invalid operation trying to delete RQ job hash for {job_id}: {e}."); raise HTTPException(status_code=409, detail=f"Cannot remove job '{job_id}': Invalid operation (job might be active or locked). Try stopping first.")
+            except Exception as delete_err: logger.error(f"Error deleting job hash for {job_id}: {delete_err}"); raise HTTPException(status_code=500, detail=f"Could not delete job {job_id}")
+
+        except HTTPException as e: raise e
+        except redis.exceptions.RedisError as e: logger.error(f"Redis error removing RQ job {job_id}: {e}"); raise HTTPException(status_code=503, detail="Service unavailable: Could not remove RQ job due to storage error.")
+        except Exception as e: logger.exception(f"Unexpected error during RQ job removal for {job_id}: {str(e)}"); raise HTTPException(status_code=500, detail=f"Internal server error removing RQ job: {str(e)}")
+
+    # --- Cleanup CSV and Log History ---
+    if job_removed:
+        # Cleanup CSV
+        if csv_path_to_remove:
             try:
-                job.delete() # CORRECTED: No remove_from_registries argument here
-                logger.info(f"Successfully deleted RQ job hash for {job_id}")
-                job_removed = True # Mark as removed
-            except InvalidJobOperation as e:
-                 # This might happen if the job is still actively running and locked
-                logger.warning(f"Invalid operation trying to delete RQ job hash for {job_id}: {e}.")
-                raise HTTPException(status_code=409, detail=f"Cannot remove job '{job_id}': Invalid operation (job might be active or locked). Try stopping first.")
-            except Exception as delete_err:
-                logger.error(f"Error deleting job hash for {job_id}: {delete_err}")
-                raise HTTPException(status_code=500, detail=f"Could not delete job {job_id}")
-            # *** End Corrected Block ***
+                csv_path = Path(csv_path_to_remove)
+                if csv_path.is_file() and csv_path.suffix == '.csv' and str(csv_path.parent).startswith(tempfile.gettempdir()):
+                    os.remove(csv_path); logger.info(f"Cleaned up temporary CSV file for removed job {job_id}: {csv_path}")
+                elif csv_path.exists(): logger.warning(f"Temporary CSV path '{csv_path_to_remove}' exists but not cleaned up for job {job_id}.")
+                else: logger.debug(f"Temporary CSV path '{csv_path_to_remove}' not found. No cleanup needed for job {job_id}.")
+            except Exception as e: logger.warning(f"Unexpected error during CSV cleanup for job {job_id}: {e}")
 
-        except HTTPException as e:
-            raise e
-        except redis.exceptions.RedisError as e:
-            logger.error(f"Redis error removing RQ job {job_id}: {e}")
-            raise HTTPException(status_code=503, detail="Service unavailable: Could not remove RQ job due to storage error.")
-        except Exception as e:
-            logger.exception(f"Unexpected error during RQ job removal for {job_id}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Internal server error removing RQ job: {str(e)}")
-
-    # --- Cleanup CSV ---
-    # Do this *after* successful removal from Redis/RQ structures
-    if job_removed and csv_path_to_remove:
-        try:
-            csv_path = Path(csv_path_to_remove)
-            # Basic check: is it a CSV file in the system's temp directory?
-            if csv_path.is_file() and csv_path.suffix == '.csv' and str(csv_path.parent).startswith(tempfile.gettempdir()):
-                os.remove(csv_path)
-                logger.info(f"Cleaned up temporary CSV file for removed job {job_id}: {csv_path}")
-            elif csv_path.exists():
-                logger.warning(f"Temporary CSV path '{csv_path_to_remove}' exists but is not a file, not a CSV, or not in temp dir. Skipping cleanup for job {job_id}.")
-            else:
-                 logger.debug(f"Temporary CSV path '{csv_path_to_remove}' not found. No cleanup needed for job {job_id}.")
-        except OSError as e:
-            logger.warning(f"Could not clean up temporary CSV file {csv_path_to_remove} for job {job_id}: {e}")
-        except Exception as e:
-            logger.warning(f"Unexpected error during CSV cleanup for job {job_id}: {e}")
+        # Cleanup Log History List
+        if not job_id.startswith("staged_"):
+            try:
+                deleted_count = redis_conn.delete(log_history_key)
+                if deleted_count > 0: logger.info(f"Cleaned up log history list for removed job {job_id}: {log_history_key}")
+                else: logger.debug(f"Log history list not found or already deleted for job {job_id}: {log_history_key}")
+            except redis.exceptions.RedisError as e: logger.error(f"Redis error deleting log history list {log_history_key} for job {job_id}: {e}")
+            except Exception as e: logger.error(f"Unexpected error deleting log history list {log_history_key} for job {job_id}: {e}")
 
     if not job_removed:
-        # Fallback if logic somehow fails to set the flag despite no exception
         logger.error(f"Job removal process completed for {job_id}, but job_removed flag is false. Removal likely failed.")
         raise HTTPException(status_code=500, detail=f"Failed to remove job {job_id}.")
 
@@ -3472,241 +3371,120 @@ async def rerun_job(
 
     try:
         # Fetch the original job using the queue's connection
-        try:
-            original_job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer)
-            logger.debug(f"Fetched original job {job_id} for re-staging.")
-        except NoSuchJobError:
-            logger.warning(f"Re-stage request failed: Original RQ job ID '{job_id}' not found.")
-            raise HTTPException(status_code=404, detail=f"Original job '{job_id}' not found to re-stage.")
+        try: original_job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer); logger.debug(f"Fetched original job {job_id} for re-staging.")
+        except NoSuchJobError: logger.warning(f"Re-stage request failed: Original RQ job ID '{job_id}' not found."); raise HTTPException(status_code=404, detail=f"Original job '{job_id}' not found to re-stage.")
 
-        if not original_job.meta:
-            logger.error(f"Cannot re-stage job {job_id}: Original job metadata is missing.")
-            raise HTTPException(status_code=400, detail=f"Cannot re-stage job {job_id}: Missing original parameters.")
-
-        original_meta = original_job.meta
-        logger.debug(f"Original job metadata found for {job_id}")
+        if not original_job.meta: logger.error(f"Cannot re-stage job {job_id}: Original job metadata is missing."); raise HTTPException(status_code=400, detail=f"Cannot re-stage job {job_id}: Missing original parameters.")
+        original_meta = original_job.meta; logger.debug(f"Original job metadata found for {job_id}")
 
         # Extract necessary parameters from metadata
-        original_sarek_params = original_meta.get("sarek_params", {})
-        original_input_params = original_meta.get("input_params", {})
-        original_sample_info = original_meta.get("sample_info", [])
-        original_description = original_meta.get("description", f"Sarek run") # Use stored description
-        original_input_type = original_meta.get("input_type")
-        original_step = original_sarek_params.get("step")
+        original_sarek_params = original_meta.get("sarek_params", {}); original_input_params = original_meta.get("input_params", {}); original_sample_info = original_meta.get("sample_info", [])
+        original_description = original_meta.get("description", f"Sarek run"); original_input_type = original_meta.get("input_type"); original_step = original_sarek_params.get("step")
 
-        # Validate essential metadata fields
-        if not original_input_type or not original_step:
-            logger.error(f"Missing input_type ('{original_input_type}') or step ('{original_step}') in original metadata for job {job_id}")
-            raise HTTPException(status_code=400, detail=f"Cannot re-stage job {job_id}: Original input type or step missing from metadata.")
-        if not original_sample_info:
-            logger.error(f"Missing sample_info in original metadata for job {job_id}")
-            raise HTTPException(status_code=400, detail=f"Cannot re-stage job {job_id}: Original sample info missing from metadata.")
+        if not original_input_type or not original_step: logger.error(f"Missing input_type ('{original_input_type}') or step ('{original_step}') in original metadata for job {job_id}"); raise HTTPException(status_code=400, detail=f"Cannot re-stage job {job_id}: Original input type or step missing from metadata.")
+        if not original_sample_info: logger.error(f"Missing sample_info in original metadata for job {job_id}"); raise HTTPException(status_code=400, detail=f"Cannot re-stage job {job_id}: Original sample info missing from metadata.")
 
-        # --- Recreate Samplesheet with ABSOLUTE Paths ---
-        logger.info(f"Recreating samplesheet for input type: {original_input_type} with absolute paths.")
-        new_sample_rows_for_csv = []
-        csv_headers = []
-        validation_errors_rerun = [] # Collect errors during path validation
-
+        # Recreate Samplesheet with ABSOLUTE Paths
+        logger.info(f"Recreating samplesheet for input type: {original_input_type} with absolute paths."); new_sample_rows_for_csv = []; csv_headers = []; validation_errors_rerun = []
         try:
-            # Determine headers based on input type
-            if original_input_type == "fastq":
-                csv_headers = ['patient', 'sample', 'sex', 'status', 'lane', 'fastq_1', 'fastq_2']
+            if original_input_type == "fastq": csv_headers = ['patient', 'sample', 'sex', 'status', 'lane', 'fastq_1', 'fastq_2']
             elif original_input_type == "bam_cram":
-                first_file_rel = original_sample_info[0].get('bam_cram') if original_sample_info else None
+                first_file_rel = original_sample_info[0].get('bam_cram') if original_sample_info else None;
                 if not first_file_rel: raise ValueError("Missing bam_cram path in first sample for BAM/CRAM re-stage.")
-                bam_cram_col = 'cram' if first_file_rel.lower().endswith('.cram') else 'bam'
-                csv_headers = ['patient', 'sample', 'sex', 'status', bam_cram_col, 'index']
-            elif original_input_type == "vcf":
-                csv_headers = ['patient', 'sample', 'sex', 'status', 'vcf', 'index']
-            else:
-                 raise ValueError(f"Unknown original input type '{original_input_type}'.")
+                bam_cram_col = 'cram' if first_file_rel.lower().endswith('.cram') else 'bam'; csv_headers = ['patient', 'sample', 'sex', 'status', bam_cram_col, 'index']
+            elif original_input_type == "vcf": csv_headers = ['patient', 'sample', 'sex', 'status', 'vcf', 'index']
+            else: raise ValueError(f"Unknown original input type '{original_input_type}'.")
 
-            # Process each sample to resolve paths
             for i, sample_data in enumerate(original_sample_info):
                 row_dict = {}
-                # Map common fields (assuming they exist, validated above)
                 for key in ['patient', 'sample', 'sex', 'status']:
                     row_dict[key] = sample_data[key]
 
-                # Resolve and validate file paths
                 def resolve_and_validate(relative_path_key: str, is_required: bool, allowed_suffixes: Optional[List[str]] = None) -> Optional[str]:
                     relative_path = sample_data.get(relative_path_key)
                     if not relative_path:
-                        if is_required:
-                            validation_errors_rerun.append(f"Sample {i+1}: Missing required field '{relative_path_key}' in original metadata.")
+                        if is_required: validation_errors_rerun.append(f"Sample {i+1}: Missing required field '{relative_path_key}' in original metadata."); return None
                         return None # Return None for optional or failed required
                     try:
-                        # Use get_safe_path which checks existence and ensures path is within DATA_DIR
                         absolute_path = get_safe_path(DATA_DIR, relative_path)
                         if not absolute_path.is_file():
                             validation_errors_rerun.append(f"Sample {i+1}: File for '{relative_path_key}' ('{relative_path}') not found at resolved path {absolute_path}.")
                             return None
-                        # Check suffixes if provided
                         if allowed_suffixes and absolute_path.suffix.lower() not in [s.lower() for s in allowed_suffixes] and not any(absolute_path.name.lower().endswith(s.lower()) for s in allowed_suffixes):
                              validation_errors_rerun.append(f"Sample {i+1}: File for '{relative_path_key}' ('{relative_path}') has invalid suffix. Allowed: {', '.join(allowed_suffixes)}")
                              return None
                         return str(absolute_path)
-                    except HTTPException as e: # Catch errors from get_safe_path
-                        validation_errors_rerun.append(f"Sample {i+1}: Error validating path for '{relative_path_key}' ('{relative_path}'): {e.detail}")
-                        return None
-                    except Exception as e:
-                        logger.error(f"Unexpected error resolving path for {relative_path_key} ('{relative_path}') in sample {i+1}: {e}")
-                        validation_errors_rerun.append(f"Sample {i+1}: Internal error resolving path for '{relative_path_key}'.")
-                        return None
+                    except HTTPException as e: validation_errors_rerun.append(f"Sample {i+1}: Error validating path for '{relative_path_key}' ('{relative_path}'): {e.detail}"); return None
+                    except Exception as e: logger.error(f"Unexpected error resolving path for {relative_path_key} ('{relative_path}') in sample {i+1}: {e}"); validation_errors_rerun.append(f"Sample {i+1}: Internal error resolving path for '{relative_path_key}'."); return None
 
-                # Map type-specific fields using resolved paths
                 if original_input_type == "fastq":
-                    row_dict['lane'] = sample_data.get('lane')
+                    row_dict['lane'] = sample_data.get('lane');
                     if not row_dict['lane']: validation_errors_rerun.append(f"Sample {i+1}: Missing 'lane'.")
-                    row_dict['fastq_1'] = resolve_and_validate('fastq_1', True, ['.fq.gz', '.fastq.gz', '.fq', '.fastq'])
-                    row_dict['fastq_2'] = resolve_and_validate('fastq_2', True, ['.fq.gz', '.fastq.gz', '.fq', '.fastq'])
-                    if not row_dict['fastq_1'] or not row_dict['fastq_2']:
-                         # Error already added by resolve_and_validate if required
-                         pass
-
+                    row_dict['fastq_1'] = resolve_and_validate('fastq_1', True, ['.fq.gz', '.fastq.gz', '.fq', '.fastq']); row_dict['fastq_2'] = resolve_and_validate('fastq_2', True, ['.fq.gz', '.fastq.gz', '.fq', '.fastq'])
                 elif original_input_type == "bam_cram":
-                    row_dict[bam_cram_col] = resolve_and_validate('bam_cram', True, ['.bam', '.cram'])
-                    row_dict['index'] = resolve_and_validate('index', False, ['.bai', '.crai']) # Index optional unless CRAM
-                    # Add CRAM index requirement check
-                    if row_dict[bam_cram_col] and row_dict[bam_cram_col].lower().endswith('.cram') and not row_dict['index']:
-                        validation_errors_rerun.append(f"Sample {i+1}: CRAM file requires a corresponding index file (.crai).")
-                    if not row_dict[bam_cram_col]:
-                        pass # Error already added
-
+                    row_dict[bam_cram_col] = resolve_and_validate('bam_cram', True, ['.bam', '.cram']); row_dict['index'] = resolve_and_validate('index', False, ['.bai', '.crai'])
+                    if row_dict[bam_cram_col] and row_dict[bam_cram_col].lower().endswith('.cram') and not row_dict['index']: validation_errors_rerun.append(f"Sample {i+1}: CRAM file requires a corresponding index file (.crai).")
                 elif original_input_type == "vcf":
-                    row_dict['vcf'] = resolve_and_validate('vcf', True, ['.vcf', '.vcf.gz'])
-                    row_dict['index'] = resolve_and_validate('index', False, ['.tbi', '.csi']) # Index optional unless VCF.GZ
-                    # Add VCF.GZ index requirement check
-                    if row_dict['vcf'] and row_dict['vcf'].lower().endswith('.vcf.gz') and not row_dict['index']:
-                         validation_errors_rerun.append(f"Sample {i+1}: Compressed VCF (.vcf.gz) requires a corresponding index file (.tbi/.csi).")
-                    if not row_dict['vcf']:
-                        pass # Error already added
-
-                # Convert row_dict to list based on header order
+                    row_dict['vcf'] = resolve_and_validate('vcf', True, ['.vcf', '.vcf.gz']); row_dict['index'] = resolve_and_validate('index', False, ['.tbi', '.csi'])
+                    if row_dict['vcf'] and row_dict['vcf'].lower().endswith('.vcf.gz') and not row_dict['index']: validation_errors_rerun.append(f"Sample {i+1}: Compressed VCF (.vcf.gz) requires a corresponding index file (.tbi/.csi).")
                 new_sample_rows_for_csv.append([row_dict.get(h) for h in csv_headers])
 
-            # Check for validation errors *before* writing CSV
-            if validation_errors_rerun:
-                 error_message = "Cannot re-stage job: Errors found validating original file paths:\n" + "\n".join(f"- {e}" for e in validation_errors_rerun)
-                 logger.error(error_message)
-                 raise HTTPException(status_code=400, detail=error_message)
-
-        except ValueError as sample_err: # Catch errors from header/key checks
-            logger.error(f"Error processing sample structure during re-stage of {job_id}: {sample_err}")
-            raise HTTPException(status_code=400, detail=f"Cannot re-stage: Incomplete or invalid sample data structure in original job {job_id}.")
-        except Exception as sample_err: # Catch unexpected errors
-             logger.exception(f"Unexpected error processing sample data during re-stage of {job_id}: {sample_err}")
-             raise HTTPException(status_code=500, detail="Error processing original sample data for re-run.")
+            if validation_errors_rerun: error_message = "Cannot re-stage job: Errors found validating original file paths:\n" + "\n".join(f"- {e}" for e in validation_errors_rerun); logger.error(error_message); raise HTTPException(status_code=400, detail=error_message)
+        except ValueError as sample_err: logger.error(f"Error processing sample structure during re-stage of {job_id}: {sample_err}"); raise HTTPException(status_code=400, detail=f"Cannot re-stage: Incomplete or invalid sample data structure in original job {job_id}.")
+        except Exception as sample_err: logger.exception(f"Unexpected error processing sample data during re-stage of {job_id}: {sample_err}"); raise HTTPException(status_code=500, detail="Error processing original sample data for re-run.")
 
 
-        # Create the new CSV file (only if validation passed)
+        # Create the new CSV file
         try:
-            # Create temp file in system's temp dir
-            with tempfile.NamedTemporaryFile(mode='w', newline='', suffix='.csv', delete=False) as temp_csv:
-                csv_writer = csv.writer(temp_csv)
-                csv_writer.writerow(csv_headers)
-                csv_writer.writerows(new_sample_rows_for_csv)
-                new_temp_csv_file_path = temp_csv.name # Store the absolute path
+            with tempfile.NamedTemporaryFile(mode='w', newline='', suffix='.csv', delete=False) as temp_csv: csv_writer = csv.writer(temp_csv); csv_writer.writerow(csv_headers); csv_writer.writerows(new_sample_rows_for_csv); new_temp_csv_file_path = temp_csv.name
             logger.info(f"Created new temporary samplesheet for re-run with absolute paths: {new_temp_csv_file_path}")
-        except (OSError, csv.Error) as e:
-            logger.error(f"Failed to create new temporary samplesheet for re-run of {job_id}: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error: Could not create samplesheet for re-run.")
+        except (OSError, csv.Error) as e: logger.error(f"Failed to create new temporary samplesheet for re-run of {job_id}: {e}"); raise HTTPException(status_code=500, detail="Internal server error: Could not create samplesheet for re-run.")
 
-
-        # --- Prepare Job Details for Staging ---
-        # Function to resolve optional paths relative to DATA_DIR (kept for consistency, but uses relative paths from meta now)
+        # Function to resolve optional paths relative to DATA_DIR
         def get_original_optional_file_path_str(key):
-            filename = original_input_params.get(key) # Get original RELATIVE path
+            filename = original_input_params.get(key);
             if not filename: return None
             try:
-                full_path = (DATA_DIR / filename).resolve()
-                if os.path.commonpath([DATA_DIR.resolve(), full_path.resolve()]) == str(DATA_DIR.resolve()) and full_path.is_file():
-                    return str(full_path) # Return ABSOLUTE path for job args
-                else:
-                    logger.warning(f"Optional file '{filename}' (resolved: {full_path}) for key '{key}' not found or invalid during re-stage of {job_id}. Setting to None.")
-                    return None
-            except Exception as e:
-                logger.warning(f"Error resolving optional file path '{filename}' for key '{key}' during re-stage of {job_id}: {e}. Setting to None.")
-                return None
-
-        intervals_path = get_original_optional_file_path_str("intervals_file")
-        dbsnp_path = get_original_optional_file_path_str("dbsnp")
-        known_indels_path = get_original_optional_file_path_str("known_indels")
-        pon_path = get_original_optional_file_path_str("pon")
-
+                full_path = (DATA_DIR / filename).resolve();
+                if os.path.commonpath([DATA_DIR.resolve(), full_path.resolve()]) == str(DATA_DIR.resolve()) and full_path.is_file(): return str(full_path)
+                else: logger.warning(f"Optional file '{filename}' (resolved: {full_path}) for key '{key}' not found or invalid during re-stage of {job_id}. Setting to None."); return None
+            except Exception as e: logger.warning(f"Error resolving optional file path '{filename}' for key '{key}' during re-stage of {job_id}: {e}. Setting to None."); return None
+        intervals_path = get_original_optional_file_path_str("intervals_file"); dbsnp_path = get_original_optional_file_path_str("dbsnp"); known_indels_path = get_original_optional_file_path_str("known_indels"); pon_path = get_original_optional_file_path_str("pon")
         new_staged_job_id = f"staged_{uuid.uuid4()}"
-        new_job_details = {
-            # --- Paths ---
-            "input_csv_path": new_temp_csv_file_path, # Use the new absolute path
-            "intervals_path": intervals_path, # Absolute path if valid, else None
-            "dbsnp_path": dbsnp_path,         # Absolute path if valid, else None
-            "known_indels_path": known_indels_path, # Absolute path if valid, else None
-            "pon_path": pon_path,             # Absolute path if valid, else None
-            "outdir_base_path": str(RESULTS_DIR), # Use config path
-            # --- Sarek Params (Directly from original_sarek_params) ---
-            "genome": original_sarek_params.get("genome"), # Keep original value (should exist)
-            "tools": original_sarek_params.get("tools"), # Keep original value (can be None)
-            "step": original_step,
-            "profile": original_sarek_params.get("profile", SAREK_DEFAULT_PROFILE),
-            "aligner": original_sarek_params.get("aligner"), # Keep original value
-            "joint_germline": original_sarek_params.get("joint_germline", False),
-            "wes": original_sarek_params.get("wes", False),
-            "trim_fastq": original_sarek_params.get("trim_fastq", False),
-            "skip_qc": original_sarek_params.get("skip_qc", False),
-            "skip_annotation": original_sarek_params.get("skip_annotation", False),
-            "skip_baserecalibrator": original_sarek_params.get("skip_baserecalibrator", False),
-            # --- Metadata ---
-            "description": f"Re-run of job {job_id} ({original_description})",
-            "staged_at": time.time(),
-            "input_type": original_input_type,
-            "input_filenames": original_input_params, # Store original *relative* paths here
-            "sample_info": original_sample_info, # Store original sample info (with relative paths)
-            "is_rerun": True, # Mark as a re-run
-            "original_job_id": job_id, # Reference the original job ID
-        }
-
-        # Stage the new job in Redis
+        new_job_details = { "input_csv_path": new_temp_csv_file_path, "intervals_path": intervals_path, "dbsnp_path": dbsnp_path, "known_indels_path": known_indels_path, "pon_path": pon_path, "outdir_base_path": str(RESULTS_DIR), "genome": original_sarek_params.get("genome"), "tools": original_sarek_params.get("tools"), "step": original_step, "profile": original_sarek_params.get("profile", SAREK_DEFAULT_PROFILE), "aligner": original_sarek_params.get("aligner"), "joint_germline": original_sarek_params.get("joint_germline", False), "wes": original_sarek_params.get("wes", False), "trim_fastq": original_sarek_params.get("trim_fastq", False), "skip_qc": original_sarek_params.get("skip_qc", False), "skip_annotation": original_sarek_params.get("skip_annotation", False), "skip_baserecalibrator": original_sarek_params.get("skip_baserecalibrator", False), "description": f"Re-run of job {job_id} ({original_description})", "staged_at": time.time(), "input_type": original_input_type, "input_filenames": original_input_params, "sample_info": original_sample_info, "is_rerun": True, "original_job_id": job_id, }
         redis_conn.hset(STAGED_JOBS_KEY, new_staged_job_id.encode('utf-8'), json.dumps(new_job_details).encode('utf-8'))
         logger.info(f"Created new staged job {new_staged_job_id} for re-run of {job_id}")
 
-        # --- Optional: Remove the original failed/finished job ---
-        # Uncomment the block below if you want the original job to be removed automatically
-        # try:
-        #     logger.info(f"Attempting to remove original job {job_id} after successful re-stage.")
-        #     original_job.delete() # Delete only the hash after re-stage
-        #     logger.info(f"Successfully removed original job hash {job_id}.")
-        # except Exception as e:
-        #     logger.warning(f"Could not remove original job hash {job_id} after re-stage: {e}")
-        # --- End Optional Remove ---
-
-        return JSONResponse(
-            status_code=200, # Return 200 OK as the staging was successful
-            content={
-                "message": f"Job {job_id} re-staged successfully as {new_staged_job_id}. Please start the new job.",
-                "staged_job_id": new_staged_job_id
-            }
-        )
+        return JSONResponse( status_code=200, content={ "message": f"Job {job_id} re-staged successfully as {new_staged_job_id}. Please start the new job.", "staged_job_id": new_staged_job_id } )
 
     except redis.exceptions.RedisError as e:
         logger.error(f"Redis error during job re-stage for {job_id}: {e}")
-        # Cleanup the newly created CSV if staging fails
+        # --- CORRECTED CLEANUP ---
         if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists():
-            try: os.remove(new_temp_csv_file_path)
-            except OSError: logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after Redis error.")
+            try:
+                os.remove(new_temp_csv_file_path)
+            except OSError:
+                logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after Redis error.")
+        # --- END CORRECTION ---
         raise HTTPException(status_code=503, detail="Service unavailable: Could not access job storage.")
     except HTTPException as e:
-        # Cleanup the newly created CSV if staging fails
+        # --- CORRECTED CLEANUP ---
         if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists():
-            try: os.remove(new_temp_csv_file_path)
-            except OSError: logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after HTTP error.")
+            try:
+                os.remove(new_temp_csv_file_path)
+            except OSError:
+                logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after HTTP error.")
+        # --- END CORRECTION ---
         raise e
     except Exception as e:
         logger.exception(f"Unexpected error during job re-stage for {job_id}: {e}")
-        # Cleanup the newly created CSV if staging fails
+        # --- CORRECTED CLEANUP ---
         if new_temp_csv_file_path and Path(new_temp_csv_file_path).exists():
-             try: os.remove(new_temp_csv_file_path)
-             except OSError: logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after unexpected error.")
+             try:
+                 os.remove(new_temp_csv_file_path)
+             except OSError:
+                 logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after unexpected error.")
+        # --- END CORRECTION ---
         raise HTTPException(status_code=500, detail="Internal server error during job re-stage.")
 
 --- END FILE: ./backend/app/routers/jobs.py ---
@@ -7489,7 +7267,7 @@ export default function RootLayout({
 
 --- END FILE: ./frontend_app/tsconfig.json ---
 
---- START FILE: ./frontend_app/components/jobs/JobActions.tsx (Size: 22257 bytes) ---
+--- START FILE: ./frontend_app/components/jobs/JobActions.tsx (Size: 22790 bytes) ---
 // File: frontend_app/components/jobs/JobActions.tsx
 "use client";
 
@@ -7501,23 +7279,18 @@ import {
     MoreHorizontal,
     Play,
     Square,
-    Trash2,
     RotateCcw,
+    Trash2,
     Info,
     FolderGit2,
     Loader2,
-    Terminal, // <--- Import Terminal icon
+    Terminal,
 } from "lucide-react";
 import { toast } from "sonner";
 
+// UI Component Imports
 import { Button, buttonVariants } from "@/components/ui/button";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -7535,59 +7308,24 @@ import {
     DialogTitle,
     DialogDescription,
     DialogFooter,
-    DialogClose, // Import DialogClose
+    DialogClose,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
-// Import specific types needed
-import { Job, SampleInfo, JobMeta, InputFilenames, SarekParams } from "@/lib/types";
+// Type and API Imports
+import { Job, SampleInfo, JobMeta, InputFilenames, SarekParams, RunParameters } from "@/lib/types";
 import * as api from "@/lib/api";
 import { formatDuration } from "@/lib/utils";
 import { formatDistanceToNow } from 'date-fns';
-import JobLogViewer from "./JobLogViewer"; // <--- Import the log viewer
+import JobLogViewer from "./JobLogViewer";
 
-// --- Helper Functions ---
-// UPDATED: Get badge variant based on the *internal* status for correct styling
-function getStatusVariant(internalStatus: string | null | undefined): "default" | "destructive" | "secondary" | "outline" {
-    const status = internalStatus?.toLowerCase();
-    switch (status) {
-        case 'finished': return 'default'; // Greenish success -> Use primary for now
-        case 'failed': return 'destructive'; // Red
-        case 'started': // Treat 'started' as 'running' for UI consistency
-        case 'running': return 'default'; // Blueish -> Primary
-        case 'queued':
-        case 'staged': return 'secondary'; // Gray
-        case 'stopped': // RQ's stopped state
-        case 'canceled': return 'outline'; // Muted/outline (Represents UI Stopped/Canceled)
-        default: return 'secondary';
-    }
-}
-function formatTimestamp(timestamp: number | null | undefined): string {
-  if (!timestamp) return "N/A";
-  try {
-    const date = new Date(timestamp * 1000);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return date.toLocaleString();
-  } catch (e) { return "Invalid Date"; }
-}
-function formatTimestampRelative(timestamp: number | null | undefined): string {
-  if (!timestamp) return "N/A";
-  try {
-    if (timestamp <= 0) return "N/A";
-    const date = new Date(timestamp * 1000);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return formatDistanceToNow(date, { addSuffix: true });
-  } catch (e) { console.error("Error formatting relative timestamp:", timestamp, e); return "Invalid Date"; }
-}
-const formatParamKey = (key: string): string => { return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); }
-const formatParamValue = (value: string | number | boolean | null | undefined | any[] | Record<string, any>): string => {
-    if (value === true) return 'Yes'; if (value === false) return 'No';
-    if (value === null || value === undefined) return 'N/A';
-    if (typeof value === 'string' && value.trim() === '') return 'N/A';
-    if (Array.isArray(value)) { return value.length > 0 ? value.join(', ') : 'N/A'; }
-    if (typeof value === 'object') { return JSON.stringify(value); }
-    return String(value);
-}
+// --- Helper Functions (Unchanged) ---
+function getStatusVariant(internalStatus: string | null | undefined): "default" | "destructive" | "secondary" | "outline" { const status = internalStatus?.toLowerCase(); switch (status) { case 'finished': return 'default'; case 'failed': return 'destructive'; case 'started': case 'running': return 'default'; case 'queued': case 'staged': return 'secondary'; case 'stopped': case 'canceled': return 'outline'; default: return 'secondary'; } }
+function formatTimestamp(timestamp: number | null | undefined): string { if (!timestamp) return "N/A"; try { const date = new Date(timestamp * 1000); if (isNaN(date.getTime())) return "Invalid Date"; return date.toLocaleString(); } catch (e) { return "Invalid Date"; } }
+function formatTimestampRelative(timestamp: number | null | undefined): string { if (!timestamp) return "N/A"; try { if (timestamp <= 0) return "N/A"; const date = new Date(timestamp * 1000); if (isNaN(date.getTime())) return "Invalid Date"; return formatDistanceToNow(date, { addSuffix: true }); } catch (e) { console.error("Error formatting relative timestamp:", timestamp, e); return "Invalid Date"; } }
+const formatParamKey = (key: string): string => key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+const formatParamValue = (value: any): string => { if (value === true) return 'Yes'; if (value === false) return 'No'; if (value === null || value === undefined) return 'N/A'; if (typeof value === 'string' && value.trim() === '') return 'N/A'; if (Array.isArray(value)) { return value.length > 0 ? value.join(', ') : 'N/A'; } if (typeof value === 'object') { return JSON.stringify(value); } return String(value); }
 // --- End Helper Functions ---
 
 interface JobActionsProps {
@@ -7595,90 +7333,45 @@ interface JobActionsProps {
 }
 
 export default function JobActions({ job }: JobActionsProps) {
-    if (!job) {
-        console.warn("JobActions rendered with undefined job prop");
-        return null;
-    }
-
-    const router = useRouter();
-    const queryClient = useQueryClient(); // Get query client instance
+    // --- State Management (Unchanged) ---
+    const queryClient = useQueryClient();
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [isStopConfirmOpen, setIsStopConfirmOpen] = useState(false);
     const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false);
     const [isRerunConfirmOpen, setIsRerunConfirmOpen] = useState(false);
-    const [isLogViewerOpen, setIsLogViewerOpen] = useState(false); // <--- State for log viewer
-    const [logViewerJobId, setLogViewerJobId] = useState<string | null>(null); // Store ID for log viewer
+    const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
+    const [logViewerJobId, setLogViewerJobId] = useState<string | null>(null);
+    const jobsQueryKey = ['jobsList'];
+    // --- End State Management ---
 
-    const jobsQueryKey = ['jobsList']; // Define query key used by useJobsList
-
-    // --- Mutations ---
-    const startMutation = useMutation({
-        mutationFn: api.startJob,
-        onSuccess: (data) => {
-            toast.success(`Job ${data.job_id} started successfully.`);
-            queryClient.invalidateQueries({ queryKey: jobsQueryKey });
-        },
-        onError: (error: Error) => { toast.error(`Failed to start job: ${error.message}`); }
-    });
-
-    const stopMutation = useMutation({
-        mutationFn: api.stopJob,
-        onSuccess: (data) => {
-            toast.info(`${data.message}`); // Use message from backend
-            queryClient.invalidateQueries({ queryKey: jobsQueryKey });
-        },
-        onError: (error: Error) => { toast.error(`Failed to stop/cancel job: ${error.message}`); },
-        onSettled: () => setIsStopConfirmOpen(false),
-    });
-
-    const removeMutation = useMutation({
-        mutationFn: api.removeJob,
-        onSuccess: (data) => {
-            toast.success(`Job ${data.removed_id} removed.`);
-            // Use invalidateQueries for simplicity and robustness
-            queryClient.invalidateQueries({ queryKey: jobsQueryKey });
-        },
-        onError: (error: Error) => {
-            toast.error(`Failed to remove job: ${error.message}`);
-            queryClient.invalidateQueries({ queryKey: jobsQueryKey }); // Invalidate on error too
-        },
-        onSettled: () => setIsRemoveConfirmOpen(false),
-    });
-
-    const rerunMutation = useMutation({
-        mutationFn: api.rerunJob,
-        onSuccess: (data) => {
-            toast.success(`Job ${job.id} re-staged as ${data.staged_job_id}.`);
-            queryClient.invalidateQueries({ queryKey: jobsQueryKey });
-        },
-        onError: (error: Error) => { toast.error(`Failed to re-stage job: ${error.message}`); },
-        onSettled: () => setIsRerunConfirmOpen(false),
-    });
+    // --- Mutations (Unchanged) ---
+    const startMutation = useMutation({ mutationFn: api.startJob, onSuccess: (data) => { toast.success(`Job ${data.job_id} started successfully.`); queryClient.invalidateQueries({ queryKey: jobsQueryKey }); }, onError: (error: Error) => { toast.error(`Failed to start job: ${error.message}`); } });
+    const stopMutation = useMutation({ mutationFn: api.stopJob, onSuccess: (data) => { toast.info(`${data.message}`); queryClient.invalidateQueries({ queryKey: jobsQueryKey }); }, onError: (error: Error) => { toast.error(`Failed to stop/cancel job: ${error.message}`); }, onSettled: () => setIsStopConfirmOpen(false), });
+    const removeMutation = useMutation({ mutationFn: api.removeJob, onSuccess: (data) => { toast.success(`Job ${data.removed_id} removed.`); queryClient.invalidateQueries({ queryKey: jobsQueryKey }); }, onError: (error: Error) => { toast.error(`Failed to remove job: ${error.message}`); queryClient.invalidateQueries({ queryKey: jobsQueryKey }); }, onSettled: () => setIsRemoveConfirmOpen(false), });
+    const rerunMutation = useMutation({ mutationFn: api.rerunJob, onSuccess: (data) => { toast.success(`Job ${job?.id} re-staged as ${data.staged_job_id}.`); queryClient.invalidateQueries({ queryKey: jobsQueryKey }); }, onError: (error: Error) => { toast.error(`Failed to re-stage job: ${error.message}`); }, onSettled: () => setIsRerunConfirmOpen(false), });
     // --- End Mutations ---
 
-
-    // --- Handlers ---
+    // --- Handlers (Unchanged) ---
     const handleStart = () => { if (!job) return; startMutation.mutate(job.id); };
     const handleStop = () => { if (!job) return; stopMutation.mutate(job.id); };
     const handleRemove = () => { if (!job) return; removeMutation.mutate(job.id); };
     const handleRerun = () => { if (!job) return; rerunMutation.mutate(job.id); };
-    // Handler to set the job ID and open the log viewer
-    const handleViewLogs = () => {
-        if (job) {
-            setLogViewerJobId(job.id); // Set the ID to pass to the viewer
-            setIsLogViewerOpen(true);
-        }
-     };
+    const handleViewLogs = () => { if (job && !job.id.startsWith("staged_")) { setLogViewerJobId(job.id); setIsLogViewerOpen(true); } };
     // --- End Handlers ---
 
+    // --- Base Check (Unchanged) ---
+    if (!job) {
+        console.warn("JobActions rendered with undefined job prop");
+        return <div className="flex items-center justify-end gap-1 h-9 w-[100px]"></div>;
+    }
+    // --- End Base Check ---
 
-    // --- Conditional Logic & Metadata ---
+    // --- Conditional Logic (Unchanged) ---
     const internalStatus = job.status?.toLowerCase();
     const canStart = internalStatus === 'staged';
     const canStop = internalStatus === 'running' || internalStatus === 'started' || internalStatus === 'queued';
     const canRerun = internalStatus === 'finished' || internalStatus === 'failed' || internalStatus === 'stopped' || internalStatus === 'canceled';
     const canRemove = internalStatus === 'staged' || internalStatus === 'finished' || internalStatus === 'failed' || internalStatus === 'stopped' || internalStatus === 'canceled';
-    // Allow viewing logs for any non-staged job
     const canViewLogs = internalStatus !== 'staged';
 
     const meta = job.meta as JobMeta | null | undefined;
@@ -7687,92 +7380,109 @@ export default function JobActions({ job }: JobActionsProps) {
     const hasParameters = !!(inputParams && Object.keys(inputParams).length > 0) || !!(sarekParams && Object.keys(sarekParams).length > 0);
     // --- End Conditional Logic ---
 
-
-    // --- JSX Rendering ---
     return (
         <>
-            <div className="flex items-center gap-1">
-                 {/* Start Button */}
-                 {canStart && (
-                     <Button
-                         variant="ghost" size="icon" onClick={handleStart} disabled={startMutation.isPending}
-                         className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" title="Start Job"
-                     >
-                         {startMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-[24px] w-[24px]" />}
-                         <span className="sr-only">Start Job</span>
-                     </Button>
-                 )}
-                 {/* Stop Button */}
-                 {canStop && (
-                     <Button
-                         variant="ghost" size="icon" onClick={() => setIsStopConfirmOpen(true)} disabled={stopMutation.isPending}
-                         className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" title="Stop/Cancel Job"
-                     >
-                         {stopMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Square className="h-5 w-5" />}
-                         <span className="sr-only">Stop/Cancel Job</span>
-                     </Button>
-                 )}
-                 {/* View Logs Button */}
-                 {canViewLogs && !job.id.startsWith("staged_") && (
+            {/* --- Parent FLEX Container with justify-between --- */}
+            <div className="flex items-center justify-between gap-1 w-full">
+
+                {/* --- Group 1: Left-aligned Buttons --- */}
+                <div className="flex items-center gap-1">
+
+                    {/* --- Logs Button Rendered FIRST (Always, but maybe disabled) --- */}
                     <Button
-                        variant="ghost" size="icon" onClick={handleViewLogs}
-                        className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" title="View Live Logs"
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleViewLogs}
+                        disabled={!canViewLogs} // Disable based on condition
+                        className={cn(
+                            "h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground transition-colors",
+                            !canViewLogs ? "opacity-50 cursor-not-allowed" : "cursor-pointer" // Style when disabled
+                        )}
+                        title={canViewLogs ? "View Live Logs" : "Logs not available for staged jobs"}
                     >
-                         <Terminal className="h-5 w-5" />
-                         <span className="sr-only">View Logs</span>
-                     </Button>
-                 )}
-                 {/* Re-stage Button */}
-                  {canRerun && (
-                    <Button
-                        variant="ghost" size="icon" onClick={() => setIsRerunConfirmOpen(true)} disabled={rerunMutation.isPending}
-                        className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" title="Re-stage Job"
-                    >
-                        {rerunMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <RotateCcw className="h-5 w-5" />}
-                        <span className="sr-only">Re-stage Job</span>
+                        <Terminal className="h-5 w-5" />
+                        <span className="sr-only">View Logs</span>
                     </Button>
-                 )}
 
-                 {/* More Actions Dropdown */}
-                <DropdownMenu> {/* Use simplified component */}
-                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors">
-                            <MoreHorizontal className="h-5 w-5" /> <span className="sr-only">Job Actions</span>
+                    {/* --- Start Button Rendered SECOND if applicable --- */}
+                    {canStart && (
+                        <Button variant="ghost" size="icon" onClick={handleStart} disabled={startMutation.isPending} className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" title="Start Job">
+                            {startMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-[24px] w-[24px]" />}
+                            <span className="sr-only">Start Job</span>
                         </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" sideOffset={4} >
-                            {/* View Details */}
-                            <DropdownMenuItem onSelect={() => setIsDetailsOpen(true)}>
-                                <Info className="mr-2 h-4 w-4" /> View Details
-                            </DropdownMenuItem>
-                             {/* View Results Link */}
-                            {job.status === 'finished' && job.result?.results_path && (
-                                <DropdownMenuItem asChild>
-                                    <Link href={`/results?highlight=${encodeURIComponent(job.result.results_path.split('/').filter(Boolean).pop() || '')}`}>
-                                        <FolderGit2 className="mr-2 h-4 w-4" /> View Results
-                                    </Link>
-                                </DropdownMenuItem>
-                            )}
-                             {/* Remove Job */}
-                             {canRemove && (
-                                <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                        onSelect={() => setIsRemoveConfirmOpen(true)}
-                                        disabled={removeMutation.isPending}
-                                        className="text-destructive focus:text-destructive focus:bg-destructive/10 dark:focus:bg-destructive/20"
-                                    >
-                                        {removeMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />} Remove Job
-                                    </DropdownMenuItem>
-                                </>
-                            )}
-                        </DropdownMenuContent>
-                 </DropdownMenu>
+                    )}
 
-            </div>
+                    {/* Stop Button */}
+                    {canStop && (
+                        <Button variant="ghost" size="icon" onClick={() => setIsStopConfirmOpen(true)} disabled={stopMutation.isPending} className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" title="Stop/Cancel Job">
+                            {stopMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Square className="h-5 w-5" />}
+                            <span className="sr-only">Stop/Cancel Job</span>
+                        </Button>
+                    )}
+                    {/* Re-stage Button */}
+                     {canRerun && (
+                       <Button variant="ghost" size="icon" onClick={() => setIsRerunConfirmOpen(true)} disabled={rerunMutation.isPending} className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors" title="Re-stage Job">
+                           {rerunMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <RotateCcw className="h-5 w-5" />}
+                           <span className="sr-only">Re-stage Job</span>
+                       </Button>
+                    )}
+                </div>
+                {/* --- End Group 1 --- */}
 
-            {/* Details Dialog */}
-             <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+
+                {/* --- Group 2: Right-aligned Buttons (More Actions) --- */}
+                <div className="flex items-center gap-1">
+                    {/* More Actions Dropdown */}
+                    <DropdownMenuPrimitive.Root>
+                        <DropdownMenuPrimitive.Trigger asChild>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors flex-shrink-0">
+                                <MoreHorizontal className="h-5 w-5" /> <span className="sr-only">Job Actions</span>
+                            </Button>
+                        </DropdownMenuPrimitive.Trigger>
+                        <DropdownMenuPrimitive.Portal>
+                            <DropdownMenuPrimitive.Content
+                                align="end"
+                                sideOffset={4}
+                                className="min-w-[12rem] z-50 overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2"
+                            >
+                                {/* Dropdown Items remain the same */}
+                                <DropdownMenuPrimitive.Item
+                                    onSelect={(e) => { e.preventDefault(); setIsDetailsOpen(true); }}
+                                    className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                                >
+                                    <span className="flex items-center gap-2"><Info className="h-4 w-4" /> View Details</span>
+                                </DropdownMenuPrimitive.Item>
+                                {job.status === 'finished' && job.result?.results_path && (
+                                    <DropdownMenuPrimitive.Item asChild className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground">
+                                        <Link href={`/results?highlight=${encodeURIComponent(job.result.results_path.split('/').filter(Boolean).pop() || '')}`} className="flex items-center gap-2">
+                                            <FolderGit2 className="h-4 w-4" /> View Results
+                                        </Link>
+                                    </DropdownMenuPrimitive.Item>
+                                )}
+                                {canRemove && (
+                                    <>
+                                        <DropdownMenuPrimitive.Separator className="my-1 h-px bg-muted -mx-1" />
+                                        <DropdownMenuPrimitive.Item
+                                            onSelect={(e) => { e.preventDefault(); setIsRemoveConfirmOpen(true); }}
+                                            disabled={removeMutation.isPending}
+                                            className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-destructive/10 hover:text-destructive text-destructive data-[disabled]:pointer-events-none data-[disabled]:opacity-50 dark:hover:bg-destructive/20"
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                {removeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Remove Job
+                                            </span>
+                                        </DropdownMenuPrimitive.Item>
+                                    </>
+                                )}
+                            </DropdownMenuPrimitive.Content>
+                        </DropdownMenuPrimitive.Portal>
+                    </DropdownMenuPrimitive.Root>
+                </div>
+                {/* --- End Group 2 --- */}
+
+            </div> {/* --- End Parent Flex Container --- */}
+
+            {/* --- Dialogs (Remain the same) --- */}
+            <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
                 <DialogContent className="sm:max-w-2xl">
                     <DialogHeader> <DialogTitle>Job Details: {job.id}</DialogTitle> <DialogDescription>{job.description || "No description provided."}</DialogDescription> </DialogHeader>
                     <div className="mt-4 max-h-[65vh] overflow-y-auto space-y-4 pr-2">
@@ -7796,51 +7506,26 @@ export default function JobActions({ job }: JobActionsProps) {
                          {/* Result Path */}
                         {job.status === 'finished' && job.result?.results_path && ( <div> <h4 className="font-semibold mb-1">Results Path:</h4> <p className="text-sm pl-4 font-mono break-all">{job.result.results_path}</p> </div> )}
                     </div>
-                    {/* Manual Close Button */}
                     <DialogFooter className="mt-4">
-                         {/* Use DialogClose for accessibility */}
-                         <DialogClose asChild>
-                             <Button type="button" variant="outline">Close</Button>
-                         </DialogClose>
+                         <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
                      </DialogFooter>
                 </DialogContent>
              </Dialog>
 
-            {/* Confirmation Dialogs */}
-             <AlertDialog open={isStopConfirmOpen} onOpenChange={setIsStopConfirmOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Confirm Stop/Cancel Job</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to stop job <span className="font-mono font-semibold">{job.id}</span>?
-                            If it's running, a stop signal will be sent. If it's queued, it will be canceled.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={stopMutation.isPending}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleStop} disabled={stopMutation.isPending} className="bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-700">
-                            {stopMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Stop/Cancel Job
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-             </AlertDialog>
-             <AlertDialog open={isRemoveConfirmOpen} onOpenChange={setIsRemoveConfirmOpen}>
-                 <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Remove Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to remove job <span className="font-mono font-semibold">{job.id}</span>? This will remove its entry from the list. Results files (if any) will not be deleted. This action cannot be undone. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={removeMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleRemove} disabled={removeMutation.isPending} className={buttonVariants({ variant: "destructive" })}> {removeMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Remove Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent>
-             </AlertDialog>
-             <AlertDialog open={isRerunConfirmOpen} onOpenChange={setIsRerunConfirmOpen}>
-                 <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Re-stage Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to re-stage job <span className="font-mono font-semibold">{job.id}</span>? This will create a new 'staged' job entry using the same parameters. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={rerunMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleRerun} disabled={rerunMutation.isPending}> {rerunMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Re-stage Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent>
-             </AlertDialog>
+            <AlertDialog open={isStopConfirmOpen} onOpenChange={setIsStopConfirmOpen}> <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Stop/Cancel Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to stop job <span className="font-mono font-semibold">{job.id}</span>? If it's running, a stop signal will be sent. If it's queued, it will be canceled. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={stopMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleStop} disabled={stopMutation.isPending} className="bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-700"> {stopMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Stop/Cancel Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent> </AlertDialog>
+            <AlertDialog open={isRemoveConfirmOpen} onOpenChange={setIsRemoveConfirmOpen}> <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Remove Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to remove job <span className="font-mono font-semibold">{job.id}</span>? This will remove its entry from the list. Results files (if any) will not be deleted. This action cannot be undone. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={removeMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleRemove} disabled={removeMutation.isPending} className={buttonVariants({ variant: "destructive" })}> {removeMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Remove Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent> </AlertDialog>
+            <AlertDialog open={isRerunConfirmOpen} onOpenChange={setIsRerunConfirmOpen}> <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Re-stage Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to re-stage job <span className="font-mono font-semibold">{job.id}</span>? This will create a new 'staged' job entry using the same parameters. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={rerunMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleRerun} disabled={rerunMutation.isPending}> {rerunMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Re-stage Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent> </AlertDialog>
 
-             {/* Log Viewer Dialog - Render conditionally or always and control via isOpen */}
-              {job && (
+             {/* Log Viewer Dialog */}
+             {job && (
                   <JobLogViewer
-                      jobId={logViewerJobId} // Use state variable for ID
+                      jobId={logViewerJobId}
                       isOpen={isLogViewerOpen}
-                      onOpenChange={setIsLogViewerOpen} // Function to close the dialog
-                      jobDescription={job.description} // Pass description for title
+                      onOpenChange={setIsLogViewerOpen}
+                      jobDescription={job.description}
                   />
               )}
+             {/* --- END DIALOGS --- */}
         </>
     );
 }
@@ -7987,12 +7672,12 @@ export default function JobTable({ jobs }: JobTableProps) {
 
 --- END FILE: ./frontend_app/components/jobs/JobTable.tsx ---
 
---- START FILE: ./frontend_app/components/jobs/JobLogViewer.tsx (Size: 11490 bytes) ---
+--- START FILE: ./frontend_app/components/jobs/JobLogViewer.tsx (Size: 11501 bytes) ---
 // frontend_app/components/jobs/JobLogViewer.tsx
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import useWebSocket, { ReadyState } from 'react-use-websocket'; // Use the correct library
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import useWebSocket, { ReadyState } from 'react-use-websocket';
 import { Terminal, Wifi, WifiOff, Loader2, ServerCrash } from 'lucide-react';
 
 import {
@@ -8007,6 +7692,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 import { cn } from '@/lib/utils';
 
 interface LogLine {
@@ -8023,197 +7709,171 @@ interface JobLogViewerProps {
     jobDescription?: string | null;
 }
 
-let messageIdCounter = 0; // Simple counter for unique log line keys
+let messageIdCounter = 0;
 
 export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescription }: JobLogViewerProps) {
     const [logs, setLogs] = useState<LogLine[]>([]);
-    const logContainerRef = useRef<HTMLDivElement>(null); // Ref for the inner div of ScrollArea
+    const scrollAreaViewportRef = useRef<HTMLDivElement>(null);
+    // --- ADD Ref for the sentinel element ---
+    const bottomRef = useRef<HTMLDivElement>(null);
+    // ---------------------------------------
     const [websocketUrl, setWebsocketUrl] = useState<string | null>(null);
     const [showEOFMessage, setShowEOFMessage] = useState(false);
+    const [isScrolledToBottom, setIsScrolledToBottom] = useState(true);
 
-    // Construct WebSocket URL only on the client when jobId changes or dialog opens
+    // --- Scroll to Bottom Function (using sentinel) ---
+    const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+        // console.log(`Attempting scrollIntoView (${behavior})...`); // Debug
+        bottomRef.current?.scrollIntoView({ behavior: behavior });
+        // We might not need to manually set isScrolledToBottom here when using scrollIntoView
+        // as the handleScroll should detect it, but let's keep it for now.
+        if (behavior === 'auto') { // Force state update on instant scroll
+             setIsScrolledToBottom(true);
+        }
+    }, []); // No dependencies needed
+
+    // Construct WebSocket URL & Reset State on Open/Job Change
     useEffect(() => {
         if (isOpen && jobId && typeof window !== 'undefined') {
             const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || window.location.origin;
             const wsProtocol = apiUrl.startsWith('https://') ? 'wss://' : 'ws://';
             const domainAndPath = apiUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
-            // Use the prefix defined in the websockets router
             const url = `${wsProtocol}${domainAndPath}/api/ws/logs/${jobId}`;
             console.log("[JobLogViewer] Setting WebSocket URL:", url);
             setWebsocketUrl(url);
-            setShowEOFMessage(false); // Reset EOF on open/job change
+            setShowEOFMessage(false);
+            setLogs([]);
+            messageIdCounter = 0;
+            setIsScrolledToBottom(true); // Reset to true on open
         } else {
-            // Clear URL when dialog closes or no job ID
             setWebsocketUrl(null);
         }
-    }, [jobId, isOpen]); // Depend on isOpen as well
+    }, [jobId, isOpen]);
 
-    // Reset logs when dialog closes or jobId changes
+    // Reset non-URL state when dialog closes
     useEffect(() => {
         if (!isOpen) {
-            console.log("[JobLogViewer] Dialog closed, resetting logs.");
             setLogs([]);
-            messageIdCounter = 0; // Reset counter
+            messageIdCounter = 0;
             setShowEOFMessage(false);
         }
     }, [isOpen]);
 
-    // Use react-use-websocket hook
+    // WebSocket Hook (Unchanged)
     const {
-        lastMessage, // The most recent message event
-        readyState,  // Connection state enum
-    } = useWebSocket(websocketUrl, {
-        share: false, // Each instance should have its own connection
-        shouldReconnect: (closeEvent) => true, // Attempt to reconnect on close
-        reconnectInterval: 3000,
-        reconnectAttempts: 10, // Increase attempts slightly
-        retryOnError: true, // Retry connection on error
-        onOpen: () => console.log(`[JobLogViewer] WebSocket opened for ${jobId}`),
-        onClose: (event) => console.log(`[JobLogViewer] WebSocket closed for ${jobId}. Code: ${event.code}, Reason: ${event.reason}`),
-        onError: (event) => console.error(`[JobLogViewer] WebSocket error for ${jobId}:`, event),
-        // Filter out non-relevant messages if needed, though backend should only send strings
-        filter: (message: MessageEvent<any>): boolean => {
-            return typeof message.data === 'string'; // Only process string messages
-        },
-    }, !!websocketUrl); // Connect only if websocketUrl is not null
+        lastMessage,
+        readyState,
+    } = useWebSocket(websocketUrl, { /* ... options ... */ share: false, shouldReconnect: (closeEvent) => true, reconnectInterval: 3000, reconnectAttempts: 10, retryOnError: true, onOpen: () => console.log(`[JobLogViewer] WebSocket opened for ${jobId}`), onClose: (event) => console.log(`[JobLogViewer] WebSocket closed for ${jobId}. Code: ${event.code}, Reason: ${event.reason}`), onError: (event) => console.error(`[JobLogViewer] WebSocket error for ${jobId}:`, event), filter: (message: MessageEvent<any>): boolean => typeof message.data === 'string', }, !!websocketUrl);
 
-    // Handle incoming messages using lastMessage
+    // Handle incoming messages (Unchanged)
     useEffect(() => {
         if (lastMessage !== null) {
+            let logEntry: LogLine | null = null;
             try {
                 const jsonData = JSON.parse(lastMessage.data);
-                const logData = jsonData as { type?: string; line?: any }; // Type assertion
+                const logData = jsonData as { type?: string; line?: any };
                 const logType = logData.type || 'raw';
-                const logLineContent = typeof logData.line === 'string' ? logData.line : JSON.stringify(logData.line);
+                const logLineContent = typeof logData.line === 'string' ? logData.line : JSON.stringify(logData.line ?? '');
 
-                // Check for EOF control message
                 if (logType === 'control' && logLineContent === 'EOF') {
                     console.log(`[JobLogViewer] Received EOF for ${jobId}`);
                     setShowEOFMessage(true);
-                    return; // Stop processing this message
+                    // Scroll after EOF message state is set
+                    setTimeout(() => scrollToBottom('smooth'), 50);
+                    return;
                 }
-
-                const logEntry: LogLine = {
-                    id: messageIdCounter++,
-                    type: logType as LogLine['type'], // Assert type
-                    line: logLineContent,
-                    timestamp: Date.now()
-                };
-                // Add new log entry, potentially capping the total number of lines
-                setLogs((prevLogs) => {
-                     const newLogs = [...prevLogs, logEntry];
-                    // Optional: Limit the number of log lines stored in state to prevent memory issues
-                    // const MAX_LOG_LINES = 2000;
-                    // if (newLogs.length > MAX_LOG_LINES) {
-                    //     return newLogs.slice(newLogs.length - MAX_LOG_LINES);
-                    // }
-                    return newLogs;
-                });
-
+                logEntry = { id: messageIdCounter++, type: logType as LogLine['type'], line: logLineContent, timestamp: Date.now() };
             } catch (e) {
-                console.error("[JobLogViewer] Error processing WebSocket message:", e, lastMessage.data);
-                 setLogs((prevLogs) => [...prevLogs, { id: messageIdCounter++, type: 'error', line: `Error processing message: ${lastMessage.data}`, timestamp: Date.now()}]);
+                console.warn("[JobLogViewer] Message not valid JSON, treating as raw:", lastMessage.data);
+                logEntry = { id: messageIdCounter++, type: 'raw', line: lastMessage.data, timestamp: Date.now() };
+            }
+            if (logEntry) {
+                setLogs((prevLogs) => [...prevLogs, logEntry!]);
             }
         }
-    }, [lastMessage, jobId]); // Depend on lastMessage and jobId
+    }, [lastMessage, jobId, scrollToBottom]); // Added scrollToBottom
 
-    // Scroll to bottom effect
+    // --- Auto-Scroll Effect (using sentinel) ---
     useEffect(() => {
-        if (logContainerRef.current) {
-            // Slightly more robust scroll check
-            const scrollThreshold = 100; // Pixels from bottom
-            const isScrolledToBottom = logContainerRef.current.scrollHeight - logContainerRef.current.scrollTop - logContainerRef.current.clientHeight < scrollThreshold;
+        // Scroll whenever logs update, but only if user is considered at the bottom
+        if (isScrolledToBottom) {
+            // console.log("Logs updated and isScrolledToBottom=true, scrolling..."); // Debug
+            scrollToBottom('smooth'); // Use smooth scroll for updates
+        }
+        // This effect also handles the initial scroll implicitly after the first logs render
+    }, [logs, isScrolledToBottom, scrollToBottom]); // Depend on logs and state
 
-            if (isScrolledToBottom) {
-                requestAnimationFrame(() => {
-                     if (logContainerRef.current) {
-                        logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-                     }
-                });
+    // Handle manual scrolling (Unchanged, but important)
+    const handleScroll = useCallback(() => {
+        if (scrollAreaViewportRef.current) {
+            const { scrollTop, scrollHeight, clientHeight } = scrollAreaViewportRef.current;
+            // Use a slightly larger threshold to account for potential rounding errors
+            const atBottom = scrollHeight - scrollTop - clientHeight < 15;
+            if (atBottom !== isScrolledToBottom) {
+                // console.log(`Scrolled to bottom state changed: ${atBottom}`); // Debug
+                setIsScrolledToBottom(atBottom);
             }
         }
-    }, [logs]); // Trigger scroll on new logs
+    }, [isScrolledToBottom]);
 
-    // Connection status text and indicator
-    const connectionStatusText = {
-        [ReadyState.CONNECTING]: 'Connecting',
-        [ReadyState.OPEN]: 'Connected',
-        [ReadyState.CLOSING]: 'Closing',
-        [ReadyState.CLOSED]: 'Disconnected',
-        [ReadyState.UNINSTANTIATED]: 'Idle',
-    }[readyState];
+    // Connection status text and indicator (Unchanged)
+    const connectionStatusText = { /* ... */ }[readyState];
+    const getStatusIndicator = () => { /* ... */ switch (readyState) { case ReadyState.CONNECTING: return <Loader2 className="h-3 w-3 animate-spin text-yellow-500"/>; case ReadyState.OPEN: return <Wifi className="h-3 w-3 text-green-500"/>; case ReadyState.CLOSED: return <WifiOff className="h-3 w-3 text-red-500"/>; case ReadyState.CLOSING: return <WifiOff className="h-3 w-3 text-yellow-500"/>; default: return <ServerCrash className="h-3 w-3 text-gray-500"/>; } };
 
-    const getStatusIndicator = () => {
-         switch (readyState) {
-             case ReadyState.CONNECTING: return <Loader2 className="h-3 w-3 animate-spin text-yellow-500"/>;
-             case ReadyState.OPEN: return <Wifi className="h-3 w-3 text-green-500"/>;
-             case ReadyState.CLOSED: return <WifiOff className="h-3 w-3 text-red-500"/>;
-             case ReadyState.CLOSING: return <WifiOff className="h-3 w-3 text-yellow-500"/>;
-             default: return <ServerCrash className="h-3 w-3 text-gray-500"/>;
-         }
-    };
-
-    // Log line color
-    const getLogLineColor = (type: LogLine['type']): string => {
-        switch (type) {
-            case 'stdout': return 'text-gray-300 dark:text-gray-300';
-            case 'stderr': return 'text-red-500 dark:text-red-400';
-            case 'error': return 'text-red-600 dark:text-red-500 font-semibold';
-            case 'info': return 'text-blue-600 dark:text-blue-400';
-            case 'status': return 'text-yellow-600 dark:text-yellow-400 italic';
-            case 'control': return 'text-purple-600 dark:text-purple-400 italic'; // Should not be displayed now
-            case 'raw':
-            default: return 'text-gray-500 dark:text-gray-500';
-        }
-    };
+    // Log line color (Unchanged)
+    const getLogLineColor = (type: LogLine['type']): string => { /* ... */ switch (type) { case 'stdout': return 'text-gray-300 dark:text-gray-300'; case 'stderr': return 'text-red-500 dark:text-red-400'; case 'error': return 'text-red-600 dark:text-red-500 font-semibold'; case 'info': return 'text-blue-500 dark:text-blue-400'; case 'status': return 'text-yellow-600 dark:text-yellow-400 italic'; case 'control': return 'hidden'; case 'raw': default: return 'text-gray-500 dark:text-gray-500'; } };
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            {/* Increased max width and height */}
             <DialogContent className="sm:max-w-5xl md:max-w-6xl lg:max-w-7xl h-[90vh] flex flex-col p-0 gap-0">
+                {/* Header (Unchanged) */}
                 <DialogHeader className="p-4 border-b flex-shrink-0">
                     <DialogTitle className="flex items-center gap-2">
-                        <Terminal className="h-5 w-5" /> Live Logs: <span className="font-mono text-sm ml-1">{jobDescription || jobId}</span>
+                        <Terminal className="h-5 w-5" /> Live Logs: <span className="font-mono text-sm ml-1 truncate">{jobDescription || jobId}</span>
                     </DialogTitle>
                     <DialogDescription className="flex items-center justify-between text-xs pt-1">
-                         <span>Real-time output from the pipeline process.</span>
+                         <span>Real-time output & history from the pipeline process.</span>
                          <Badge variant="outline" className="flex items-center gap-1.5 py-0.5 px-2 text-xs">
                              {getStatusIndicator()}
                              {connectionStatusText}
                          </Badge>
                     </DialogDescription>
                 </DialogHeader>
-                {/* Use ScrollArea for consistent scrollbars */}
-                <ScrollArea className="flex-grow bg-gray-950 dark:bg-black text-white font-mono text-[0.8rem] leading-relaxed overflow-y-auto">
-                     {/* The direct child of ScrollArea needs the ref */}
-                     <div ref={logContainerRef} className="p-4 space-y-0.5 min-h-full">
-                         {logs.length === 0 && readyState === ReadyState.OPEN && !showEOFMessage && (
-                             <p className="text-gray-500 italic">Waiting for logs...</p>
-                         )}
-                         {logs.length === 0 && (readyState === ReadyState.CLOSED || readyState === ReadyState.UNINSTANTIATED) && !websocketUrl && jobId && (
-                             <p className="text-gray-500 italic">Preparing connection...</p>
-                         )}
-                          {logs.length === 0 && readyState === ReadyState.CLOSED && websocketUrl && !showEOFMessage && (
-                              <p className="text-red-500 italic">Connection closed unexpectedly. Logs might be incomplete. Attempting to reconnect...</p>
-                         )}
-                         {logs.length === 0 && readyState === ReadyState.CONNECTING && (
-                              <p className="text-yellow-500 italic">Connecting to log stream...</p>
-                         )}
+
+                <ScrollArea className="flex-grow bg-gray-950 dark:bg-black text-white font-mono text-[0.8rem] leading-relaxed overflow-y-auto" onScroll={handleScroll}>
+                    <ScrollAreaPrimitive.Viewport ref={scrollAreaViewportRef} className="h-full w-full rounded-[inherit] p-4">
+                        {/* Initial Status Messages (Unchanged) */}
+                        {logs.length === 0 && readyState === ReadyState.CONNECTING && ( <p className="text-yellow-500 italic">Connecting to log stream...</p> )}
+                        {logs.length === 0 && readyState === ReadyState.OPEN && !showEOFMessage && ( <p className="text-gray-500 italic">Loading history or waiting for live logs...</p> )}
+                        {logs.length === 0 && (readyState === ReadyState.CLOSED || readyState === ReadyState.UNINSTANTIATED) && !websocketUrl && jobId && ( <p className="text-gray-500 italic">Preparing connection...</p> )}
+                        {logs.length === 0 && readyState === ReadyState.CLOSED && websocketUrl && !showEOFMessage && ( <p className="text-red-500 italic">Connection closed. Attempting to reconnect...</p> )}
+
+                        {/* Render Logs */}
                         {logs.map((log) => (
-                           <p key={log.id} className={cn(getLogLineColor(log.type))}>
+                           <p key={log.id} className={cn(getLogLineColor(log.type), "whitespace-pre-wrap break-words")}>
                                 {log.line}
                            </p>
                         ))}
-                        {showEOFMessage && (
-                             <p className="text-yellow-400 italic pt-2">--- End of log stream (Job finished or stopped) ---</p>
-                        )}
-                    </div>
+
+                        {/* EOF Message */}
+                        {showEOFMessage && ( <p className="text-yellow-400 italic pt-2">--- End of log stream (Job finished or stopped) ---</p> )}
+
+                        {/* --- ADD Sentinel Element --- */}
+                        <div ref={bottomRef} style={{ height: '1px' }} />
+                        {/* -------------------------- */}
+
+                    </ScrollAreaPrimitive.Viewport>
                     <ScrollBar orientation="vertical" />
-                    <ScrollBar orientation="horizontal" /> {/* Added horizontal scrollbar */}
+                    <ScrollBar orientation="horizontal" />
                 </ScrollArea>
+
+                 {/* Footer with Pause/Resume Button (Unchanged) */}
                  <DialogFooter className="p-3 border-t flex-shrink-0">
+                    <Button type="button" variant="secondary" onClick={() => setIsScrolledToBottom(!isScrolledToBottom)} size="sm">
+                       {isScrolledToBottom ? "Pause Auto-Scroll" : "Resume Auto-Scroll"}
+                    </Button>
                     <DialogClose asChild>
-                        <Button type="button" variant="outline">Close</Button>
+                        <Button type="button" variant="outline" size="sm">Close</Button>
                     </DialogClose>
                 </DialogFooter>
             </DialogContent>
