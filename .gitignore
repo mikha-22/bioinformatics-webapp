@@ -22,6 +22,8 @@ backend/app/.nextflow/
 backend/app/.nextflow.log*
 backend/app/work/
 backend/app/results/
+nextflow_run_artifacts/work/
+nextflow_run_artifacts/logs/
 
 # Environment and IDE
 .env

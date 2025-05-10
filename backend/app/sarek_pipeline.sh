@@ -70,7 +70,6 @@ skip_baserecalibrator_flag="${17}"
 is_rerun="${18}"  # New parameter to indicate if this is a re-run
 
 # --- Basic Validation (Required Args) ---
-# Added logging for clarity
 log "Validating required arguments..."
 if [ -z "$input_csv" ]; then
     log "ERROR: Missing required argument: input_csv (Argument #1)" >&2
@@ -105,74 +104,95 @@ log "Skip Base Recalibrator: $skip_baserecalibrator_flag"
 log "Is Rerun: $is_rerun"
 
 
-# --- Generate Timestamped Results Directory ---
-log "Generating results directory..."
-timestamp=$(date +"%Y%m%d_%H%M%S")
-csv_basename=$(basename "$input_csv" .csv)
-results_dir="${outdir_base}/sarek_run_${timestamp}_${csv_basename}"
+# --- Determine Project Root, Artifact Dirs, and Run Identifier ---
+log "Determining project root and artifact directories..."
+# SCRIPT_CWD will be the directory from which this script is effectively run,
+# which is backend/app/ when called by tasks.py.
+SCRIPT_CWD=$(pwd)
+# Navigate two levels up from backend/app/ to reach the project root.
+PROJECT_ROOT_ABS=$(realpath "${SCRIPT_CWD}/../../")
 
-# Attempt to create directory, check permissions
+log "Script current working directory (from where sarek_pipeline.sh is run): ${SCRIPT_CWD}"
+log "Project root identified as: ${PROJECT_ROOT_ABS}"
+
+# Define base directories for Nextflow artifacts within the project root
+NEXTFLOW_RUN_ARTIFACTS_DIR="${PROJECT_ROOT_ABS}/nextflow_run_artifacts"
+NEXTFLOW_CONFIG_DIR="${NEXTFLOW_RUN_ARTIFACTS_DIR}/config"
+NEXTFLOW_WORK_BASE_DIR="${NEXTFLOW_RUN_ARTIFACTS_DIR}/work" # Base for all run-specific work dirs
+NEXTFLOW_LOG_BASE_DIR="${NEXTFLOW_RUN_ARTIFACTS_DIR}/logs" # Base for all run-specific log files
+
+log "Ensuring Nextflow artifact directories exist under ${NEXTFLOW_RUN_ARTIFACTS_DIR}..."
+mkdir -p "$NEXTFLOW_CONFIG_DIR" || { log "ERROR: Failed to create Nextflow config dir: $NEXTFLOW_CONFIG_DIR" >&2; exit 1; }
+mkdir -p "$NEXTFLOW_WORK_BASE_DIR" || { log "ERROR: Failed to create Nextflow base work dir: $NEXTFLOW_WORK_BASE_DIR" >&2; exit 1; }
+mkdir -p "$NEXTFLOW_LOG_BASE_DIR" || { log "ERROR: Failed to create Nextflow base log dir: $NEXTFLOW_LOG_BASE_DIR" >&2; exit 1; }
+
+# Path to the centrally managed Nextflow config file
+NEXTFLOW_CONFIG_FILE="${NEXTFLOW_CONFIG_DIR}/default_sarek.config"
+log "Using Nextflow config file: ${NEXTFLOW_CONFIG_FILE}"
+if [ ! -f "$NEXTFLOW_CONFIG_FILE" ]; then
+    log "ERROR: Nextflow config file not found at ${NEXTFLOW_CONFIG_FILE}" >&2
+    exit 1
+fi
+if [ ! -r "$NEXTFLOW_CONFIG_FILE" ]; then
+    log "ERROR: Nextflow config file not readable at ${NEXTFLOW_CONFIG_FILE}" >&2
+    exit 1
+fi
+
+# Generate a unique identifier for this specific pipeline run
+log "Generating run identifier and Sarek results directory..."
+timestamp=$(date +"%Y%m%d_%H%M%S")
+csv_filename_only=$(basename "$input_csv") # Get only the filename.csv
+csv_basename_no_ext="${csv_filename_only%.csv}" # Remove .csv extension
+run_identifier="sarek_run_${timestamp}_${csv_basename_no_ext}"
+
+# Define the Sarek --outdir (final results location)
+results_dir="${outdir_base}/${run_identifier}"
+
+# Attempt to create Sarek results directory, check permissions
 mkdir -p "$results_dir"
 if [ $? -ne 0 ]; then
-    log "ERROR: Failed to create results directory: ${results_dir}. Check permissions for base directory: $outdir_base" >&2
+    log "ERROR: Failed to create Sarek results directory: ${results_dir}. Check permissions for base: $outdir_base" >&2
     exit 1
 fi
 if [ ! -w "$results_dir" ]; then
-     log "ERROR: Results directory (${results_dir}) is not writable by user $(whoami)." >&2
-     # Optional: attempt to fix if possible, or just exit
-     # chmod u+w "$results_dir" || exit 1
+     log "ERROR: Sarek results directory (${results_dir}) is not writable by user $(whoami)." >&2
      exit 1
 fi
-
-# Echo the final path for backend parsing (keep this simple echo for easy parsing by tasks.py)
+# This echo is parsed by tasks.py to know where the results are
 echo "Results directory: ${results_dir}"
-log "Successfully created results directory: ${results_dir}"
+log "Successfully created Sarek results directory: ${results_dir}"
+
+# Define Nextflow Work Directory and Log File paths for THIS specific run
+RUN_SPECIFIC_WORK_DIR="${NEXTFLOW_WORK_BASE_DIR}/${run_identifier}"
+RUN_SPECIFIC_LOG_FILE="${NEXTFLOW_LOG_BASE_DIR}/${run_identifier}.nextflow.log" # e.g., sarek_run_....nextflow.log
+
+log "Run-specific Nextflow work directory will be: ${RUN_SPECIFIC_WORK_DIR}"
+log "Run-specific Nextflow log file will be: ${RUN_SPECIFIC_LOG_FILE}"
+
+# Ensure these specific directories exist (mkdir -p will handle it if they don't)
+mkdir -p "$RUN_SPECIFIC_WORK_DIR" || { log "ERROR: Failed to create run-specific work dir: $RUN_SPECIFIC_WORK_DIR" >&2; exit 1; }
+# The log file itself will be created by Nextflow.
+
 
 # --- Define Paths ---
-# Use absolute path for nextflow executable found in the worker's PATH
-# Make sure this path matches the output of 'which nextflow' in your working environment
+# Ensure this path matches the Nextflow executable available in the worker's environment
 NXF_EXECUTABLE="/usr/local/bin/nextflow"
 
-# <<< UPDATED config path variable >>>
-NEXTFLOW_CONFIG="/home/admin01/labs/temp/nextflow_run/nextflow.config"
-log "Using Nextflow config: ${NEXTFLOW_CONFIG}"
-
-# <<< Define Nextflow Run Directory >>>
-NEXTFLOW_RUN_DIR="/home/admin01/labs/temp/nextflow_run"
-log "Using Nextflow run directory (for logs/work): ${NEXTFLOW_RUN_DIR}"
-
-# <<< Define Nextflow Work Directory and Log File paths >>>
-NEXTFLOW_WORK_DIR="${NEXTFLOW_RUN_DIR}/work"
-NEXTFLOW_LOG_FILE="${NEXTFLOW_RUN_DIR}/.nextflow.log"
-
-# <<< Ensure Nextflow Run Directory exists and is writable >>>
-log "Checking Nextflow run directory..."
-mkdir -p "$NEXTFLOW_RUN_DIR"
-if [ $? -ne 0 ]; then
-    log "ERROR: Failed to create Nextflow run directory: ${NEXTFLOW_RUN_DIR}. Check permissions." >&2
-    exit 1
-fi
-if [ ! -w "$NEXTFLOW_RUN_DIR" ]; then
-    log "ERROR: Nextflow run directory (${NEXTFLOW_RUN_DIR}) is not writable by user $(whoami)." >&2
-    exit 1
-fi
-log "Nextflow run directory check passed."
 
 # --- Build the Sarek Command ---
 log "Building Nextflow command..."
 # Start with the absolute path to nextflow
 cmd="$NXF_EXECUTABLE run nf-core/sarek -r 3.5.1" # Use the specific version
-cmd+=" --input ${input_csv}"
-cmd+=" --outdir ${results_dir}"
+cmd+=" --input \"${input_csv}\"" # Quote path
+cmd+=" --outdir \"${results_dir}\"" # Quote path
 cmd+=" --genome ${genome}"
-cmd+=" -c ${NEXTFLOW_CONFIG}" # Use variable for config path
+cmd+=" -c \"${NEXTFLOW_CONFIG_FILE}\"" # Use the centrally managed config file (quoted)
 
-# <<< EXPORT Nextflow environment variables >>>
-export NXF_WORK="${NEXTFLOW_WORK_DIR}"
-export NXF_LOG_FILE="${NEXTFLOW_LOG_FILE}"
+# EXPORT Nextflow environment variables for work directory and log file
+export NXF_WORK="${RUN_SPECIFIC_WORK_DIR}"
+export NXF_LOG_FILE="${RUN_SPECIFIC_LOG_FILE}"
 log "Setting NXF_WORK=${NXF_WORK}"
 log "Setting NXF_LOG_FILE=${NXF_LOG_FILE}"
-# <<< END EXPORT >>>
 
 # Add wes flag if true
 if [ "$wes_flag" = "true" ]; then
@@ -185,7 +205,6 @@ if [ "$skip_baserecalibrator_flag" = "true" ]; then
 fi
 
 # Add tools if specified and not empty
-# Check specifically against " " which might have been passed if tools was None in Python
 if [ -n "$tools" ] && [ "$tools" != " " ]; then
     cmd+=" --tools ${tools}"
 fi
@@ -196,7 +215,6 @@ if [ -n "$step" ] && [ "$step" != " " ]; then
 fi
 
 # Add profile (use provided profile or default to docker)
-# Use the variable $profile here
 effective_profile="${profile:-docker}" # Default to 'docker' if $profile is empty or null
 if [ -n "$effective_profile" ] && [ "$effective_profile" != " " ]; then
     cmd+=" -profile ${effective_profile}"
@@ -207,24 +225,18 @@ if [ -n "$aligner" ] && [ "$aligner" != " " ]; then
     cmd+=" --aligner ${aligner}"
 fi
 
-# Add intervals if specified and not empty
+# Add optional files if specified and not empty, quoting paths
 if [ -n "$intervals" ] && [ "$intervals" != " " ]; then
-    cmd+=" --intervals ${intervals}"
+    cmd+=" --intervals \"${intervals}\""
 fi
-
-# Add dbsnp if specified and not empty
 if [ -n "$dbsnp" ] && [ "$dbsnp" != " " ]; then
-    cmd+=" --dbsnp ${dbsnp}"
+    cmd+=" --dbsnp \"${dbsnp}\""
 fi
-
-# Add known_indels if specified and not empty
 if [ -n "$known_indels" ] && [ "$known_indels" != " " ]; then
-    cmd+=" --known_indels ${known_indels}"
+    cmd+=" --known_indels \"${known_indels}\""
 fi
-
-# Add pon if specified and not empty
 if [ -n "$pon" ] && [ "$pon" != " " ]; then
-    cmd+=" --pon ${pon}"
+    cmd+=" --pon \"${pon}\""
 fi
 
 # Add joint_germline flag if true
@@ -253,16 +265,18 @@ if [ "$is_rerun" = "true" ]; then
 fi
 
 # --- DIAGNOSTIC BLOCK ---
-log "--- Worker Environment ---"
+log "--- Worker Environment & Sanity Checks ---"
 log "User: $(whoami) (UID: $(id -u))"
-log "Current Directory: $(pwd)" # This script runs from backend/app/
+log "Current Directory (of script execution): $(pwd)"
+log "PROJECT_ROOT_ABS (Determined): ${PROJECT_ROOT_ABS}"
+log "NEXTFLOW_RUN_ARTIFACTS_DIR: ${NEXTFLOW_RUN_ARTIFACTS_DIR}"
 log "PATH: $PATH"
-log "JAVA_HOME: ${JAVA_HOME:-<not set>}" # Check if JAVA_HOME is explicitly set
-log "NXF_HOME: $NXF_HOME"
-log "NXF_WORK (Explicit): $NXF_WORK" # <<< Added
-log "NXF_LOG_FILE (Explicit): $NXF_LOG_FILE" # <<< Added
-log "NXF_VER used in script: $(${NXF_EXECUTABLE} -v | head -n 1 || echo '<failed>') " # Show resolved NF version
-log "--- Sanity Checks ---"
+log "JAVA_HOME: ${JAVA_HOME:-<not set>}"
+log "NXF_HOME (for assets/plugins): $NXF_HOME"
+log "NXF_WORK (explicitly set for this run): $NXF_WORK"
+log "NXF_LOG_FILE (explicitly set for this run): $NXF_LOG_FILE"
+log "NXF_VER used in script: $(${NXF_EXECUTABLE} -v | head -n 1 || echo '<failed>') "
+
 log "Checking Java..."
 if command -v java >/dev/null 2>&1; then
     log "Java Path: $(command -v java)"
@@ -277,47 +291,44 @@ if [ -x "$NXF_EXECUTABLE" ]; then
      $NXF_EXECUTABLE -v || log "ERROR: 'nextflow -v' command failed using path $NXF_EXECUTABLE" >&2
 else
      log "ERROR: Nextflow executable not found or not executable at $NXF_EXECUTABLE" >&2
-     exit 1 # Exit if NF is not executable
+     exit 1
 fi
 log "Checking Input CSV..."
 if [ -f "$input_csv" ] && [ -r "$input_csv" ]; then
     log "Input CSV found and readable: $input_csv"
 else
     log "ERROR: Input CSV not found or not readable: $input_csv" >&2
-    ls -l "$input_csv" # Show details if possible
-    exit 1 # Exit if input CSV missing
+    ls -l "$input_csv"
+    exit 1
 fi
-log "Checking Config File..."
-if [ -f "$NEXTFLOW_CONFIG" ] && [ -r "$NEXTFLOW_CONFIG" ]; then
-    log "Config file found and readable: $NEXTFLOW_CONFIG"
+log "Checking Nextflow Config File..."
+if [ -f "$NEXTFLOW_CONFIG_FILE" ] && [ -r "$NEXTFLOW_CONFIG_FILE" ]; then
+    log "Config file found and readable: $NEXTFLOW_CONFIG_FILE"
 else
-    log "ERROR: Config file not found or not readable: $NEXTFLOW_CONFIG" >&2
-    ls -l "$NEXTFLOW_CONFIG" # Show details if possible
-    exit 1 # Exit if config file missing
+    log "ERROR: Config file not found or not readable: $NEXTFLOW_CONFIG_FILE" >&2
+    ls -l "$NEXTFLOW_CONFIG_FILE"
+    exit 1
 fi
 log "--- End Sanity Checks ---"
-# --- END DIAGNOSTIC BLOCK ---
 
 
 # --- Execute the pipeline ---
 log "Executing Nextflow Command:"
 log "$cmd"
-# Log the command to a file as well for easier debugging
+# Log the command to a file in the Sarek results directory for easier debugging
 echo "Timestamp: $(date)" > "${results_dir}/pipeline_command.log"
 echo "Executing User: $(whoami) (UID: $(id -u))" >> "${results_dir}/pipeline_command.log"
 echo "Working Directory (of script): $(pwd)" >> "${results_dir}/pipeline_command.log"
-echo "NXF_WORK: ${NXF_WORK}" >> "${results_dir}/pipeline_command.log"
-echo "NXF_LOG_FILE: ${NXF_LOG_FILE}" >> "${results_dir}/pipeline_command.log"
+echo "NXF_WORK (run-specific): ${NXF_WORK}" >> "${results_dir}/pipeline_command.log"
+echo "NXF_LOG_FILE (run-specific): ${NXF_LOG_FILE}" >> "${results_dir}/pipeline_command.log"
 echo "Command: ${cmd}" >> "${results_dir}/pipeline_command.log"
 echo "---------------------" >> "${results_dir}/pipeline_command.log"
 
-# *** MODIFIED EXECUTION LINE ***
-# Execute directly, merging stdout/stderr, let Python capture it
-# Environment variables NXF_WORK and NXF_LOG_FILE are already exported
+# Execute directly, merging stdout/stderr for Python to capture.
+# Environment variables NXF_WORK and NXF_LOG_FILE are already exported.
 $cmd 2>&1
 
 exit_code=$? # Get exit code directly from the nextflow command
-# *** END MODIFIED EXECUTION LINE ***
 
 log "Nextflow command finished with exit code: ${exit_code}"
 echo "---------------------" >> "${results_dir}/pipeline_command.log"
@@ -327,14 +338,11 @@ echo "Finished: $(date)" >> "${results_dir}/pipeline_command.log"
 # --- Check Final Status ---
 if [ $exit_code -eq 0 ]; then
     log "Pipeline completed successfully (Exit Code 0)."
-    # Echo simple status for Python - can enhance later if needed
-    # e.g., could parse pipeline_command.log for specific success markers
-    echo "status::success"
+    echo "status::success" # Parsed by tasks.py
     exit 0
 else
     log "ERROR: Pipeline failed with exit code ${exit_code}" >&2
-    # Echo simple status for Python
-    echo "status::failed"
+    echo "status::failed" # Parsed by tasks.py
     # It's important to exit with the non-zero code so RQ knows it failed
     exit ${exit_code}
 fi
