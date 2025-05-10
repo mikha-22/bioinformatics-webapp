@@ -1,4 +1,3 @@
-
 # backend/app/core/config.py
 import logging
 from pathlib import Path
@@ -12,26 +11,32 @@ try:
     APP_FILE_PATH = Path(__file__).resolve() # Path to this config.py file
     CORE_DIR = APP_FILE_PATH.parent
     BACKEND_APP_DIR = CORE_DIR.parent
-    PROJECT_ROOT = BACKEND_APP_DIR.parents[1]
+    PROJECT_ROOT = BACKEND_APP_DIR.parents[1] # This should still resolve to your bioinformatics-webapp project root
     DOCKER_DIR = PROJECT_ROOT / "docker"
     SAREK_PIPELINE_SCRIPT_PATH = BACKEND_APP_DIR / "sarek_pipeline.sh"
 
-    # --- *** OVERRIDE DATA and RESULTS paths for local execution *** ---
+    # --- *** UPDATED DATA and RESULTS paths *** ---
     # Use the specified absolute host paths directly
-    DATA_DIR = Path("/home/admin01/work/mnt/nas/mikha_temp/data").resolve()
-    RESULTS_DIR = Path("/home/admin01/work/mnt/nas/mikha_temp/results").resolve()
-    # --- *** END OVERRIDE *** ---
+    DATA_DIR = Path("/home/admin01/work/mnt/nas/sarek-webapp/data").resolve()
+    RESULTS_DIR = Path("/home/admin01/work/mnt/nas/sarek-webapp/results").resolve()
+    # --- *** END UPDATED PATHS *** ---
 
     # Log the paths being used
     logger.info(f"PROJECT_ROOT determined as: {PROJECT_ROOT}")
     logger.info(f"BACKEND_APP_DIR determined as: {BACKEND_APP_DIR}")
-    logger.info(f"DATA_DIR OVERRIDDEN TO: {DATA_DIR}")
-    logger.info(f"RESULTS_DIR OVERRIDDEN TO: {RESULTS_DIR}")
+    logger.info(f"DATA_DIR SET TO: {DATA_DIR}") # Updated log message
+    logger.info(f"RESULTS_DIR SET TO: {RESULTS_DIR}") # Updated log message
     logger.info(f"SAREK_PIPELINE_SCRIPT_PATH set to: {SAREK_PIPELINE_SCRIPT_PATH}")
 
     # Optional: Check if these overridden directories exist at startup
     if not DATA_DIR.is_dir():
         logger.warning(f"Configured DATA_DIR does not exist or is not a directory: {DATA_DIR}")
+        # Optionally create it if it's expected that the app might create them
+        # try:
+        #     DATA_DIR.mkdir(parents=True, exist_ok=True)
+        #     logger.info(f"Created DATA_DIR: {DATA_DIR}")
+        # except OSError as e:
+        #     logger.error(f"Failed to create DATA_DIR {DATA_DIR}: {e}")
     if not RESULTS_DIR.is_dir():
         logger.warning(f"Configured RESULTS_DIR does not exist or is not a directory: {RESULTS_DIR}")
         # Optionally create it?
@@ -56,9 +61,7 @@ PIPELINE_QUEUE_NAME = "pipeline_tasks"
 STAGED_JOBS_KEY = "staged_pipeline_jobs" # Key for Redis Hash storing staged jobs
 PIPELINE_PROFILES_KEY = "pipeline_profiles" # Key for storing profiles
 LOG_CHANNEL_PREFIX = "logs:"
-# --- ADD THIS LINE ---
 LOG_HISTORY_PREFIX = "log_history:" # Prefix for Redis List storing log history
-# --- END ADD ---
 
 logger.info(f"Using REDIS_HOST: {REDIS_HOST}:{REDIS_PORT} DB:{REDIS_DB}")
 
