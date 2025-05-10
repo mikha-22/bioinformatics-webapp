@@ -164,3 +164,4 @@ volumes:
       device: '/path/on/host/for/nf_work' # <-- !!! UPDATE THIS PATH or use Docker volume !!!
   redis_data_vol: # Docker managed volume for Redis persistence
     # No device needed, Docker manages this
+

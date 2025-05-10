@@ -149,3 +149,4 @@ volumes:
     # Define if needed
   redis_data_vol:
     # Docker managed volume
+
