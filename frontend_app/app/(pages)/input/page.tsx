@@ -7,16 +7,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z, ZodType } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { PlusCircle, Loader2, Play, Save, Info, Settings2, ChevronDown } from "lucide-react"; // ChevronDown will be used by AccordionTrigger
+import { PlusCircle, Loader2, Play, Save, Info, Settings2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription, // Will use for the trigger
-  CardHeader,      // Used for other cards
-  CardTitle,       // Used for other cards
+  CardDescription,
+  CardHeader, // Keep for other cards
+  CardTitle,   // Keep for other cards
 } from "@/components/ui/card";
 import {
   Form,
@@ -134,7 +134,7 @@ export default function InputPage() {
   const scrollToFirstError = (errors: FieldErrors<PipelineFormValues>) => { /* (same as before) */ const errorKeys = Object.keys(errors); if (errorKeys.length > 0) { let firstErrorKey = errorKeys[0] as keyof PipelineFormValues | 'samples'; let fieldNameToQuery = firstErrorKey as string; if (firstErrorKey === 'samples') { const samplesCardHeader = formRef.current?.querySelector('#samples-card-header'); if (samplesCardHeader && errors.samples?.root) { samplesCardHeader.scrollIntoView({ behavior: "smooth", block: "center" }); return; } if (Array.isArray(errors.samples)) { const firstSampleErrorIndex = errors.samples.findIndex(s => s && Object.keys(s).length > 0); if (firstSampleErrorIndex !== -1) { const sampleErrors = errors.samples[firstSampleErrorIndex]; if (sampleErrors) { const firstSampleFieldError = Object.keys(sampleErrors)[0] as keyof ApiSampleInfo; fieldNameToQuery = `samples.${firstSampleErrorIndex}.${firstSampleFieldError}`; } } } else { fieldNameToQuery = 'samples.0.patient';} } const attemptScroll = () => { let element = formRef.current?.querySelector(`[name="${fieldNameToQuery}"]`); if (!element) { const errorPathParts = fieldNameToQuery.split('.'); let selector = `#${errorPathParts.join('-')}-form-item`; element = formRef.current?.querySelector(selector); if (!element) { element = formRef.current?.querySelector(`label[for="${fieldNameToQuery}"]`);} if (!element && fieldNameToQuery === 'step') { element = formRef.current?.querySelector('button[role="combobox"][aria-controls*="radix"][id*="step"]'); } if (!element && fieldNameToQuery.startsWith('samples.')) { const sampleIndexMatch = fieldNameToQuery.match(/samples\.(\d+)\./); if (sampleIndexMatch && sampleIndexMatch[1]) { const errorSampleIndex = parseInt(sampleIndexMatch[1], 10); const sampleCard = formRef.current?.querySelectorAll('div[class*="relative border border-border pt-8"]')[errorSampleIndex]; if(sampleCard) element = sampleCard as HTMLElement;} } } if (element) { element.scrollIntoView({ behavior: "smooth", block: "center" }); } else { formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } }; if (isAdvancedField(fieldNameToQuery) && advancedAccordionValue !== "advanced-sarek-options") { setAdvancedAccordionValue("advanced-sarek-options"); requestAnimationFrame(attemptScroll); } else { attemptScroll(); } } };
   const onFormError: SubmitErrorHandler<PipelineFormValues> = (errorsArgument) => { console.warn("Form validation failed."); toast.error("Please fix the validation errors.", { duration: 5000 }); scrollToFirstError(errorsArgument); };
   const toggleCheckboxValue = (fieldName: keyof PipelineFormValues | 'tools', tool?: string) => { /* (same as before) */ if (fieldName === 'tools' && tool) { const currentVal = form.getValues("tools") ?? []; const newVal = currentVal.includes(tool) ? currentVal.filter((t) => t !== tool) : [...currentVal, tool]; form.setValue("tools", newVal, { shouldValidate: true, shouldDirty: true }); } else if (fieldName !== 'tools') { const fieldKey = fieldName as keyof PipelineFormValues; if (fieldKey in form.getValues()) { const currentVal = form.getValues(fieldKey); form.setValue(fieldKey, !currentVal, { shouldValidate: true, shouldDirty: true }); } } };
-  const handleProfileLoaded = (name: string | null, data: ProfileData | null) => { /* (same as before) */ setCurrentProfileName(name); let shouldOpenAdvanced = false; const currentFormDefaults = form.formState.defaultValues || {}; if (data) { let loadedInputType: InputType = 'fastq'; if (data.step === 'mapping') loadedInputType = 'fastq'; else if (STEPS_FOR_INPUT_TYPE.bam_cram.includes(data.step as SarekStep)) loadedInputType = 'bam_cram'; else if (data.step === 'annotation') loadedInputType = 'vcf'; const currentFormInputType = form.getValues('input_type'); if (loadedInputType !== currentFormInputType) { toast.info(`Profile '${name}' uses ${loadedInputType.toUpperCase()} input. Switching input type and applying settings.`); (formRef.current as any)._profileToApplyAfterReset = data; form.setValue('input_type', loadedInputType, { shouldValidate: true }); } else { Object.entries(data).forEach(([key, value]) => { const fieldKey = key as keyof ProfileData; if (fieldKey in form.getValues()) { form.setValue(fieldKey as any, value !== null ? value : (currentFormDefaults as any)[fieldKey], { shouldValidate: true, shouldDirty: true }); if (ADVANCED_FIELD_NAMES.includes(fieldKey as keyof PipelineFormValues) && value !== null) { const defaultValueForField = (currentFormDefaults as any)[fieldKey]; if (Array.isArray(value) && Array.isArray(defaultValueForField)) { if (value.length !== defaultValueForField.length || !value.every(v => defaultValueForField.includes(v))) { shouldOpenAdvanced = true; } } else if (value !== defaultValueForField) { shouldOpenAdvanced = true; } } } }); setAdvancedAccordionValue(shouldOpenAdvanced ? "advanced-sarek-options" : undefined); } } else { form.reset(); setSelectedInputType('fastq'); setAdvancedAccordionValue(undefined); } };
+  const handleProfileLoaded = (name: string | null, data: ProfileData | null) => { /* (same logic for opening accordion as before) */ setCurrentProfileName(name); let shouldOpenAdvanced = false; const currentFormDefaults = form.formState.defaultValues || {}; if (data) { let loadedInputType: InputType = 'fastq'; if (data.step === 'mapping') loadedInputType = 'fastq'; else if (STEPS_FOR_INPUT_TYPE.bam_cram.includes(data.step as SarekStep)) loadedInputType = 'bam_cram'; else if (data.step === 'annotation') loadedInputType = 'vcf'; const currentFormInputType = form.getValues('input_type'); if (loadedInputType !== currentFormInputType) { toast.info(`Profile '${name}' uses ${loadedInputType.toUpperCase()} input. Switching input type and applying settings.`); (formRef.current as any)._profileToApplyAfterReset = data; form.setValue('input_type', loadedInputType, { shouldValidate: true }); } else { Object.entries(data).forEach(([key, value]) => { const fieldKey = key as keyof ProfileData; if (fieldKey in form.getValues()) { form.setValue(fieldKey as any, value !== null ? value : (currentFormDefaults as any)[fieldKey], { shouldValidate: true, shouldDirty: true }); if (ADVANCED_FIELD_NAMES.includes(fieldKey as keyof PipelineFormValues) && value !== null) { const defaultValueForField = (currentFormDefaults as any)[fieldKey]; if (Array.isArray(value) && Array.isArray(defaultValueForField)) { if (value.length !== defaultValueForField.length || !value.every(v => defaultValueForField.includes(v))) { shouldOpenAdvanced = true; } } else if (value !== defaultValueForField) { shouldOpenAdvanced = true; } } } }); setAdvancedAccordionValue(shouldOpenAdvanced ? "advanced-sarek-options" : undefined); } } else { form.reset(); setSelectedInputType('fastq'); setAdvancedAccordionValue(undefined); } };
   useEffect(() => { /* Profile application after reset - same as before */ if ((formRef.current as any)?._profileToApplyAfterReset) { const dataToApply = (formRef.current as any)._profileToApplyAfterReset as ProfileData; let shouldOpenAdvancedAfterReset = false; const currentFormDefaultsAfterReset = form.formState.defaultValues || {}; Object.entries(dataToApply).forEach(([key, value]) => { const fieldKey = key as keyof ProfileData; if (fieldKey in form.getValues()) { form.setValue(fieldKey as any, value !== null ? value : (currentFormDefaultsAfterReset as any)[fieldKey], { shouldValidate: true, shouldDirty: true }); if (ADVANCED_FIELD_NAMES.includes(fieldKey as keyof PipelineFormValues) && value !== null) { const defaultValueForField = (currentFormDefaultsAfterReset as any)[fieldKey]; if (Array.isArray(value) && Array.isArray(defaultValueForField)) { if (value.length !== defaultValueForField.length || !value.every(v => defaultValueForField.includes(v))) { shouldOpenAdvancedAfterReset = true; } } else if (value !== defaultValueForField) { shouldOpenAdvancedAfterReset = true; } } } }); setAdvancedAccordionValue(shouldOpenAdvancedAfterReset ? "advanced-sarek-options" : undefined); delete (formRef.current as any)._profileToApplyAfterReset; } }, [form.formState.isSubmitSuccessful]);
   const handleSaveProfile = async (profileName: string) => { /* (same as before) */ const currentValues = form.getValues(); const profileData: ProfileData = { genome: currentValues.genome, step: currentValues.step, intervals_file: currentValues.intervals_file || null, dbsnp: currentValues.dbsnp || null, known_indels: currentValues.known_indels || null, pon: currentValues.pon || null, tools: (showTools && currentValues.tools && currentValues.tools.length > 0 ? currentValues.tools : null), profile: currentValues.profile, aligner: (showAligner ? (currentValues.aligner || null) : null), joint_germline: (showJointGermline ? currentValues.joint_germline : null), wes: currentValues.wes, trim_fastq: (showTrimFastq ? currentValues.trim_fastq : null), skip_qc: currentValues.skip_qc, skip_annotation: (showSkipAnnotation ? currentValues.skip_annotation : null), skip_baserecalibrator: (showSkipBaserecalibrator ? currentValues.skip_baserecalibrator : null), description: currentValues.description || null, }; await saveProfileMutation.mutateAsync({ name: profileName, data: profileData }); };
   const addSample = () => { /* (same as before) */ let defaultSample: Partial<ApiSampleInfo> = {}; if (selectedInputType === 'fastq') { defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, lane: "L001", fastq_1: "", fastq_2: "" }; } else if (selectedInputType === 'bam_cram') { defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, bam_cram: "", index: "" }; } else if (selectedInputType === 'vcf') { defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, vcf: "", index: "" }; } append(defaultSample); };
@@ -183,22 +183,21 @@ export default function InputPage() {
                         <AccordionTrigger
                             className={cn(
                                 "flex w-full items-center justify-between hover:no-underline cursor-pointer",
-                                "px-6 py-4", // Reduced padding for a slimmer trigger
-                                "data-[state=open]:border-b data-[state=open]:pb-[calc(1rem-1px)] data-[state=closed]:pb-4" // Adjusted padding for open/closed
+                                "px-6 py-3", // Adjusted padding for a slimmer trigger
+                                "data-[state=open]:border-b data-[state=closed]:border-transparent" // Ensure border only when open
                             )}
                         >
                             <div className="text-left">
-                                {/* Smaller text for title, closer to FormLabel size */}
-                                <h3 className="text-base font-medium leading-none tracking-tight">Advanced Sarek Parameters</h3>
-                                <p className="text-sm text-muted-foreground mt-1">Optional parameters to fine-tune the pipeline. Click to expand.</p>
+                                <h3 className="text-md font-medium leading-tight tracking-tight">Advanced Sarek Parameters</h3>
+                                <p className="text-sm text-muted-foreground mt-0.5">Optional parameters to fine-tune the pipeline. Click to expand.</p>
                             </div>
-                            {/* The default ChevronDownIcon from AccordionTrigger should render here now */}
-                            {/* If it doesn't or you want more control, you can add it manually and remove from AccordionTrigger component:
-                            <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200", advancedAccordionValue === "advanced-sarek-options" && "rotate-180" )}/>
+                            {/* The default ChevronDownIcon from AccordionTrigger (shadcn/ui) will be used.
+                                It handles its own rotation based on data-state.
+                                No need to manually add <ChevronDown /> here if using the default trigger.
                             */}
                         </AccordionTrigger>
                         <AccordionContent>
-                            <div className="px-6 pt-4 pb-6 space-y-6 border-t"> {/* Standard content padding */}
+                            <div className="px-6 pt-4 pb-6 space-y-6 border-t">
                                 {showTools && (
                                     <div>
                                         <div className="mb-4">
@@ -230,7 +229,50 @@ export default function InputPage() {
 
             {/* Action Buttons */}
             <div className="flex justify-start items-center gap-4 pt-4">
-                 <TooltipProvider delayDuration={100}> <Tooltip> <TooltipTrigger asChild> <Button type="submit" disabled={isStagingDisabled} className={cn( "border border-primary hover:underline bg-primary text-primary-foreground hover:bg-primary/90", isStagingDisabled && "cursor-not-allowed opacity-50" )} aria-disabled={isStagingDisabled} > {(stageMutation.isPending || saveProfileMutation.isPending) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" /> } Stage Pipeline Run </Button> </TooltipTrigger> {isStagingDisabled && getDisabledButtonTooltip() && ( <TooltipContent side="top" align="center"> <p className="text-sm flex items-center gap-1"> <Info className="h-4 w-4"/> {getDisabledButtonTooltip()} </p> </TooltipContent> )} </Tooltip> </TooltipProvider>
+                 <TooltipProvider delayDuration={100}>
+                    <Tooltip>
+                        {isStagingDisabled ? (
+                            <TooltipTrigger asChild>
+                                 {/* Button is direct child for asChild when enabled,
+                                     or TooltipTrigger directly wraps a Button (no asChild) when disabled */}
+                                <Button
+                                    type="submit"
+                                    disabled={true}
+                                    className={cn("border border-primary hover:underline bg-primary text-primary-foreground opacity-50 cursor-not-allowed")}
+                                    aria-disabled={true}
+                                >
+                                    {(stageMutation.isPending || saveProfileMutation.isPending)
+                                        ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        : <Play className="mr-2 h-4 w-4" />
+                                    }
+                                    Stage Pipeline Run
+                                </Button>
+                            </TooltipTrigger>
+                        ) : (
+                            <TooltipTrigger asChild>
+                                <Button
+                                    type="submit"
+                                    disabled={false}
+                                    className={cn("border border-primary hover:underline bg-primary text-primary-foreground hover:bg-primary/90")}
+                                >
+                                    {(stageMutation.isPending || saveProfileMutation.isPending)
+                                        ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        : <Play className="mr-2 h-4 w-4" />
+                                    }
+                                    Stage Pipeline Run
+                                </Button>
+                            </TooltipTrigger>
+                        )}
+                        {isStagingDisabled && getDisabledButtonTooltip() && (
+                            <TooltipContent side="top" align="center">
+                                <p className="text-sm flex items-center gap-1">
+                                    <Info className="h-4 w-4"/>
+                                    {getDisabledButtonTooltip()}
+                                </p>
+                            </TooltipContent>
+                        )}
+                    </Tooltip>
+                 </TooltipProvider>
                  <Button type="button" variant="outline" onClick={() => setIsSaveProfileOpen(true)} disabled={stageMutation.isPending || saveProfileMutation.isPending} className="cursor-pointer" > <Save className="mr-2 h-4 w-4" /> Save Profile </Button>
              </div>
         </form>
@@ -239,5 +281,3 @@ export default function InputPage() {
     </FormProvider>
   );
 }
-
-
