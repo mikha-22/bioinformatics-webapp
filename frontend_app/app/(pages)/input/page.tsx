@@ -184,8 +184,7 @@ export default function InputPage() {
                             className={cn(
                                 "flex w-full items-center justify-between hover:no-underline cursor-pointer",
                                 "px-6 py-3", // Adjusted padding for a slimmer trigger
-                                "data-[state=open]:border-b data-[state=closed]:border-transparent", // Ensure border only when open
-				"rounded-none"
+                                "data-[state=open]:border-b data-[state=closed]:border-transparent" // Ensure border only when open
                             )}
                         >
                             <div className="text-left">
