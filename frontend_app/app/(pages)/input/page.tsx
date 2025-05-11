@@ -183,7 +183,7 @@ export default function InputPage() {
                         <AccordionTrigger
                             className={cn(
                                 "flex w-full items-center justify-between hover:no-underline cursor-pointer",
-                                "px-6", // Keep horizontal padding, remove py-3 to use default py-4
+                                "px-6 py-3", // Adjusted padding for a slimmer trigger
                                 "data-[state=open]:border-b data-[state=closed]:border-transparent" // Ensure border only when open
                             )}
                         >
@@ -193,10 +193,11 @@ export default function InputPage() {
                             </div>
                             {/* The default ChevronDownIcon from AccordionTrigger (shadcn/ui) will be used.
                                 It handles its own rotation based on data-state.
+                                No need to manually add <ChevronDown /> here if using the default trigger.
                             */}
                         </AccordionTrigger>
                         <AccordionContent>
-                            <div className="px-6 pt-4 pb-6 space-y-6 border-t"> {/* This div is INSIDE AccordionContent */}
+                            <div className="px-6 pt-4 pb-6 space-y-6 border-t">
                                 {showTools && (
                                     <div>
                                         <div className="mb-4">
