@@ -177,7 +177,7 @@ export default function InputPage() {
           </Card>
 
           {/* Advanced Sarek Parameters Card with Accordion */}
-            <Card className="overflow-hidden">
+            <Card className="overflow-hidden p-2"> {/* Apply p-2 to override default py-6 */}
                 <Accordion type="single" collapsible className="w-full" value={advancedAccordionValue} onValueChange={setAdvancedAccordionValue}>
                     <AccordionItem value="advanced-sarek-options" className="border-0">
                         <AccordionTrigger
