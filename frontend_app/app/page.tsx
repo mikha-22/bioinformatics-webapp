@@ -67,14 +67,17 @@ export default function HomePage() {
   });
 
   // Get recent items (slice only after data is available)
-  const recentJobs = jobs?.slice(0, MAX_RECENT_ITEMS) ?? [];
+  // --- THIS IS THE FIX ---
+  const recentJobs = jobs?.filter(job => job && typeof job.id === 'string').slice(0, MAX_RECENT_ITEMS) ?? [];
+  // ----------------------
   const recentResults = results?.slice(0, MAX_RECENT_ITEMS) ?? [];
 
   // --- Job Stats Calculation ---
   const jobStats = React.useMemo(() => {
     if (!jobs || isLoadingJobs) return { running: 0, queued: 0, completed: 0, failed: 0, staged: 0, total: 0 }; // Include staged and total
     return jobs.reduce((acc, job) => {
-        const status = job.status?.toLowerCase();
+        // Add a check for job and job.status being defined before accessing toLowerCase
+        const status = job?.status?.toLowerCase();
         if (status === 'running' || status === 'started') acc.running++;
         else if (status === 'queued') acc.queued++;
         else if (status === 'finished') acc.completed++;
@@ -195,6 +198,7 @@ export default function HomePage() {
               {!isLoadingJobs && !isErrorJobs && recentJobs.length === 0 && <p className="text-sm text-muted-foreground">No recent jobs found.</p>}
               {!isLoadingJobs && !isErrorJobs && recentJobs.length > 0 && (
                 <ul className="space-y-3">
+                  {/* Because of the filter above, job and job.id are now guaranteed to be valid */}
                   {recentJobs.map((job) => (
                     <li key={job.id} className="flex items-center justify-between text-sm border-b pb-2 last:border-0 last:pb-0">
                       <Link href="/jobs" className="hover:underline truncate mr-2 group flex-grow min-w-0">
