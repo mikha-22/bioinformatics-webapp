@@ -9,25 +9,25 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Job } from "@/lib/types"; // Job type now includes run_name
+import { Job } from "@/lib/types"; // Job type now uses job_id
 import { formatDistanceToNow } from 'date-fns';
 import { formatDuration } from "@/lib/utils";
 import JobActions from "./JobActions";
 import React from 'react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // For longer run names
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface JobTableProps {
   jobs: Job[];
 }
 
-// --- Helper Functions (Unchanged from your provided code) ---
+// --- Helper Functions ---
 function mapToUiStatus(internalStatus: string | null | undefined): string {
     const status = internalStatus?.toLowerCase();
     switch (status) {
         case 'staged': return 'Staged';
         case 'queued': return 'Queued';
         case 'started': return 'Running';
-        case 'running': return 'Running'; // Explicitly map RQ's running
+        case 'running': return 'Running';
         case 'finished': return 'Finished';
         case 'failed': return 'Failed';
         case 'canceled': return 'Stopped';
@@ -69,7 +69,13 @@ function formatTimestamp(timestamp: number | null | undefined): React.ReactEleme
 
 export default function JobTable({ jobs }: JobTableProps) {
 
-  if (!jobs || jobs.length === 0) {
+  const validJobs = jobs?.filter(job => job && typeof job.job_id === 'string') || [];
+
+  if (!validJobs || validJobs.length === 0) {
+    if (jobs && jobs.length > 0 && validJobs.length === 0) {
+        console.warn("JobTable: All jobs received were invalid or missing a job_id.", jobs);
+        return <p className="text-center text-destructive py-8">Error: Received invalid job data.</p>;
+    }
     return <p className="text-center text-muted-foreground py-8">No jobs found.</p>;
   }
 
@@ -80,9 +86,8 @@ export default function JobTable({ jobs }: JobTableProps) {
         <TableHeader>
           <TableRow>
             <TableHead className="w-[120px] hidden lg:table-cell">Job ID</TableHead>
-            {/* <<< NEW: Run Name Column >>> */}
             <TableHead className="min-w-[150px] max-w-[250px]">Run Name</TableHead>
-            <TableHead>Description</TableHead> {/* Was "Description / ID" */}
+            <TableHead>Description</TableHead>
             <TableHead className="w-[100px] hidden xl:table-cell">Step</TableHead>
             <TableHead className="w-[100px] hidden xl:table-cell">Genome</TableHead>
             <TableHead className="w-[120px] hidden md:table-cell">Duration</TableHead>
@@ -92,31 +97,29 @@ export default function JobTable({ jobs }: JobTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {jobs.map((job) => (
-            <TableRow key={job.id} data-state={job.status === 'finished' ? 'completed' : job.status === 'failed' ? 'error' : undefined}>
-              <TableCell className="font-mono text-xs hidden lg:table-cell" title={job.id}>
-                {job.id.startsWith("staged_") ? "STAGED" : "RQ"}
+          {validJobs.map((job) => (
+            <TableRow key={job.job_id} data-state={job.status === 'finished' ? 'completed' : job.status === 'failed' ? 'error' : undefined}>
+              <TableCell className="font-mono text-xs hidden lg:table-cell" title={job.job_id}>
+                {job.job_id.startsWith("staged_") ? "STAGED" : "RQ"}
                 <span className="text-muted-foreground">_</span>
-                {job.id.substring(job.id.indexOf('_') + 1, job.id.indexOf('_') + 9)}...
+                {job.job_id.substring(job.job_id.indexOf('_') + 1, job.job_id.indexOf('_') + 9)}...
               </TableCell>
 
-              {/* <<< NEW: Run Name Cell >>> */}
               <TableCell className="font-medium min-w-[150px] max-w-[250px] truncate" title={job.run_name ?? "N/A"}>
                 <TooltipProvider delayDuration={300}>
                     <Tooltip>
                         <TooltipTrigger asChild>
                              <span className="block truncate">{job.run_name || <span className="italic text-muted-foreground">N/A</span>}</span>
                         </TooltipTrigger>
-                        {job.run_name && job.run_name.length > 30 && ( // Show tooltip only if name is long
+                        {job.run_name && job.run_name.length > 30 && (
                             <TooltipContent side="top" align="start">
                                 <p>{job.run_name}</p>
                             </TooltipContent>
                         )}
                     </Tooltip>
                 </TooltipProvider>
-                {/* Show Job ID below Run Name on smaller screens where Job ID column is hidden */}
-                <div className="lg:hidden text-xs text-muted-foreground font-mono mt-0.5" title={job.id}>
-                    {job.id.startsWith("staged_") ? "STG" : "RQ"}_{job.id.substring(job.id.indexOf('_') + 1, job.id.indexOf('_') + 9)}...
+                <div className="lg:hidden text-xs text-muted-foreground font-mono mt-0.5" title={job.job_id}>
+                    {job.job_id.startsWith("staged_") ? "STG" : "RQ"}_{job.job_id.substring(job.job_id.indexOf('_') + 1, job.job_id.indexOf('_') + 9)}...
                 </div>
               </TableCell>
 
