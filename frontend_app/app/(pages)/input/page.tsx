@@ -200,7 +200,7 @@ export default function InputPage() {
           <Card className="overflow-hidden p-2">
             <Accordion type="single" collapsible className="w-full" value={advancedAccordionValue} onValueChange={setAdvancedAccordionValue}>
               <AccordionItem value="advanced-sarek-options" className="border-0">
-                <AccordionTrigger className={cn("flex w-full items-center justify-between hover:no-underline cursor-pointer", "px-6 py-3", "data-[state=open]:border-b data-[state=closed]:border-transparent")}>
+                <AccordionTrigger className={cn("flex w-full items-center justify-between hover:no-underline cursor-pointer", "px-6 py-3", "data-[state=open]:border-0 data-[state=closed]:border-transparent")}>
                   <div className="text-left"> <h3 className="text-md font-medium leading-tight tracking-tight">Advanced Sarek Parameters</h3> <p className="text-sm text-muted-foreground mt-0.5">Optional parameters to fine-tune the pipeline. Click to expand.</p> </div>
                 </AccordionTrigger>
                 <AccordionContent>
