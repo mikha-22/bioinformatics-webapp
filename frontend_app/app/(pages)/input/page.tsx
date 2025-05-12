@@ -144,8 +144,61 @@ export default function InputPage() {
   const scrollToFirstError = (errors: FieldErrors<PipelineFormValues>) => { const errorKeys = Object.keys(errors); if (errorKeys.length > 0) { let firstErrorKey = errorKeys[0] as keyof PipelineFormValues | 'samples'; let fieldNameToQuery = firstErrorKey as string; if (firstErrorKey === 'samples') { const samplesCardHeader = formRef.current?.querySelector('#samples-card-header'); if (samplesCardHeader && errors.samples?.root) { samplesCardHeader.scrollIntoView({ behavior: "smooth", block: "center" }); return; } if (Array.isArray(errors.samples)) { const firstSampleErrorIndex = errors.samples.findIndex(s => s && Object.keys(s).length > 0); if (firstSampleErrorIndex !== -1) { const sampleErrors = errors.samples[firstSampleErrorIndex]; if (sampleErrors) { const firstSampleFieldError = Object.keys(sampleErrors)[0] as keyof ApiSampleInfo; fieldNameToQuery = `samples.${firstSampleErrorIndex}.${firstSampleFieldError}`; } } } else { fieldNameToQuery = 'samples.0.patient';} } const attemptScroll = () => { let element = formRef.current?.querySelector(`[name="${fieldNameToQuery}"]`); if (!element) { const errorPathParts = fieldNameToQuery.split('.'); let selector = `#${errorPathParts.join('-')}-form-item`; element = formRef.current?.querySelector(selector); if (!element) { element = formRef.current?.querySelector(`label[for="${fieldNameToQuery}"]`);} if (!element && fieldNameToQuery === 'step') { element = formRef.current?.querySelector('button[role="combobox"][aria-controls*="radix"][id*="step"]'); } if (!element && fieldNameToQuery.startsWith('samples.')) { const sampleIndexMatch = fieldNameToQuery.match(/samples\.(\d+)\./); if (sampleIndexMatch && sampleIndexMatch[1]) { const errorSampleIndex = parseInt(sampleIndexMatch[1], 10); const sampleCard = formRef.current?.querySelectorAll('div[class*="relative border border-border pt-8"]')[errorSampleIndex]; if(sampleCard) element = sampleCard as HTMLElement;} } } if (element) { element.scrollIntoView({ behavior: "smooth", block: "center" }); } else { formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } }; if (isAdvancedField(fieldNameToQuery) && advancedAccordionValue !== "advanced-sarek-options") { setAdvancedAccordionValue("advanced-sarek-options"); requestAnimationFrame(attemptScroll); } else { attemptScroll(); } } };
   const onFormError: SubmitErrorHandler<PipelineFormValues> = (errorsArgument) => { console.warn("Form validation failed.", errorsArgument); toast.error("Please fix the validation errors.", { duration: 5000 }); scrollToFirstError(errorsArgument); };
   const toggleCheckboxValue = (fieldName: keyof PipelineFormValues | 'tools', tool?: string) => { if (fieldName === 'tools' && tool) { const currentVal = form.getValues("tools") ?? []; const newVal = currentVal.includes(tool) ? currentVal.filter((t) => t !== tool) : [...currentVal, tool]; form.setValue("tools", newVal, { shouldValidate: true, shouldDirty: true }); } else if (fieldName !== 'tools') { const fieldKey = fieldName as keyof PipelineFormValues; if (fieldKey in form.getValues()) { const currentVal = form.getValues(fieldKey); form.setValue(fieldKey, !currentVal, { shouldValidate: true, shouldDirty: true }); } } };
-  const handleProfileLoaded = (name: string | null, data: ProfileData | null) => { setCurrentProfileName(name); let shouldOpenAdvanced = false; const currentFormDefaults = form.formState.defaultValues || {}; form.setValue('run_name', '', { shouldValidate: false, shouldDirty: true }); form.setValue('run_description', '', { shouldValidate: false, shouldDirty: true }); if (data) { let loadedInputType: InputType = 'fastq'; if (data.step === 'mapping') loadedInputType = 'fastq'; else if (STEPS_FOR_INPUT_TYPE.bam_cram.includes(data.step as SarekStep)) loadedInputType = 'bam_cram'; else if (data.step === 'annotation') loadedInputType = 'vcf'; const currentFormInputType = form.getValues('input_type'); if (loadedInputType !== currentFormInputType) { toast.info(`Profile '${name}' uses ${loadedInputType.toUpperCase()} input. Switching input type and applying settings.`); (formRef.current as any)._profileToApplyAfterReset = data; form.setValue('input_type', loadedInputType, { shouldValidate: true }); } else { Object.entries(data).forEach(([key, value]) => { const fieldKey = key as keyof ProfileData; if (fieldKey in form.getValues()) { form.setValue(fieldKey as any, value !== null ? value : (currentFormDefaults as any)[fieldKey], { shouldValidate: true, shouldDirty: true }); if (ADVANCED_FIELD_NAMES.includes(fieldKey as keyof PipelineFormValues) && value !== null) { const defaultValueForField = (currentFormDefaults as any)[fieldKey]; if (Array.isArray(value) && Array.isArray(defaultValueForField)) { if (value.length !== defaultValueForField.length || !value.every(v => defaultValueForField.includes(v))) { shouldOpenAdvanced = true; } } else if (value !== defaultValueForField) { shouldOpenAdvanced = true; } } } }); setAdvancedAccordionValue(shouldOpenAdvanced ? "advanced-sarek-options" : undefined); } } else { form.reset(); setSelectedInputType('fastq'); setAdvancedAccordionValue(undefined); } };
-  useEffect(() => { if ((formRef.current as any)?._profileToApplyAfterReset) { const dataToApply = (formRef.current as any)._profileToApplyAfterReset as ProfileData; let shouldOpenAdvancedAfterReset = false; const currentFormDefaultsAfterReset = form.formState.defaultValues || {}; Object.entries(dataToApply).forEach(([key, value]) => { const fieldKey = key as keyof ProfileData; if (fieldKey in form.getValues()) { form.setValue(fieldKey as any, value !== null ? value : (currentFormDefaultsAfterReset as any)[fieldKey], { shouldValidate: true, shouldDirty: true }); if (ADVANCED_FIELD_NAMES.includes(fieldKey as keyof PipelineFormValues) && value !== null) { const defaultValueForField = (currentFormDefaultsAfterReset as any)[fieldKey]; if (Array.isArray(value) && Array.isArray(defaultValueForField)) { if (value.length !== defaultValueForField.length || !value.every(v => defaultValueForField.includes(v))) { shouldOpenAdvancedAfterReset = true; } } else if (value !== defaultValueForField) { shouldOpenAdvancedAfterReset = true; } } } }); setAdvancedAccordionValue(shouldOpenAdvancedAfterReset ? "advanced-sarek-options" : undefined); delete (formRef.current as any)._profileToApplyAfterReset; } }, [form.formState.isSubmitSuccessful, form, advancedAccordionValue]);
+
+  const handleProfileLoaded = (name: string | null, data: ProfileData | null) => {
+    setCurrentProfileName(name);
+    // const currentFormDefaults = form.formState.defaultValues || {}; // Not needed if we don't auto-open
+    form.setValue('run_name', '', { shouldValidate: false, shouldDirty: true });
+    form.setValue('run_description', '', { shouldValidate: false, shouldDirty: true });
+
+    if (data) {
+      let loadedInputType: InputType = 'fastq';
+      if (data.step === 'mapping') loadedInputType = 'fastq';
+      else if (STEPS_FOR_INPUT_TYPE.bam_cram.includes(data.step as SarekStep)) loadedInputType = 'bam_cram';
+      else if (data.step === 'annotation') loadedInputType = 'vcf';
+
+      const currentFormInputType = form.getValues('input_type');
+      if (loadedInputType !== currentFormInputType) {
+        toast.info(`Profile '${name}' uses ${loadedInputType.toUpperCase()} input. Switching input type and applying settings.`);
+        (formRef.current as any)._profileToApplyAfterReset = data; // Store data to apply after reset
+        form.setValue('input_type', loadedInputType, { shouldValidate: true }); // Trigger reset
+      } else {
+        // Input type is the same, apply directly
+        Object.entries(data).forEach(([key, value]) => {
+          const fieldKey = key as keyof ProfileData;
+          if (fieldKey in form.getValues()) { // Check if the key exists in form values
+            form.setValue(fieldKey as any, value !== null ? value : form.formState.defaultValues?.[fieldKey as keyof PipelineFormValues], { shouldValidate: true, shouldDirty: true });
+          }
+        });
+      }
+    } else {
+      // Resetting to default settings
+      form.reset(); // This will use the defaultValues defined in useForm
+      setSelectedInputType('fastq'); // Explicitly set input type to default
+    }
+    // Always ensure accordion is closed when a profile is loaded or reset
+    setAdvancedAccordionValue(undefined);
+  };
+
+  useEffect(() => {
+    if ((formRef.current as any)?._profileToApplyAfterReset) {
+      const dataToApply = (formRef.current as any)._profileToApplyAfterReset as ProfileData;
+      // const currentFormDefaultsAfterReset = form.formState.defaultValues || {}; // Not needed for auto-open logic
+
+      Object.entries(dataToApply).forEach(([key, value]) => {
+        const fieldKey = key as keyof ProfileData;
+        if (fieldKey in form.getValues()) {
+          form.setValue(fieldKey as any, value !== null ? value : form.formState.defaultValues?.[fieldKey as keyof PipelineFormValues], { shouldValidate: true, shouldDirty: true });
+        }
+      });
+      // Ensure accordion remains closed after applying profile post-reset
+      setAdvancedAccordionValue(undefined);
+      delete (formRef.current as any)._profileToApplyAfterReset;
+    }
+  }, [form.formState.isSubmitSuccessful, form]); // form.formState.isSubmitSuccessful is a bit of a hack to detect reset completion.
+                                                // A more direct way might be needed if this isn't reliable.
+                                                // Watching form.getValues('input_type') might be better if reset is guaranteed to change it.
+
   const handleSaveProfile = async (profileName: string) => { const currentValues = form.getValues(); const profileData: ProfileData = { genome: currentValues.genome, step: currentValues.step, intervals_file: currentValues.intervals_file || null, dbsnp: currentValues.dbsnp || null, known_indels: currentValues.known_indels || null, pon: currentValues.pon || null, tools: (showTools && currentValues.tools && currentValues.tools.length > 0 ? currentValues.tools : null), profile: currentValues.profile, aligner: (showAligner ? (currentValues.aligner || null) : null), joint_germline: (showJointGermline ? currentValues.joint_germline : null), wes: currentValues.wes, trim_fastq: (showTrimFastq ? currentValues.trim_fastq : null), skip_qc: currentValues.skip_qc, skip_annotation: (showSkipAnnotation ? currentValues.skip_annotation : null), skip_baserecalibrator: (showSkipBaserecalibrator ? currentValues.skip_baserecalibrator : null), }; await saveProfileMutation.mutateAsync({ name: profileName, data: profileData }); };
   const addSample = () => { let defaultSample: Partial<ApiSampleInfo> = {}; if (selectedInputType === 'fastq') { defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, lane: "L001", fastq_1: "", fastq_2: "" }; } else if (selectedInputType === 'bam_cram') { defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, bam_cram: "", index: "" }; } else if (selectedInputType === 'vcf') { defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, vcf: "", index: "" }; } append(defaultSample); };
 
@@ -187,7 +240,6 @@ export default function InputPage() {
           <Card>
             <CardHeader> <CardTitle className="text-xl">Core Pipeline Setup</CardTitle> <CardDescription>Essential parameters for the Sarek pipeline run.</CardDescription> </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
-                {/* The Sarek internal description FormField was here - NOW REMOVED */}
                 <FormField control={form.control} name="genome" render={({ field }) => ( <FormItem> <FormLabel>Reference Genome Build <span className="text-destructive">*</span></FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select genome build" /> </SelectTrigger> </FormControl> <SelectContent> {SAREK_GENOMES.map(g => ( <SelectItem key={g.value} value={g.value}> {g.label} </SelectItem> ))} </SelectContent> </Select> <FormDescription className="italic"> Select the genome assembly key. </FormDescription> <FormMessage /> </FormItem> )} />
                 <FormField control={form.control} name="step" render={({ field }) => ( <FormItem id="step-form-item"> <FormLabel>Starting Step <span className="text-destructive">*</span></FormLabel> <Select onValueChange={field.onChange} value={field.value} disabled={availableSteps.length <= 1} > <FormControl> <SelectTrigger id="step"> <SelectValue placeholder="Select starting step" /> </SelectTrigger> </FormControl> <SelectContent> {availableSteps.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)} </SelectContent> </Select> <FormDescription className="italic">Pipeline execution starting point.</FormDescription> <FormMessage /> </FormItem> )} />
                 <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 md:col-span-2 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-wes" className="flex flex-row items-center space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-center"> <Checkbox id="flag-wes" checked={form.watch('wes')} onCheckedChange={() => toggleCheckboxValue('wes')} /> </FormControl> <div className="space-y-1 leading-none"> <span>Whole Exome Sequencing (WES)</span> <FormDescription className="italic mt-1"> Check if data is WES/targeted. Providing an Intervals file is recommended. </FormDescription> </div> </FormLabel> <FormField control={form.control} name="wes" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem>
