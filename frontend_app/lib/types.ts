@@ -6,9 +6,12 @@ export interface JobResourceInfo {
   duration_seconds?: number | null;
 }
 
+// SarekParams as understood by our application for storing in JobMeta.
+// If Sarek pipeline itself has an internal description parameter it uses,
+// it would be part of this generic dictionary if passed.
 export interface SarekParams {
   genome?: string;
-  tools?: string;
+  tools?: string; // Comma-separated string when stored in backend meta
   step?: string;
   profile?: string;
   aligner?: string;
@@ -18,6 +21,10 @@ export interface SarekParams {
   skip_qc?: boolean;
   skip_annotation?: boolean;
   skip_baserecalibrator?: boolean;
+  // No explicit 'description' field here for Sarek's internal config,
+  // as it's not a standard top-level Sarek CLI param we manage.
+  // If Sarek uses one internally via other means, it would be part of this Any dict.
+  [key: string]: any; // Allows for other Sarek params not explicitly listed
 }
 
 export interface InputFilenames {
@@ -41,7 +48,10 @@ export interface SampleInfo {
 }
 
 export interface JobMeta {
-  run_name?: string | null;
+  run_name?: string | null; // User-defined run name
+  // description field here is for the user's overall run_description,
+  // which is also on JobStatusDetails.description and RQ Job.description
+  description?: string | null;
   input_type?: string;
   input_params?: InputFilenames;
   sarek_params?: SarekParams;
@@ -56,38 +66,36 @@ export interface JobMeta {
   input_csv_path_used?: string;
   is_rerun_execution?: boolean;
   original_job_id?: string;
-  description?: string | null; // Holds run_description from staging
 }
 
 export interface JobResultSuccess {
     status: "success";
     results_path?: string;
     message?: string;
-    resources: JobMeta; // resources within result might be a subset or all of JobMeta
+    resources: JobMeta;
 }
 
 export interface Job {
-  job_id: string; // <<< CHANGED from id to job_id
+  job_id: string;
   run_name?: string | null;
   status: "staged" | "queued" | "started" | "running" | "finished" | "failed" | "stopped" | "canceled" | string;
-  description: string | null; // This will hold the run_description
+  description: string | null; // This holds the user's run_description
   enqueued_at: number | null;
   started_at: number | null;
   ended_at: number | null;
-  staged_at?: number | null; // Present for staged jobs from backend logic
-  result: JobResultSuccess | null | any; // 'any' for flexibility if backend result varies
+  staged_at?: number | null;
+  result: JobResultSuccess | null | any;
   error: string | null;
   meta: JobMeta;
   resources: JobResourceInfo | null;
 }
 
-// This type should align with what the /api/jobs_list and /api/job_status/{job_id} endpoints return.
-// The backend uses JobStatusDetails Pydantic model for this.
 export interface JobStatusDetails {
     job_id: string;
     run_name?: string | null;
     status: string;
-    description?: string | null; // This is the run_description
+    description?: string | null; // This is the user's run_description
+    staged_at?: number | null;
     enqueued_at?: number | null;
     started_at?: number | null;
     ended_at?: number | null;
@@ -95,15 +103,7 @@ export interface JobStatusDetails {
     error?: string | null;
     meta: JobMeta;
     resources?: JobResourceInfo | null;
-    // If staged_at needs to be on this specific type, add it.
-    // For now, assuming it's handled by the broader `Job` type if needed after transformation.
-    // However, if getJobsList directly returns objects that should have staged_at,
-    // and we are casting to Job[], then Job should have it.
-    // The backend's JobStatusDetails model does not have staged_at.
-    // The `all_jobs_list_model.append(JobStatusDetails(...))` in jobs.py uses the Pydantic model.
-    // Let's ensure the frontend Job type is the one primarily used after fetching.
 }
-
 
 export interface ResultRun {
   name: string;
@@ -131,9 +131,10 @@ export interface DataFile {
     type: 'file';
 }
 
+// Type for the API input payload to the backend
 export interface PipelineInput {
   run_name: string;
-  run_description?: string;
+  run_description?: string; // User's overall run description
   input_type: 'fastq' | 'bam_cram' | 'vcf';
   samples: SampleInfo[];
   genome: string;
@@ -151,14 +152,15 @@ export interface PipelineInput {
   skip_qc?: boolean;
   skip_annotation?: boolean;
   skip_baserecalibrator?: boolean;
-  description?: string; // Sarek's internal config description
+  // The Sarek-specific internal config description field is removed
 }
 
+// Type for parameters displayed in the Results page dialog
 export interface RunParameters {
   run_name?: string | null;
-  run_description?: string | null;
+  run_description?: string | null; // User's overall run description
   input_filenames?: InputFilenames | null;
-  sarek_params?: SarekParams | null;
+  sarek_params?: SarekParams | null; // This SarekParams might contain Sarek's own internal description if it was part of the run's meta
   sample_info?: SampleInfo[] | null;
   input_type?: string | null;
   staged_job_id_origin?: string | null;
@@ -167,6 +169,7 @@ export interface RunParameters {
   input_csv_path_used?: string | null;
 }
 
+// Type for data saved/loaded as a configuration profile
 export interface ProfileData {
     genome: string;
     step: string;
@@ -183,5 +186,5 @@ export interface ProfileData {
     skip_qc?: boolean | null;
     skip_annotation?: boolean | null;
     skip_baserecalibrator?: boolean | null;
-    description?: string | null; // Sarek's internal config description for the profile
+    // The Sarek-specific internal config description field is removed
 }

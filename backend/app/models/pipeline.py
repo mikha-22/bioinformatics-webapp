@@ -2,7 +2,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 
-# --- Existing Models ---
 class SampleInfo(BaseModel):
     patient: str = Field(..., description="Patient identifier")
     sample: str = Field(..., description="Sample identifier")
@@ -17,9 +16,9 @@ class SampleInfo(BaseModel):
 
 
 class PipelineInput(BaseModel):
-    """ Main input model, now includes input_type, run_name, and run_description """
+    """ Main input model """
     run_name: str = Field(..., description="User-defined name for the pipeline run. Spaces will be converted to underscores.")
-    run_description: Optional[str] = Field(None, description="Optional user-defined description for the pipeline run.")
+    run_description: Optional[str] = Field(None, description="Optional user-defined description for the pipeline run.") # User's overall description
     input_type: str = Field(..., description="Type of input data ('fastq', 'bam_cram', 'vcf')")
     samples: List[SampleInfo] = Field(..., description="List of sample information, structure depends on input_type")
 
@@ -41,8 +40,7 @@ class PipelineInput(BaseModel):
     skip_qc: Optional[bool] = Field(False, description="Skip QC steps")
     skip_annotation: Optional[bool] = Field(False, description="Skip annotation steps")
     skip_baserecalibrator: Optional[bool] = Field(False, description="Skip base quality score recalibration")
-
-    description: Optional[str] = Field(None, description="Optional Sarek internal description of the pipeline run") # Sarek's own description field
+    # description: Optional[str] = Field(None, ...) // <<< REMOVED Sarek's internal config description
 
 class JobResourceInfo(BaseModel):
     peak_memory_mb: Optional[float] = None
@@ -51,9 +49,10 @@ class JobResourceInfo(BaseModel):
 
 class JobMeta(BaseModel):
     run_name: Optional[str] = Field(None, description="User-defined name for the pipeline run.")
+    # The user's overall run_description is stored in RQ Job.description / JobStatusDetails.description
     input_type: Optional[str] = None
     input_params: Optional[Dict[str, Optional[str]]] = Field(default_factory=dict)
-    sarek_params: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Sarek-specific parameters, may include its own 'description' field for Sarek config.")
+    sarek_params: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Sarek-specific parameters. If Sarek uses an internal description, it would be part of this dict.")
     sample_info: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     staged_job_id_origin: Optional[str] = None
     error_message: Optional[str] = None
@@ -65,16 +64,12 @@ class JobMeta(BaseModel):
     input_csv_path_used: Optional[str] = None
     is_rerun_execution: Optional[bool] = None
     original_job_id: Optional[str] = None
-    # The user's overall run_description is NOT part of JobMeta;
-    # it's a top-level field in JobStatusDetails (populated from RQ Job.description)
-    # or directly from staged details.
-    # The 'description' field within 'sarek_params' is for Sarek's internal config description.
 
 class JobStatusDetails(BaseModel):
     job_id: str = Field(..., description="The unique ID of the RQ job or Staged ID")
     run_name: Optional[str] = Field(None, description="User-defined name for the pipeline run.")
     status: str = Field(..., description="Current status of the job")
-    description: Optional[str] = Field(None, description="User-defined run description for the pipeline run.")
+    description: Optional[str] = Field(None, description="User-defined run description for the pipeline run.") # This is the one
     staged_at: Optional[float] = Field(None, description="Unix timestamp when the job was staged")
     enqueued_at: Optional[float] = Field(None, description="Unix timestamp when the job was enqueued")
     started_at: Optional[float] = Field(None, description="Unix timestamp when the job started execution")
@@ -85,6 +80,7 @@ class JobStatusDetails(BaseModel):
     resources: Optional[JobResourceInfo] = Field(None, description="Resource usage statistics")
 
 class ProfileData(BaseModel):
+    """ Data stored for a configuration profile. """
     genome: str = Field(..., description="Genome build to use (e.g., GRCh38, GRCh37)")
     step: str = Field(..., description="Intended pipeline step to start from (e.g., mapping, variant_calling)")
     intervals_file: Optional[str] = Field(None, description="Path to BED file with target regions")
@@ -100,7 +96,7 @@ class ProfileData(BaseModel):
     skip_qc: Optional[bool] = Field(False, description="Skip QC steps")
     skip_annotation: Optional[bool] = Field(False, description="Skip annotation steps")
     skip_baserecalibrator: Optional[bool] = Field(False, description="Skip base quality score recalibration")
-    description: Optional[str] = Field(None, description="Optional Sarek internal description of the profile itself")
+    # description: Optional[str] = Field(None, ...) // <<< REMOVED Sarek's internal config description
 
 class SaveProfileRequest(BaseModel):
     name: str = Field(..., description="The name to save the profile under.")
