@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useForm, useFieldArray, FormProvider, SubmitErrorHandler, FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z, ZodType } from "zod"; // Keep ZodType if it's used by other parts of your codebase, otherwise it can be removed
+import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { PlusCircle, Loader2, Play, Save, Info, Settings2, ChevronDown } from "lucide-react";
@@ -102,7 +102,6 @@ const fastqPipelineSchemaBase = z.object({
   aligner: z.enum(SAREK_ALIGNERS as [string, ...string[]]).optional().default("bwa-mem"),
   joint_germline: z.boolean().default(false), wes: z.boolean().default(false), trim_fastq: z.boolean().default(false),
   skip_qc: z.boolean().default(false), skip_annotation: z.boolean().default(false), skip_baserecalibrator: z.boolean().default(false),
-  // description: z.string().optional(), // <<< REMOVED Sarek's internal config description
 });
 const bamCramPipelineSchemaBase = z.object({
   ...commonRunInfoSchema,
@@ -116,7 +115,6 @@ const bamCramPipelineSchemaBase = z.object({
   aligner: z.union([z.string().length(0), z.null(), z.undefined()]).optional(),
   joint_germline: z.boolean().default(false), wes: z.boolean().default(false), trim_fastq: z.boolean().default(false),
   skip_qc: z.boolean().default(false), skip_annotation: z.boolean().default(false), skip_baserecalibrator: z.boolean().default(false),
-  // description: z.string().optional(), // <<< REMOVED Sarek's internal config description
 });
 const vcfPipelineSchemaBase = z.object({
   ...commonRunInfoSchema,
@@ -130,7 +128,6 @@ const vcfPipelineSchemaBase = z.object({
   aligner: z.union([z.string().length(0), z.null(), z.undefined()]).optional(),
   joint_germline: z.boolean().default(false), wes: z.boolean().default(false), trim_fastq: z.boolean().default(false),
   skip_qc: z.boolean().default(false), skip_annotation: z.boolean().default(false), skip_baserecalibrator: z.boolean().default(false),
-  // description: z.string().optional(), // <<< REMOVED Sarek's internal config description
 });
 
 const pipelineInputSchema = z.discriminatedUnion("input_type", [ fastqPipelineSchemaBase, bamCramPipelineSchemaBase, vcfPipelineSchemaBase, ])
@@ -146,7 +143,7 @@ const pipelineInputSchema = z.discriminatedUnion("input_type", [ fastqPipelineSc
 });
 type PipelineFormValues = z.infer<typeof pipelineInputSchema>;
 type InputType = PipelineFormValues['input_type'];
-const ADVANCED_FIELD_NAMES: (keyof PipelineFormValues)[] = [ 'tools', 'profile', 'aligner', 'pon', 'trim_fastq', 'joint_germline', 'skip_qc', 'skip_annotation']; // 'description' removed
+const ADVANCED_FIELD_NAMES: (keyof PipelineFormValues)[] = [ 'tools', 'profile', 'aligner', 'pon', 'trim_fastq', 'joint_germline', 'skip_qc', 'skip_annotation'];
 
 export default function InputPage() {
   const router = useRouter();
@@ -172,7 +169,6 @@ export default function InputPage() {
       tools: [], profile: "docker", aligner: "bwa-mem",
       joint_germline: false, wes: false, trim_fastq: false,
       skip_qc: false, skip_annotation: false, skip_baserecalibrator: false,
-      // description: "", // <<< REMOVED Sarek's internal config description
     },
   });
 
@@ -196,12 +192,11 @@ export default function InputPage() {
 
       const currentValues = form.getValues();
       const newDefaultValues: Partial<PipelineFormValues> = {
-        run_name: "", run_description: "", // Reset these on type change
+        run_name: "", run_description: "",
         genome: currentValues.genome || "GATK.GRCh38",
         profile: currentValues.profile || "docker",
         wes: currentValues.wes || false,
         skip_qc: currentValues.skip_qc || false,
-        // description: currentValues.description || "", // <<< REMOVED
         intervals_file: currentValues.intervals_file || "",
         dbsnp: currentValues.dbsnp || "", known_indels: currentValues.known_indels || "", pon: currentValues.pon || "",
         input_type: watchedInputType, samples: [defaultSample as ApiSampleInfo],
@@ -255,6 +250,8 @@ export default function InputPage() {
     if (stageMutation.isPending || saveProfileMutation.isPending) { return "Operation in progress..."; }
     return undefined;
   };
+  const disabledButtonTooltipMessage = getDisabledButtonTooltip(); // Get the message once
+
 
   function onSubmit(values: PipelineFormValues) {
     const apiPayload: PipelineInput = {
@@ -273,7 +270,6 @@ export default function InputPage() {
       skip_qc: values.skip_qc,
       skip_annotation: showSkipAnnotation ? values.skip_annotation : undefined,
       skip_baserecalibrator: showSkipBaserecalibrator ? values.skip_baserecalibrator : undefined,
-      // description: values.description || undefined, // <<< REMOVED Sarek's internal config description
     };
     stageMutation.mutate(apiPayload);
   }
@@ -326,7 +322,6 @@ export default function InputPage() {
       skip_qc: currentValues.skip_qc,
       skip_annotation: (showSkipAnnotation ? currentValues.skip_annotation : null),
       skip_baserecalibrator: (showSkipBaserecalibrator ? currentValues.skip_baserecalibrator : null),
-      // description: currentValues.description || null, // <<< REMOVED Sarek's internal config description
     };
     await saveProfileMutation.mutateAsync({ name: profileName, data: profileData });
   };
@@ -370,7 +365,7 @@ export default function InputPage() {
           <Card>
             <CardHeader> <CardTitle className="text-xl">Core Pipeline Setup</CardTitle> <CardDescription>Essential parameters for the Sarek pipeline run.</CardDescription> </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
-                {/* Sarek's internal config description field was here - NOW REMOVED */}
+                {/* The Sarek internal description field was here, now removed. */}
                 <FormField control={form.control} name="genome" render={({ field }) => ( <FormItem> <FormLabel>Reference Genome Build <span className="text-destructive">*</span></FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select genome build" /> </SelectTrigger> </FormControl> <SelectContent> {SAREK_GENOMES.map(g => ( <SelectItem key={g.value} value={g.value}> {g.label} </SelectItem> ))} </SelectContent> </Select> <FormDescription className="italic"> Select the genome assembly key. </FormDescription> <FormMessage /> </FormItem> )} />
                 <FormField control={form.control} name="step" render={({ field }) => ( <FormItem id="step-form-item"> <FormLabel>Starting Step <span className="text-destructive">*</span></FormLabel> <Select onValueChange={field.onChange} value={field.value} disabled={availableSteps.length <= 1} > <FormControl> <SelectTrigger id="step"> <SelectValue placeholder="Select starting step" /> </SelectTrigger> </FormControl> <SelectContent> {availableSteps.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)} </SelectContent> </Select> <FormDescription className="italic">Pipeline execution starting point.</FormDescription> <FormMessage /> </FormItem> )} />
                 <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 md:col-span-2 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-wes" className="flex flex-row items-center space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-center"> <Checkbox id="flag-wes" checked={form.watch('wes')} onCheckedChange={() => toggleCheckboxValue('wes')} /> </FormControl> <div className="space-y-1 leading-none"> <span>Whole Exome Sequencing (WES)</span> <FormDescription className="italic mt-1"> Check if data is WES/targeted. Providing an Intervals file is recommended. </FormDescription> </div> </FormLabel> <FormField control={form.control} name="wes" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem>
@@ -409,12 +404,38 @@ export default function InputPage() {
           <div className="flex justify-start items-center gap-4 pt-4">
             <TooltipProvider delayDuration={100}>
               <Tooltip>
-                {isStagingDisabled ? ( <TooltipTrigger asChild> <Button type="submit" disabled={true} className={cn("border border-primary hover:underline bg-primary text-primary-foreground opacity-50 cursor-not-allowed")} aria-disabled={true}> {(stageMutation.isPending || saveProfileMutation.isPending) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Stage Pipeline Run </Button> </TooltipTrigger>
-                ) : ( <TooltipTrigger asChild> <Button type="submit" disabled={false} className={cn("border border-primary hover:underline bg-primary text-primary-foreground hover:bg-primary/90")}> {(stageMutation.isPending || saveProfileMutation.isPending) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Stage Pipeline Run </Button> </TooltipTrigger> )}
-                {isStagingDisabled && getDisabledButtonTooltip() && ( <TooltipContent side="top" align="center"> <p className="text-sm flex items-center gap-1"><Info className="h-4 w-4"/>{getDisabledButtonTooltip()}</p> </TooltipContent> )}
+                <TooltipTrigger asChild>
+                  <Button
+                    type="submit"
+                    disabled={isStagingDisabled}
+                    className={cn(
+                      "border border-primary hover:underline",
+                      isStagingDisabled
+                        ? "bg-primary/50 text-primary-foreground/70 opacity-50 cursor-not-allowed"
+                        : "bg-primary text-primary-foreground hover:bg-primary/90"
+                    )}
+                    aria-disabled={isStagingDisabled}
+                  >
+                    {(stageMutation.isPending || saveProfileMutation.isPending)
+                        ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        : <Play className="mr-2 h-4 w-4" />
+                    }
+                    Stage Pipeline Run
+                  </Button>
+                </TooltipTrigger>
+                {isStagingDisabled && disabledButtonTooltipMessage && (
+                  <TooltipContent side="top" align="center">
+                    <p className="text-sm flex items-center gap-1">
+                        <Info className="h-4 w-4"/>
+                        {disabledButtonTooltipMessage}
+                    </p>
+                  </TooltipContent>
+                )}
               </Tooltip>
             </TooltipProvider>
-            <Button type="button" variant="outline" onClick={() => setIsSaveProfileOpen(true)} disabled={stageMutation.isPending || saveProfileMutation.isPending} className="cursor-pointer" > <Save className="mr-2 h-4 w-4" /> Save Profile </Button>
+            <Button type="button" variant="outline" onClick={() => setIsSaveProfileOpen(true)} disabled={stageMutation.isPending || saveProfileMutation.isPending} className="cursor-pointer" >
+              <Save className="mr-2 h-4 w-4" /> Save Profile
+            </Button>
           </div>
         </form>
       </Form>
