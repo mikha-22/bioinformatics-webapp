@@ -1,6 +1,6 @@
 # backend/app/models/pipeline.py
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any # Make sure Any is imported
+from typing import Optional, List, Dict, Any
 
 # --- Existing Models ---
 class SampleInfo(BaseModel):
@@ -8,35 +8,33 @@ class SampleInfo(BaseModel):
     sample: str = Field(..., description="Sample identifier")
     sex: str = Field(..., description="Sex (e.g., XX, XY)")
     status: int = Field(..., description="Status (0 for normal, 1 for tumor)")
-    lane: Optional[str] = Field(None, description="Lane identifier (e.g., L001) - Required only for FASTQ input") # Made optional at model level
-    fastq_1: Optional[str] = Field(None, description="Path to first FASTQ file relative to data dir") # Made optional
-    fastq_2: Optional[str] = Field(None, description="Path to second FASTQ file relative to data dir") # Made optional
-    bam_cram: Optional[str] = Field(None, description="Path to BAM or CRAM file relative to data dir") # Added for BAM/CRAM input
-    index: Optional[str] = Field(None, description="Path to index file (bai/crai/tbi) relative to data dir") # Added for index files
-    vcf: Optional[str] = Field(None, description="Path to VCF file relative to data dir") # Added for VCF input
+    lane: Optional[str] = Field(None, description="Lane identifier (e.g., L001) - Required only for FASTQ input")
+    fastq_1: Optional[str] = Field(None, description="Path to first FASTQ file relative to data dir")
+    fastq_2: Optional[str] = Field(None, description="Path to second FASTQ file relative to data dir")
+    bam_cram: Optional[str] = Field(None, description="Path to BAM or CRAM file relative to data dir")
+    index: Optional[str] = Field(None, description="Path to index file (bai/crai/tbi) relative to data dir")
+    vcf: Optional[str] = Field(None, description="Path to VCF file relative to data dir")
 
 
 class PipelineInput(BaseModel):
-    """ Main input model, now includes input_type """
+    """ Main input model, now includes input_type, run_name, and run_description """
+    run_name: str = Field(..., description="User-defined name for the pipeline run. Spaces will be converted to underscores.") # <<< NEW
+    run_description: Optional[str] = Field(None, description="Optional user-defined description for the pipeline run.") # <<< NEW
     input_type: str = Field(..., description="Type of input data ('fastq', 'bam_cram', 'vcf')")
     samples: List[SampleInfo] = Field(..., description="List of sample information, structure depends on input_type")
 
-    # Required parameters (from Sarek docs / frontend form)
     genome: str = Field(..., description="Genome build to use (e.g., GRCh38, GRCh37)")
-    step: str = Field(..., description="Pipeline step to start from (e.g., mapping, variant_calling)") # Now required
+    step: str = Field(..., description="Pipeline step to start from (e.g., mapping, variant_calling)")
 
-    # Optional files (from Sarek docs / frontend form)
     intervals_file: Optional[str] = Field(None, description="Path to BED file with target regions (relative to data dir)")
     dbsnp: Optional[str] = Field(None, description="Path to dbSNP VCF file (relative to data dir)")
     known_indels: Optional[str] = Field(None, description="Path to known indels VCF file (relative to data dir)")
     pon: Optional[str] = Field(None, description="Path to Panel of Normals (PoN) VCF file (relative to data dir)")
 
-    # Optional parameters (from Sarek docs / frontend form)
     tools: Optional[List[str]] = Field(None, description="List of tools (e.g., ['strelka', 'mutect2'])")
     profile: Optional[str] = Field(None, description="Nextflow profile (e.g., docker, singularity)")
     aligner: Optional[str] = Field(None, description="Aligner to use (e.g., bwa-mem, dragmap)")
 
-    # Boolean flags (from Sarek docs / frontend form)
     joint_germline: Optional[bool] = Field(False, description="Perform joint germline calling")
     wes: Optional[bool] = Field(False, description="Data is from Whole Exome Sequencing")
     trim_fastq: Optional[bool] = Field(False, description="Enable adapter trimming")
@@ -44,63 +42,63 @@ class PipelineInput(BaseModel):
     skip_annotation: Optional[bool] = Field(False, description="Skip annotation steps")
     skip_baserecalibrator: Optional[bool] = Field(False, description="Skip base quality score recalibration")
 
-    # Optional metadata (from frontend form)
-    description: Optional[str] = Field(None, description="Optional description of the pipeline run")
+    description: Optional[str] = Field(None, description="Optional Sarek internal description of the pipeline run") # Sarek's own description field
 
-# --- Existing Models ---
 class JobResourceInfo(BaseModel):
     peak_memory_mb: Optional[float] = None
     average_cpu_percent: Optional[float] = None
     duration_seconds: Optional[float] = None
 
+class JobMeta(BaseModel): # <<< ADD run_name here
+    run_name: Optional[str] = Field(None, description="User-defined name for the pipeline run.")
+    input_type: Optional[str] = None
+    input_params: Optional[Dict[str, Optional[str]]] = None # Using InputFilenames from types.ts as reference
+    sarek_params: Optional[Dict[str, Any]] = None # Using SarekParams from types.ts as reference
+    sample_info: Optional[List[Dict[str, Any]]] = None # Using SampleInfo from types.ts as reference
+    staged_job_id_origin: Optional[str] = None
+    error_message: Optional[str] = None
+    stderr_snippet: Optional[str] = None
+    progress: Optional[int] = None
+    current_task: Optional[str] = None
+    results_path: Optional[str] = None
+    warning_message: Optional[str] = None
+    input_csv_path_used: Optional[str] = None
+    is_rerun_execution: Optional[bool] = None
+    original_job_id: Optional[str] = None
+    # Note: peak_memory_mb, average_cpu_percent, duration_seconds are now in JobResourceInfo within JobStatusDetails
+    # The 'description' in JobStatusDetails will hold the 'run_description'
+
 class JobStatusDetails(BaseModel):
     job_id: str = Field(..., description="The unique ID of the RQ job")
+    run_name: Optional[str] = Field(None, description="User-defined name for the pipeline run.") # <<< ADDED run_name
     status: str = Field(..., description="Current status of the job (e.g., queued, started, finished, failed)")
-    description: Optional[str] = Field(None, description="Job description")
+    description: Optional[str] = Field(None, description="Job description (this will be the run_description)")
     enqueued_at: Optional[float] = Field(None, description="Unix timestamp when the job was enqueued")
     started_at: Optional[float] = Field(None, description="Unix timestamp when the job started execution")
     ended_at: Optional[float] = Field(None, description="Unix timestamp when the job finished or failed")
     result: Optional[Any] = Field(None, description="Result returned by the job if successful")
     error: Optional[str] = Field(None, description="Error message if the job failed")
-    meta: Dict[str, Any] = Field({}, description="Metadata associated with the job")
+    meta: JobMeta = Field({}, description="Metadata associated with the job") # JobMeta now includes run_name
     resources: Optional[JobResourceInfo] = Field(None, description="Resource usage statistics")
-# --- END Existing Models ---
 
-# --- UPDATED PROFILE MODELS ---
 class ProfileData(BaseModel):
-    """
-    Represents the data stored for a configuration profile.
-    Essentially PipelineInput minus the 'samples' and 'input_type' fields.
-    Includes the intended starting step.
-    """
-    # Required parameters
     genome: str = Field(..., description="Genome build to use (e.g., GRCh38, GRCh37)")
-    step: str = Field(..., description="Intended pipeline step to start from (e.g., mapping, variant_calling)") # Added step
-
-    # Optional files
+    step: str = Field(..., description="Intended pipeline step to start from (e.g., mapping, variant_calling)")
     intervals_file: Optional[str] = Field(None, description="Path to BED file with target regions")
     dbsnp: Optional[str] = Field(None, description="Path to dbSNP VCF file")
     known_indels: Optional[str] = Field(None, description="Path to known indels VCF file")
     pon: Optional[str] = Field(None, description="Path to Panel of Normals (PoN) VCF file")
-
-    # Optional parameters
     tools: Optional[List[str]] = Field(None, description="List of tools")
     profile: Optional[str] = Field(None, description="Nextflow profile")
     aligner: Optional[str] = Field(None, description="Aligner to use")
-
-    # Boolean flags
     joint_germline: Optional[bool] = Field(False, description="Perform joint germline calling")
     wes: Optional[bool] = Field(False, description="Data is from Whole Exome Sequencing")
     trim_fastq: Optional[bool] = Field(False, description="Enable adapter trimming")
     skip_qc: Optional[bool] = Field(False, description="Skip QC steps")
     skip_annotation: Optional[bool] = Field(False, description="Skip annotation steps")
     skip_baserecalibrator: Optional[bool] = Field(False, description="Skip base quality score recalibration")
-
-    # Optional metadata
-    description: Optional[str] = Field(None, description="Optional description of the profile itself")
+    description: Optional[str] = Field(None, description="Optional Sarek internal description of the profile itself")
 
 class SaveProfileRequest(BaseModel):
-    """ Request body for saving a profile. """
     name: str = Field(..., description="The name to save the profile under.")
     data: ProfileData = Field(..., description="The profile configuration data.")
-# --- END UPDATED PROFILE MODELS ---

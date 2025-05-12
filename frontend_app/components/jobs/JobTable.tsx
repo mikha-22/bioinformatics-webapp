@@ -9,44 +9,44 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Job } from "@/lib/types";
+import { Job } from "@/lib/types"; // Job type now includes run_name
 import { formatDistanceToNow } from 'date-fns';
 import { formatDuration } from "@/lib/utils";
-import JobActions from "./JobActions"; // Using the version with <span> wrappers
+import JobActions from "./JobActions";
 import React from 'react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // For longer run names
 
 interface JobTableProps {
   jobs: Job[];
 }
 
-// --- Helper Functions ---
-
-// NEW: Function to map internal status to simplified UI status
+// --- Helper Functions (Unchanged from your provided code) ---
 function mapToUiStatus(internalStatus: string | null | undefined): string {
     const status = internalStatus?.toLowerCase();
     switch (status) {
         case 'staged': return 'Staged';
         case 'queued': return 'Queued';
-        case 'started': return 'Running'; // Map 'started' to 'Running'
+        case 'started': return 'Running';
+        case 'running': return 'Running'; // Explicitly map RQ's running
         case 'finished': return 'Finished';
         case 'failed': return 'Failed';
-        case 'canceled': return 'Stopped'; // Map 'canceled' to 'Stopped'
-        case 'stopped': return 'Stopped'; // Also map RQ's 'stopped' to UI 'Stopped'
+        case 'canceled': return 'Stopped';
+        case 'stopped': return 'Stopped';
         default: return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown';
     }
 }
 
-// UPDATED: Get badge variant based on the *internal* status for correct styling
 function getStatusVariant(internalStatus: string | null | undefined): "default" | "destructive" | "secondary" | "outline" {
     const status = internalStatus?.toLowerCase();
     switch (status) {
-        case 'finished': return 'default'; // Greenish success -> Use primary for now
-        case 'failed': return 'destructive'; // Red
-        case 'started': return 'default'; // Blueish -> Primary (Represents Running)
+        case 'finished': return 'default';
+        case 'failed': return 'destructive';
+        case 'started':
+        case 'running': return 'default';
         case 'queued':
-        case 'staged': return 'secondary'; // Gray
-        case 'stopped': // RQ's stopped state
-        case 'canceled': return 'outline'; // Muted/outline (Represents UI Stopped/Canceled)
+        case 'staged': return 'secondary';
+        case 'stopped':
+        case 'canceled': return 'outline';
         default: return 'secondary';
     }
 }
@@ -80,7 +80,9 @@ export default function JobTable({ jobs }: JobTableProps) {
         <TableHeader>
           <TableRow>
             <TableHead className="w-[120px] hidden lg:table-cell">Job ID</TableHead>
-            <TableHead>Description / ID</TableHead>
+            {/* <<< NEW: Run Name Column >>> */}
+            <TableHead className="min-w-[150px] max-w-[250px]">Run Name</TableHead>
+            <TableHead>Description</TableHead> {/* Was "Description / ID" */}
             <TableHead className="w-[100px] hidden xl:table-cell">Step</TableHead>
             <TableHead className="w-[100px] hidden xl:table-cell">Genome</TableHead>
             <TableHead className="w-[120px] hidden md:table-cell">Duration</TableHead>
@@ -97,14 +99,29 @@ export default function JobTable({ jobs }: JobTableProps) {
                 <span className="text-muted-foreground">_</span>
                 {job.id.substring(job.id.indexOf('_') + 1, job.id.indexOf('_') + 9)}...
               </TableCell>
-              <TableCell className="max-w-xs truncate" title={job.description ?? job.id}>
-                <span className="lg:hidden font-mono text-xs mr-1">
-                  {job.id.startsWith("staged_") ? "STG" : "RQ"}
-                  <span className="text-muted-foreground">_</span>
-                  {job.id.substring(job.id.indexOf('_') + 1, job.id.indexOf('_') + 9)}...
-                </span>
-                <span className="lg:hidden mr-1">|</span>
-                {job.description || <span className="italic text-muted-foreground">{job.id.startsWith("staged_") ? 'Staged Job' : 'Pipeline Job'}</span>}
+
+              {/* <<< NEW: Run Name Cell >>> */}
+              <TableCell className="font-medium min-w-[150px] max-w-[250px] truncate" title={job.run_name ?? "N/A"}>
+                <TooltipProvider delayDuration={300}>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                             <span className="block truncate">{job.run_name || <span className="italic text-muted-foreground">N/A</span>}</span>
+                        </TooltipTrigger>
+                        {job.run_name && job.run_name.length > 30 && ( // Show tooltip only if name is long
+                            <TooltipContent side="top" align="start">
+                                <p>{job.run_name}</p>
+                            </TooltipContent>
+                        )}
+                    </Tooltip>
+                </TooltipProvider>
+                {/* Show Job ID below Run Name on smaller screens where Job ID column is hidden */}
+                <div className="lg:hidden text-xs text-muted-foreground font-mono mt-0.5" title={job.id}>
+                    {job.id.startsWith("staged_") ? "STG" : "RQ"}_{job.id.substring(job.id.indexOf('_') + 1, job.id.indexOf('_') + 9)}...
+                </div>
+              </TableCell>
+
+              <TableCell className="max-w-xs truncate" title={job.description ?? "No description"}>
+                {job.description || <span className="italic text-muted-foreground">No description</span>}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground hidden xl:table-cell">
                 {job.meta?.sarek_params?.step || 'N/A'}
@@ -119,7 +136,6 @@ export default function JobTable({ jobs }: JobTableProps) {
                 {formatTimestamp(job.ended_at || job.started_at || job.enqueued_at || job.staged_at)}
               </TableCell>
               <TableCell>
-                {/* UPDATED: Use getStatusVariant with original status for styling, but mapToUiStatus for display text */}
                 <Badge variant={getStatusVariant(job.status)} className="text-xs px-1.5 py-0.5">
                   {mapToUiStatus(job.status)}
                 </Badge>

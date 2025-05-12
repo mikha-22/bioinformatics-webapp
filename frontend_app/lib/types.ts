@@ -45,10 +45,11 @@ export interface SampleInfo { // Already exported
 
 
 export interface JobMeta { // Already exported
-  input_type?: string; // Added input_type
+  run_name?: string | null; // <<< ADDED: User-defined run name, stored in meta
+  input_type?: string;
   input_params?: InputFilenames;
-  sarek_params?: SarekParams; // Now includes step
-  sample_info?: SampleInfo[]; // Structure depends on input_type
+  sarek_params?: SarekParams;
+  sample_info?: SampleInfo[];
   staged_job_id_origin?: string;
   error_message?: string;
   stderr_snippet?: string;
@@ -59,9 +60,9 @@ export interface JobMeta { // Already exported
   duration_seconds?: number | null;
   results_path?: string;
   warning_message?: string;
-  input_csv_path_used?: string; // Added in jobs.py for rerun debugging
-  is_rerun_execution?: boolean; // Added in jobs.py
-  original_job_id?: string; // Added in jobs.py for rerun reference
+  input_csv_path_used?: string;
+  is_rerun_execution?: boolean;
+  original_job_id?: string;
 }
 
 export interface JobResultSuccess { // Already exported
@@ -73,15 +74,16 @@ export interface JobResultSuccess { // Already exported
 
 export interface Job { // Already exported
   id: string;
+  run_name?: string | null; // <<< ADDED: User-defined run name for direct access
   status: "staged" | "queued" | "started" | "running" | "finished" | "failed" | "stopped" | "canceled" | string;
-  description: string | null;
+  description: string | null; // This will hold the run_description
   enqueued_at: number | null;
   started_at: number | null;
   ended_at: number | null;
   staged_at?: number | null;
   result: JobResultSuccess | null | any;
   error: string | null;
-  meta: JobMeta; // Meta now potentially includes more fields
+  meta: JobMeta; // run_name will also be here
   resources: JobResourceInfo | null;
 }
 
@@ -106,9 +108,15 @@ export interface ResultItem { // Already exported
     relative_path: string;
 }
 
-export interface JobStatusDetails extends Omit<Job, 'id' | 'staged_at'> { // Already exported
+// JobStatusDetails will inherit run_name from Job via Omit if we use it that way,
+// or we can explicitly add it if needed for clarity.
+// For now, components using JobStatusDetails might need to check job.meta.run_name
+// or we ensure the backend populates a top-level run_name for JobStatusDetails as well.
+export interface JobStatusDetails extends Omit<Job, 'id' | 'staged_at' | 'run_name'> {
     job_id: string;
+    run_name?: string | null; // Explicitly adding here for clarity if backend sends it
 }
+
 
 export interface DataFile { // Already exported
     name: string;
@@ -117,15 +125,17 @@ export interface DataFile { // Already exported
 
 // Type for the API input payload
 export interface PipelineInput {
-  input_type: 'fastq' | 'bam_cram' | 'vcf'; // Type is required
-  samples: SampleInfo[]; // Uses updated SampleInfo
+  run_name: string; // <<< ADDED: Mandatory run name
+  run_description?: string; // <<< ADDED: Optional run description
+  input_type: 'fastq' | 'bam_cram' | 'vcf';
+  samples: SampleInfo[];
   genome: string;
-  step: string; // Step is required
+  step: string;
   intervals_file?: string;
   dbsnp?: string;
   known_indels?: string;
   pon?: string;
-  tools?: string[]; // Frontend sends list of strings
+  tools?: string[];
   profile?: string;
   aligner?: string;
   joint_germline?: boolean;
@@ -134,24 +144,26 @@ export interface PipelineInput {
   skip_qc?: boolean;
   skip_annotation?: boolean;
   skip_baserecalibrator?: boolean;
-  description?: string;
+  description?: string; // This is Sarek's internal description, distinct from run_description
 }
 
 export interface RunParameters { // Already exported
+  run_name?: string | null; // <<< ADDED: Include run_name if available in metadata
+  run_description?: string | null; // <<< ADDED: Include run_description
   input_filenames?: InputFilenames | null;
-  sarek_params?: SarekParams | null; // Includes step
-  sample_info?: SampleInfo[] | null; // Includes optional fields
+  sarek_params?: SarekParams | null;
+  sample_info?: SampleInfo[] | null;
 }
 
 // UPDATED ProfileData to include step
 export interface ProfileData {
     genome: string;
-    step: string; // Step is now part of the profile
+    step: string;
     intervals_file?: string | null;
     dbsnp?: string | null;
     known_indels?: string | null;
     pon?: string | null;
-    tools?: string[] | null; // Expect string array from backend
+    tools?: string[] | null;
     profile?: string | null;
     aligner?: string | null;
     joint_germline?: boolean | null;
@@ -160,6 +172,6 @@ export interface ProfileData {
     skip_qc?: boolean | null;
     skip_annotation?: boolean | null;
     skip_baserecalibrator?: boolean | null;
-    description?: string | null;
+    description?: string | null; // Sarek's internal description for the profile
 }
 // --- <<< END NEW TYPE >>> ---
