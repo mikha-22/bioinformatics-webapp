@@ -80,7 +80,7 @@ const vcfPipelineSchemaBase = z.object({ ...commonRunInfoSchema, input_type: z.l
 const pipelineInputSchema = z.discriminatedUnion("input_type", [ fastqPipelineSchemaBase, bamCramPipelineSchemaBase, vcfPipelineSchemaBase, ]).superRefine((data,ctx)=>{ const i=data.input_type!=='vcf'&&data.step!=='variant_calling'&&data.step!=='annotation',o=!data.skip_baserecalibrator,s=!data.dbsnp&&!data.known_indels;if(i&&o&&s){ctx.addIssue({code:z.ZodIssueCode.custom,message:"dbSNP or Known Indels file required if BQSR not skipped.",path:["dbsnp"]});ctx.addIssue({code:z.ZodIssueCode.custom,message:"dbSNP or Known Indels file required.",path:["skip_baserecalibrator"]})} if(data.step!=='annotation'){const t=data.tools??[],n=t.filter(e=>SOMATIC_TOOLS.includes(e));if(n.length>0){const r=data.samples.some(e=>e.status===1);if(!r){ctx.addIssue({code:z.ZodIssueCode.custom,message:`Somatic tool(s) selected (${n.join(', ')}) require at least one sample with Status = 1 (Tumor).`,path:["tools"]});ctx.addIssue({code:z.ZodIssueCode.custom,message:`Tumor sample required for selected somatic tool(s).`,path:["samples"]})}}} if(data.input_type==='fastq'){if(data.aligner&&!SAREK_ALIGNERS.includes(data.aligner)){ctx.addIssue({code:z.ZodIssueCode.custom,message:"Invalid aligner selected.",path:["aligner"]})}} if(data.input_type==='bam_cram'){if(data.trim_fastq){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Trim FASTQ' not applicable for BAM/CRAM input",path:["trim_fastq"]})} if(data.aligner&&data.aligner.length>0){ctx.addIssue({code:z.ZodIssueCode.custom,message:"Aligner not applicable for BAM/CRAM input",path:["aligner"]})} if(data.skip_baserecalibrator&&(data.step==='variant_calling')){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Skip Base Recalibration' not applicable when starting at variant calling.",path:["skip_baserecalibrator"]})}} if(data.input_type==='vcf'){if(data.trim_fastq){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Trim FASTQ' not applicable for VCF input",path:["trim_fastq"]})} if(data.aligner&&data.aligner.length>0){ctx.addIssue({code:z.ZodIssueCode.custom,message:"Aligner not applicable for VCF input",path:["aligner"]})} if(data.skip_baserecalibrator){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Skip Base Recalibration' not applicable for VCF input",path:["skip_baserecalibrator"]})} if(data.tools.length>0){ctx.addIssue({code:z.ZodIssueCode.custom,message:"Variant calling tools not applicable for VCF input",path:["tools"]})} if(data.skip_annotation){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Skip Annotation' not applicable when starting at annotation",path:["skip_annotation"]})} if(data.joint_germline){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Joint Germline' not applicable when starting at annotation",path:["joint_germline"]})}}});
 type PipelineFormValues = z.infer<typeof pipelineInputSchema>;
 type InputType = PipelineFormValues['input_type'];
-const ADVANCED_FIELD_NAMES: (keyof PipelineFormValues)[] = [ 'tools', 'profile', 'aligner', 'pon', 'trim_fastq', 'joint_germline', 'skip_qc', 'skip_annotation'];
+// const ADVANCED_FIELD_NAMES: (keyof PipelineFormValues)[] = [ 'tools', 'profile', 'aligner', 'pon', 'trim_fastq', 'joint_germline', 'skip_qc', 'skip_annotation']; // Not needed for this specific change
 
 export default function InputPage() {
   const router = useRouter();
@@ -140,14 +140,21 @@ export default function InputPage() {
 
   function getDisabledButtonTooltip(): string | undefined { if (isBqsrCheckFailedForButton) { return "BQSR requires dbSNP or Known Indels file unless skipped."; } if (isSomaticTumorCheckFailedForButton) { return "Selected somatic tool(s) require at least one Tumor sample (Status=1)."; } if (stageMutation.isPending || saveProfileMutation.isPending) { return "Operation in progress..."; } return undefined; };
   function onSubmit(values: PipelineFormValues) { const apiPayload: PipelineInput = { run_name: values.run_name, run_description: values.run_description, input_type: values.input_type, samples: values.samples.map((s): ApiSampleInfo => ({ patient: s.patient, sample: s.sample, sex: s.sex!, status: s.status!, lane: s.lane || null, fastq_1: s.fastq_1 || null, fastq_2: s.fastq_2 || null, bam_cram: s.bam_cram || null, index: s.index || null, vcf: s.vcf || null, })), genome: values.genome, step: values.step, intervals_file: values.intervals_file || undefined, dbsnp: values.dbsnp || undefined, known_indels: values.known_indels || undefined, pon: values.pon || undefined, tools: showTools && values.tools && values.tools.length > 0 ? values.tools : undefined, profile: values.profile, aligner: showAligner ? (values.aligner || undefined) : undefined, joint_germline: showJointGermline ? values.joint_germline : undefined, wes: values.wes, trim_fastq: showTrimFastq ? values.trim_fastq : undefined, skip_qc: values.skip_qc, skip_annotation: showSkipAnnotation ? values.skip_annotation : undefined, skip_baserecalibrator: showSkipBaserecalibrator ? values.skip_baserecalibrator : undefined, }; stageMutation.mutate(apiPayload); }
-  const isAdvancedField = (fieldName: string): boolean => ADVANCED_FIELD_NAMES.some(advField => fieldName.startsWith(advField as string));
-  const scrollToFirstError = (errors: FieldErrors<PipelineFormValues>) => { const errorKeys = Object.keys(errors); if (errorKeys.length > 0) { let firstErrorKey = errorKeys[0] as keyof PipelineFormValues | 'samples'; let fieldNameToQuery = firstErrorKey as string; if (firstErrorKey === 'samples') { const samplesCardHeader = formRef.current?.querySelector('#samples-card-header'); if (samplesCardHeader && errors.samples?.root) { samplesCardHeader.scrollIntoView({ behavior: "smooth", block: "center" }); return; } if (Array.isArray(errors.samples)) { const firstSampleErrorIndex = errors.samples.findIndex(s => s && Object.keys(s).length > 0); if (firstSampleErrorIndex !== -1) { const sampleErrors = errors.samples[firstSampleErrorIndex]; if (sampleErrors) { const firstSampleFieldError = Object.keys(sampleErrors)[0] as keyof ApiSampleInfo; fieldNameToQuery = `samples.${firstSampleErrorIndex}.${firstSampleFieldError}`; } } } else { fieldNameToQuery = 'samples.0.patient';} } const attemptScroll = () => { let element = formRef.current?.querySelector(`[name="${fieldNameToQuery}"]`); if (!element) { const errorPathParts = fieldNameToQuery.split('.'); let selector = `#${errorPathParts.join('-')}-form-item`; element = formRef.current?.querySelector(selector); if (!element) { element = formRef.current?.querySelector(`label[for="${fieldNameToQuery}"]`);} if (!element && fieldNameToQuery === 'step') { element = formRef.current?.querySelector('button[role="combobox"][aria-controls*="radix"][id*="step"]'); } if (!element && fieldNameToQuery.startsWith('samples.')) { const sampleIndexMatch = fieldNameToQuery.match(/samples\.(\d+)\./); if (sampleIndexMatch && sampleIndexMatch[1]) { const errorSampleIndex = parseInt(sampleIndexMatch[1], 10); const sampleCard = formRef.current?.querySelectorAll('div[class*="relative border border-border pt-8"]')[errorSampleIndex]; if(sampleCard) element = sampleCard as HTMLElement;} } } if (element) { element.scrollIntoView({ behavior: "smooth", block: "center" }); } else { formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } }; if (isAdvancedField(fieldNameToQuery) && advancedAccordionValue !== "advanced-sarek-options") { setAdvancedAccordionValue("advanced-sarek-options"); requestAnimationFrame(attemptScroll); } else { attemptScroll(); } } };
+  // const isAdvancedField = (fieldName: string): boolean => ADVANCED_FIELD_NAMES.some(advField => fieldName.startsWith(advField as string)); // Not needed for this change
+  const scrollToFirstError = (errors: FieldErrors<PipelineFormValues>) => { const errorKeys = Object.keys(errors); if (errorKeys.length > 0) { let firstErrorKey = errorKeys[0] as keyof PipelineFormValues | 'samples'; let fieldNameToQuery = firstErrorKey as string; if (firstErrorKey === 'samples') { const samplesCardHeader = formRef.current?.querySelector('#samples-card-header'); if (samplesCardHeader && errors.samples?.root) { samplesCardHeader.scrollIntoView({ behavior: "smooth", block: "center" }); return; } if (Array.isArray(errors.samples)) { const firstSampleErrorIndex = errors.samples.findIndex(s => s && Object.keys(s).length > 0); if (firstSampleErrorIndex !== -1) { const sampleErrors = errors.samples[firstSampleErrorIndex]; if (sampleErrors) { const firstSampleFieldError = Object.keys(sampleErrors)[0] as keyof ApiSampleInfo; fieldNameToQuery = `samples.${firstSampleErrorIndex}.${firstSampleFieldError}`; } } } else { fieldNameToQuery = 'samples.0.patient';} } const attemptScroll = () => { let element = formRef.current?.querySelector(`[name="${fieldNameToQuery}"]`); if (!element) { const errorPathParts = fieldNameToQuery.split('.'); let selector = `#${errorPathParts.join('-')}-form-item`; element = formRef.current?.querySelector(selector); if (!element) { element = formRef.current?.querySelector(`label[for="${fieldNameToQuery}"]`);} if (!element && fieldNameToQuery === 'step') { element = formRef.current?.querySelector('button[role="combobox"][aria-controls*="radix"][id*="step"]'); } if (!element && fieldNameToQuery.startsWith('samples.')) { const sampleIndexMatch = fieldNameToQuery.match(/samples\.(\d+)\./); if (sampleIndexMatch && sampleIndexMatch[1]) { const errorSampleIndex = parseInt(sampleIndexMatch[1], 10); const sampleCard = formRef.current?.querySelectorAll('div[class*="relative border border-border pt-8"]')[errorSampleIndex]; if(sampleCard) element = sampleCard as HTMLElement;} } } if (element) { element.scrollIntoView({ behavior: "smooth", block: "center" }); } else { formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } };
+    // if (isAdvancedField(fieldNameToQuery) && advancedAccordionValue !== "advanced-sarek-options") { // <<< REMOVE THIS LOGIC
+    //   setAdvancedAccordionValue("advanced-sarek-options");
+    //   requestAnimationFrame(attemptScroll);
+    // } else {
+    //   attemptScroll();
+    // }
+    attemptScroll(); // Always attempt scroll without opening accordion
+  } };
   const onFormError: SubmitErrorHandler<PipelineFormValues> = (errorsArgument) => { console.warn("Form validation failed.", errorsArgument); toast.error("Please fix the validation errors.", { duration: 5000 }); scrollToFirstError(errorsArgument); };
   const toggleCheckboxValue = (fieldName: keyof PipelineFormValues | 'tools', tool?: string) => { if (fieldName === 'tools' && tool) { const currentVal = form.getValues("tools") ?? []; const newVal = currentVal.includes(tool) ? currentVal.filter((t) => t !== tool) : [...currentVal, tool]; form.setValue("tools", newVal, { shouldValidate: true, shouldDirty: true }); } else if (fieldName !== 'tools') { const fieldKey = fieldName as keyof PipelineFormValues; if (fieldKey in form.getValues()) { const currentVal = form.getValues(fieldKey); form.setValue(fieldKey, !currentVal, { shouldValidate: true, shouldDirty: true }); } } };
 
   const handleProfileLoaded = (name: string | null, data: ProfileData | null) => {
     setCurrentProfileName(name);
-    // const currentFormDefaults = form.formState.defaultValues || {}; // Not needed if we don't auto-open
     form.setValue('run_name', '', { shouldValidate: false, shouldDirty: true });
     form.setValue('run_description', '', { shouldValidate: false, shouldDirty: true });
 
@@ -160,44 +167,40 @@ export default function InputPage() {
       const currentFormInputType = form.getValues('input_type');
       if (loadedInputType !== currentFormInputType) {
         toast.info(`Profile '${name}' uses ${loadedInputType.toUpperCase()} input. Switching input type and applying settings.`);
-        (formRef.current as any)._profileToApplyAfterReset = data; // Store data to apply after reset
-        form.setValue('input_type', loadedInputType, { shouldValidate: true }); // Trigger reset
+        (formRef.current as any)._profileToApplyAfterReset = data;
+        form.setValue('input_type', loadedInputType, { shouldValidate: true });
       } else {
-        // Input type is the same, apply directly
         Object.entries(data).forEach(([key, value]) => {
           const fieldKey = key as keyof ProfileData;
-          if (fieldKey in form.getValues()) { // Check if the key exists in form values
+          if (fieldKey in form.getValues()) {
             form.setValue(fieldKey as any, value !== null ? value : form.formState.defaultValues?.[fieldKey as keyof PipelineFormValues], { shouldValidate: true, shouldDirty: true });
           }
         });
       }
     } else {
-      // Resetting to default settings
-      form.reset(); // This will use the defaultValues defined in useForm
-      setSelectedInputType('fastq'); // Explicitly set input type to default
+      form.reset();
+      setSelectedInputType('fastq');
     }
-    // Always ensure accordion is closed when a profile is loaded or reset
-    setAdvancedAccordionValue(undefined);
+    setAdvancedAccordionValue(undefined); // <<< ENSURE ACCORDION IS CLOSED
   };
 
   useEffect(() => {
     if ((formRef.current as any)?._profileToApplyAfterReset) {
       const dataToApply = (formRef.current as any)._profileToApplyAfterReset as ProfileData;
-      // const currentFormDefaultsAfterReset = form.formState.defaultValues || {}; // Not needed for auto-open logic
-
       Object.entries(dataToApply).forEach(([key, value]) => {
         const fieldKey = key as keyof ProfileData;
         if (fieldKey in form.getValues()) {
           form.setValue(fieldKey as any, value !== null ? value : form.formState.defaultValues?.[fieldKey as keyof PipelineFormValues], { shouldValidate: true, shouldDirty: true });
         }
       });
-      // Ensure accordion remains closed after applying profile post-reset
-      setAdvancedAccordionValue(undefined);
+      setAdvancedAccordionValue(undefined); // <<< ENSURE ACCORDION IS CLOSED
       delete (formRef.current as any)._profileToApplyAfterReset;
     }
-  }, [form.formState.isSubmitSuccessful, form]); // form.formState.isSubmitSuccessful is a bit of a hack to detect reset completion.
-                                                // A more direct way might be needed if this isn't reliable.
-                                                // Watching form.getValues('input_type') might be better if reset is guaranteed to change it.
+    // Using form.formState.isSubmitSuccessful as a trigger for reset completion is a bit indirect.
+    // A more robust way might be to watch form.getValues('input_type') if the reset always changes it,
+    // or introduce a dedicated state variable that signals reset completion.
+    // For now, this relies on the form state update cycle.
+  }, [form.formState.isSubmitSuccessful, form.getValues('input_type')]); // Added form.getValues('input_type') to dependencies
 
   const handleSaveProfile = async (profileName: string) => { const currentValues = form.getValues(); const profileData: ProfileData = { genome: currentValues.genome, step: currentValues.step, intervals_file: currentValues.intervals_file || null, dbsnp: currentValues.dbsnp || null, known_indels: currentValues.known_indels || null, pon: currentValues.pon || null, tools: (showTools && currentValues.tools && currentValues.tools.length > 0 ? currentValues.tools : null), profile: currentValues.profile, aligner: (showAligner ? (currentValues.aligner || null) : null), joint_germline: (showJointGermline ? currentValues.joint_germline : null), wes: currentValues.wes, trim_fastq: (showTrimFastq ? currentValues.trim_fastq : null), skip_qc: currentValues.skip_qc, skip_annotation: (showSkipAnnotation ? currentValues.skip_annotation : null), skip_baserecalibrator: (showSkipBaserecalibrator ? currentValues.skip_baserecalibrator : null), }; await saveProfileMutation.mutateAsync({ name: profileName, data: profileData }); };
   const addSample = () => { let defaultSample: Partial<ApiSampleInfo> = {}; if (selectedInputType === 'fastq') { defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, lane: "L001", fastq_1: "", fastq_2: "" }; } else if (selectedInputType === 'bam_cram') { defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, bam_cram: "", index: "" }; } else if (selectedInputType === 'vcf') { defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, vcf: "", index: "" }; } append(defaultSample); };
@@ -252,10 +255,10 @@ export default function InputPage() {
           <Card className="overflow-hidden p-2">
             <Accordion type="single" collapsible className="w-full" value={advancedAccordionValue} onValueChange={setAdvancedAccordionValue}>
               <AccordionItem value="advanced-sarek-options" className="border-0">
-                <AccordionTrigger className={cn("flex w-full items-center justify-between hover:no-underline cursor-pointer", "px-6 py-3", "data-[state=open]:border-0 data-[state=closed]:border-transparent")}>
+                <AccordionTrigger className={cn("flex w-full items-center justify-between hover:no-underline cursor-pointer", "px-6 py-3", "data-[state=open]:border-0 data-[state=closed]:border-transparent")}> {/* Ensure no border on trigger when open */}
                   <div className="text-left"> <h3 className="text-md font-medium leading-tight tracking-tight">Advanced Sarek Parameters</h3> <p className="text-sm text-muted-foreground mt-0.5">Optional parameters to fine-tune the pipeline. Click to expand.</p> </div>
                 </AccordionTrigger>
-                <AccordionContent>
+                <AccordionContent> {/* Content has border-t when open */}
                   <div className="px-6 pt-4 pb-6 space-y-6 border-t">
                     {showTools && ( <div> <div className="mb-4"> <FormLabel className="text-base font-medium">Variant Calling Tools</FormLabel> <FormDescription className="text-sm text-muted-foreground">Select tools to run (not applicable when starting at annotation).</FormDescription> </div> <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2"> {SAREK_TOOLS.map((tool) => { const uniqueId = `tool-${tool}`; const currentTools: string[] = form.watch("tools") || []; const isChecked = currentTools.includes(tool); return ( <FormItem key={uniqueId} className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor={uniqueId} className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id={uniqueId} checked={isChecked} onCheckedChange={() => toggleCheckboxValue('tools', tool)} /> </FormControl> <span className="pt-px">{tool}</span> </FormLabel> </FormItem> ); })} </div> <FormField control={form.control} name="tools" render={() => <FormMessage className="pt-2" />} /> </div> )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
