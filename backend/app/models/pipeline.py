@@ -18,8 +18,8 @@ class SampleInfo(BaseModel):
 
 class PipelineInput(BaseModel):
     """ Main input model, now includes input_type, run_name, and run_description """
-    run_name: str = Field(..., description="User-defined name for the pipeline run. Spaces will be converted to underscores.") # <<< NEW
-    run_description: Optional[str] = Field(None, description="Optional user-defined description for the pipeline run.") # <<< NEW
+    run_name: str = Field(..., description="User-defined name for the pipeline run. Spaces will be converted to underscores.")
+    run_description: Optional[str] = Field(None, description="Optional user-defined description for the pipeline run.")
     input_type: str = Field(..., description="Type of input data ('fastq', 'bam_cram', 'vcf')")
     samples: List[SampleInfo] = Field(..., description="List of sample information, structure depends on input_type")
 
@@ -49,12 +49,12 @@ class JobResourceInfo(BaseModel):
     average_cpu_percent: Optional[float] = None
     duration_seconds: Optional[float] = None
 
-class JobMeta(BaseModel): # <<< ADD run_name here
+class JobMeta(BaseModel):
     run_name: Optional[str] = Field(None, description="User-defined name for the pipeline run.")
     input_type: Optional[str] = None
-    input_params: Optional[Dict[str, Optional[str]]] = None # Using InputFilenames from types.ts as reference
-    sarek_params: Optional[Dict[str, Any]] = None # Using SarekParams from types.ts as reference
-    sample_info: Optional[List[Dict[str, Any]]] = None # Using SampleInfo from types.ts as reference
+    input_params: Optional[Dict[str, Optional[str]]] = Field(default_factory=dict)
+    sarek_params: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Sarek-specific parameters, may include its own 'description' field for Sarek config.")
+    sample_info: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     staged_job_id_origin: Optional[str] = None
     error_message: Optional[str] = None
     stderr_snippet: Optional[str] = None
@@ -65,20 +65,23 @@ class JobMeta(BaseModel): # <<< ADD run_name here
     input_csv_path_used: Optional[str] = None
     is_rerun_execution: Optional[bool] = None
     original_job_id: Optional[str] = None
-    # Note: peak_memory_mb, average_cpu_percent, duration_seconds are now in JobResourceInfo within JobStatusDetails
-    # The 'description' in JobStatusDetails will hold the 'run_description'
+    # The user's overall run_description is NOT part of JobMeta;
+    # it's a top-level field in JobStatusDetails (populated from RQ Job.description)
+    # or directly from staged details.
+    # The 'description' field within 'sarek_params' is for Sarek's internal config description.
 
 class JobStatusDetails(BaseModel):
-    job_id: str = Field(..., description="The unique ID of the RQ job")
-    run_name: Optional[str] = Field(None, description="User-defined name for the pipeline run.") # <<< ADDED run_name
-    status: str = Field(..., description="Current status of the job (e.g., queued, started, finished, failed)")
-    description: Optional[str] = Field(None, description="Job description (this will be the run_description)")
+    job_id: str = Field(..., description="The unique ID of the RQ job or Staged ID")
+    run_name: Optional[str] = Field(None, description="User-defined name for the pipeline run.")
+    status: str = Field(..., description="Current status of the job")
+    description: Optional[str] = Field(None, description="User-defined run description for the pipeline run.")
+    staged_at: Optional[float] = Field(None, description="Unix timestamp when the job was staged")
     enqueued_at: Optional[float] = Field(None, description="Unix timestamp when the job was enqueued")
     started_at: Optional[float] = Field(None, description="Unix timestamp when the job started execution")
     ended_at: Optional[float] = Field(None, description="Unix timestamp when the job finished or failed")
     result: Optional[Any] = Field(None, description="Result returned by the job if successful")
     error: Optional[str] = Field(None, description="Error message if the job failed")
-    meta: JobMeta = Field({}, description="Metadata associated with the job") # JobMeta now includes run_name
+    meta: JobMeta = Field(default_factory=JobMeta, description="Detailed metadata associated with the job")
     resources: Optional[JobResourceInfo] = Field(None, description="Resource usage statistics")
 
 class ProfileData(BaseModel):
