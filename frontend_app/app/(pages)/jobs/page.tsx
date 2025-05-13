@@ -110,7 +110,7 @@ export default function JobsPage() {
             variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching}
             className="cursor-pointer" >
           <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-          {isFetching ? 'Refreshing...' : 'Refresh'}
+          {isFetching ? 'Refresh' : 'Refresh'}
         </Button>
       </div>
 
