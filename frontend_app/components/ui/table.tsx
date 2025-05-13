@@ -1,5 +1,5 @@
 // File: frontend_app/components/ui/table.tsx
-"use client"
+"use client"; // Assuming this was intended, keep if so. Remove if not a client component.
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
@@ -15,13 +15,15 @@ function Table({ className, children, ...props }: React.ComponentProps<"table">)
         data-slot="table"
         className={cn("w-full caption-bottom text-sm", className)}
         {...props}
-      >{children}</table> {/* Explicit children, no whitespace */}
+      >
+        {children} {/* Render children directly */}
+      </table>
     </div>
   )
 }
 Table.displayName = "Table"
 
-// TableRow component
+// TableRow component - CORRECTED
 function TableRow({ className, children, ...props }: React.ComponentProps<"tr">) {
   return (
     <tr
@@ -31,12 +33,14 @@ function TableRow({ className, children, ...props }: React.ComponentProps<"tr">)
         className
       )}
       {...props}
-    >{children}</tr>
+    >
+      {children} {/* Render children directly without extraneous characters */}
+    </tr>
   );
 }
 TableRow.displayName = "TableRow"
 
-// --- Other components remain unchanged ---
+// TableHeader component
 function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
@@ -48,6 +52,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
 }
 TableHeader.displayName = "TableHeader"
 
+// TableBody component
 function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
   return (
     <tbody
@@ -59,6 +64,7 @@ function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
 }
 TableBody.displayName = "TableBody"
 
+// TableFooter component
 function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   return (
     <tfoot
@@ -73,6 +79,7 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
 }
 TableFooter.displayName = "TableFooter"
 
+// TableHead component
 function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   return (
     <th
@@ -87,6 +94,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
 }
 TableHead.displayName = "TableHead"
 
+// TableCell component
 function TableCell({ className, ...props }: React.ComponentProps<"td">) {
   return (
     <td
@@ -101,6 +109,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
 }
 TableCell.displayName = "TableCell"
 
+// TableCaption component
 function TableCaption({
   className,
   ...props
