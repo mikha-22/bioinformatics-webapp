@@ -1,7 +1,7 @@
 // File: frontend_app/components/results/RunItem.tsx
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react"; // Added useEffect
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { FolderGit2, Cog, Download, ExternalLink, Loader2, AlertCircle, Settings2, ChevronDown, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { useFileBrowser } from "@/components/layout/FileBrowserContext";
 
 import { ResultRun, ResultItem, RunParameters } from "@/lib/types";
-import * as api from "@/lib/api";
+import * as api from "@/lib/api"; // This imports all exported functions from api.ts
 import LoadingSpinner from "@/components/common/LoadingSpinner";
 import ErrorDisplay from "@/components/common/ErrorDisplay";
 import { cn } from "@/lib/utils";
@@ -31,14 +31,35 @@ interface RunItemProps {
   isExpanded: boolean;
 }
 
-const formatParamValue = (value: string | number | boolean | null | undefined | any[] | Record<string, any>): string => { /* ... */ };
-const formatParamKey = (key: string): string => { /* ... */ };
+// Helper functions (keep as they are)
+const formatParamValue = (value: string | number | boolean | null | undefined | any[] | Record<string, any>): string => {
+    if (value === true) return 'Yes';
+    if (value === false) return 'No';
+    if (value === null || value === undefined) return 'N/A';
+    if (typeof value === 'string' && value.trim() === '') return 'N/A';
+    if (Array.isArray(value)) { return value.length > 0 ? value.join(', ') : 'N/A'; }
+    if (typeof value === 'object') { return JSON.stringify(value); }
+    return String(value);
+};
+const formatParamKey = (key: string): string => {
+    const keyMap: Record<string, string> = {
+        'skip_baserecalibrator': 'Skip Base Recalibration',
+        'skip_qc': 'Skip QC',
+        'skip_annotation': 'Skip Annotation',
+        'wes': 'WES Mode',
+        'joint_germline': 'Joint Germline',
+        'trim_fastq': 'Trim FASTQ',
+    };
+    return keyMap[key] || key
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, l => l.toUpperCase());
+};
+
 
 export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded }: RunItemProps) {
   const [isParamsOpen, setIsParamsOpen] = useState(false);
   const { openFileBrowser } = useFileBrowser();
 
-  // <<< ADDED useEffect for initial mount log >>>
   useEffect(() => {
     console.log(`[RunItem ${run.name} MOUNT_DEBUG] Component mounted/updated. isExpanded: ${isExpanded}, run.name: ${run.name}`);
   }, [run.name, isExpanded]);
@@ -56,18 +77,18 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
     refetchOnWindowFocus: false,
   });
 
+  // Query specifically for the MultiQC path
   const { data: multiqcRelativePath, isLoading: isLoadingMultiQCPath, isError: isErrorMultiQCPath, error: errorMultiQCPath } = useQuery<string | null, Error>({
     queryKey: ["multiqcPath", run.name],
     queryFn: () => {
       console.log(`[RunItem ${run.name} QUERYFN_DEBUG] Calling api.getMultiQCReportPath for run: ${run.name}`);
-      return api.getMultiQCReportPath(run.name);
+      return api.getMultiQCReportPath(run.name); // Make sure 'api.' prefix is used
     },
-    enabled: true, // Should run on mount
+    enabled: true,
     staleTime: 15 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
-  // <<< ADDED useEffect to log query results >>>
   useEffect(() => {
     if (isLoadingMultiQCPath) {
       console.log(`[RunItem ${run.name} MULTIQC_QUERY_STATUS] Loading MultiQC path...`);
@@ -77,7 +98,6 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
       console.log(`[RunItem ${run.name} MULTIQC_QUERY_STATUS] Fetched MultiQC path:`, multiqcRelativePath);
     }
   }, [run.name, multiqcRelativePath, isLoadingMultiQCPath, isErrorMultiQCPath, errorMultiQCPath]);
-
 
   const multiqcReportUrl = useMemo(() => {
     // console.log(`[RunItem ${run.name} MEMO_DEBUG] multiqcRelativePath from query:`, multiqcRelativePath);
@@ -97,16 +117,42 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
     return null;
   }, [multiqcRelativePath, run.name]);
 
+  // Parameters Query - Ensure queryFn is present
   const {
     data: parameters,
     isLoading: isLoadingParams,
-    // ... (rest of parameters query)
-  } = useQuery<RunParameters, Error>({ /* ... */ });
-  const downloadRunMutation = useMutation({ /* ... */ });
-  const handleDownloadRun = () => { /* ... */ };
-  const handleOpenParams = () => { /* ... */ };
-  const handleOpenFileBrowser = (e: React.MouseEvent) => { /* ... */ };
-  const formatTimestamp = (timestamp: number | null | undefined): string => { /* ... */ };
+    isError: isErrorParams,
+    error: errorParams,
+  } = useQuery<RunParameters, Error>({
+    queryKey: ["resultParams", run.name],
+    queryFn: () => api.getResultRunParameters(run.name), // <<< FIXED: Added queryFn
+    enabled: isParamsOpen,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  });
+
+  const downloadRunMutation = useMutation({
+     mutationFn: (runName: string) => api.downloadResultRun(runName),
+     onSuccess: (blob, runName) => { /* ... (existing code) ... */ },
+     onError: (error: Error, runName) => { /* ... (existing code) ... */ }
+  });
+
+  const handleDownloadRun = () => { downloadRunMutation.mutate(run.name); };
+  const handleOpenParams = () => { setIsParamsOpen(true); };
+  const handleOpenFileBrowser = (e: React.MouseEvent) => { e.stopPropagation(); if (run.filebrowser_link) { openFileBrowser(run.filebrowser_link); } };
+  const formatTimestamp = (timestamp: number | null | undefined): string => {
+    if (!timestamp) return "N/A";
+    try {
+        if (timestamp <= 0) return "Invalid Date";
+        const date = new Date(timestamp * 1000);
+        if (isNaN(date.getTime())) return "Invalid Date";
+        return `${date.toLocaleDateString()} ${date.toLocaleTimeString()} (${formatDistanceToNow(date, { addSuffix: true })})`;
+    } catch (e) {
+        console.error("Error formatting timestamp:", timestamp, e);
+        return "Invalid Date";
+    }
+  };
 
   return (
     <>
@@ -132,7 +178,9 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
               </div>
             </div>
 
+            {/* Action Buttons Container */}
             <div className="flex items-center gap-1 py-3" onClick={e => e.stopPropagation()}>
+              {/* View Parameters Button */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -144,7 +192,7 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
                 <span className="sr-only">View Parameters</span>
               </Button>
 
-              {/* --- MultiQC Button with Debugging --- */}
+              {/* MultiQC Button */}
               {/* {console.log(`[RunItem ${run.name} RENDER_DEBUG] isLoadingMultiQCPath: ${isLoadingMultiQCPath}, multiqcReportUrl: ${multiqcReportUrl}`)} */}
               {isLoadingMultiQCPath ? (
                 <Button variant="ghost" size="icon" className="h-7 w-7" disabled>
@@ -164,11 +212,10 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
                   </Link>
                 </Button>
               ) : (
-                 null // Not rendering a disabled button for cleaner UI if not found
+                 null // Render nothing if not loading and no URL
               )}
-              {/* --- End MultiQC Button --- */}
 
-
+              {/* Open in FileBrowser Button */}
               {run.filebrowser_link && (
                 <Button
                   variant="ghost"
@@ -181,6 +228,8 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
                   <span className="sr-only">Open in File Browser</span>
                 </Button>
               )}
+
+              {/* Download Run Button */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -192,6 +241,8 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
                 {downloadRunMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4" />}
                 <span className="sr-only">Download Run</span>
               </Button>
+
+              {/* Expand/Collapse Chevron Button */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -212,13 +263,74 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
               </Button>
             </div>
           </div>
-          <AccordionContent className={cn( /* ... */ )}>
-             {/* ... */}
+          <AccordionContent className={cn(
+            "bg-card",
+            "border-t border-border",
+            "overflow-hidden",
+            "!border-b !border-b-border"
+          )}>
+             <div className="p-4">
+               {isLoadingFiles && <div className="text-center p-4"><LoadingSpinner label="Loading files..." /></div>}
+               {isErrorFiles && <ErrorDisplay error={errorFiles} title="Error Loading Files" />}
+               {!isLoadingFiles && !isErrorFiles && runFiles && (
+                 <FileList files={runFiles} runName={run.name} />
+               )}
+               {!isLoadingFiles && !isErrorFiles && (!runFiles || runFiles.length === 0) && (
+                   <p className="text-center text-muted-foreground p-4">No files found in this run.</p>
+               )}
+             </div>
           </AccordionContent>
         </AccordionItem>
       </Accordion>
+
+      {/* Parameters Dialog */}
       <Dialog open={isParamsOpen} onOpenChange={setIsParamsOpen}>
-          {/* ... */}
+          <DialogContent className="sm:max-w-xl">
+              <DialogHeader>
+                  <DialogTitle>Parameters for Run: {run.name}</DialogTitle>
+                  <DialogDescription>
+                     Configuration used for this pipeline run.
+                  </DialogDescription>
+              </DialogHeader>
+               {isLoadingParams && <div className="py-8 flex justify-center"><LoadingSpinner label="Loading parameters..." /></div>}
+               {isErrorParams && (
+                  <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-3 rounded-md border border-destructive/30">
+                    <AlertCircle className="h-5 w-5 mt-1 self-start flex-shrink-0"/>
+                    <div>
+                       <p className="font-medium">Error Loading Parameters</p>
+                       <p className="text-sm">{errorParams instanceof Error ? errorParams.message : String(errorParams)}</p>
+                    </div>
+                 </div>
+               )}
+               {!isLoadingParams && !isErrorParams && parameters && (Object.keys(parameters.input_filenames || {}).length > 0 || Object.keys(parameters.sarek_params || {}).length > 0) && (
+                 <div className="mt-4 max-h-[60vh] overflow-y-auto rounded-md border bg-muted/30 p-4 text-sm space-y-2">
+                   {parameters.input_filenames && Object.entries(parameters.input_filenames).map(([key, value]) => (
+                       <div key={`input-${key}`} className="grid grid-cols-3 gap-x-2 items-center">
+                           <div className="font-medium text-muted-foreground capitalize truncate" title={key}>{formatParamKey(key)}:</div>
+                           <div className="col-span-2 font-mono text-xs break-words" title={String(value ?? '')}>
+                               {formatParamValue(value)}
+                           </div>
+                       </div>
+                   ))}
+                   {parameters.sarek_params && Object.entries(parameters.sarek_params).map(([key, value]) => (
+                       <div key={`sarek-${key}`} className="grid grid-cols-3 gap-x-2 items-center">
+                           <div className="font-medium text-muted-foreground capitalize truncate" title={key}>{formatParamKey(key)}:</div>
+                           <div className="col-span-2 font-mono text-xs break-words" title={String(value ?? '')}>
+                               {formatParamValue(value)}
+                           </div>
+                       </div>
+                   ))}
+                </div>
+               )}
+               {!isLoadingParams && !isErrorParams && (!parameters || (Object.keys(parameters.input_filenames || {}).length === 0 && Object.keys(parameters.sarek_params || {}).length === 0)) && (
+                   <p className="text-muted-foreground text-sm text-center py-4">No parameter information found for this run.</p>
+               )}
+              <DialogFooter className="mt-4">
+                  <DialogClose asChild>
+                      <Button type="button" variant="outline">Close</Button>
+                  </DialogClose>
+              </DialogFooter>
+          </DialogContent>
       </Dialog>
     </>
   );

@@ -1,15 +1,13 @@
 // File: frontend_app/lib/api.ts
 import axios from "axios";
-// Import updated types, including RunParameters and ProfileData
-// REMOVED JobMetaInputParams from import
+// Ensure all necessary types are imported
 import { Job, PipelineInput, ResultRun, ResultItem, DataFile, JobStatusDetails, RunParameters, ProfileData } from "./types";
-// Import zod schema for type reference in stagePipelineJob
-import { z } from "zod";
-// Assuming pipelineInputSchema is defined/imported elsewhere for the type definition below
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-if (!API_BASE_URL) {
+// <<< DEBUG LOG for API_BASE_URL >>>
+console.log("[API Init DEBUG] NEXT_PUBLIC_API_BASE_URL:", API_BASE_URL);
+if (!API_BASE_URL && typeof window !== 'undefined') {
   console.error("CRITICAL: NEXT_PUBLIC_API_BASE_URL is not defined. API calls will likely fail.");
 }
 
@@ -22,7 +20,6 @@ const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
   (config) => {
-    // Ensure config is returned
     return config;
   },
   (error) => {
@@ -33,14 +30,12 @@ apiClient.interceptors.request.use(
 
 apiClient.interceptors.response.use(
   (response) => {
-    // Ensure response is returned
     return response;
   },
   (error) => {
     console.error("Response Error Interceptor:", error.response?.status, error.config?.url, error.message);
     const message = error.response?.data?.detail || error.message || "An unknown error occurred";
     const enhancedError = new Error(message);
-    // Use type assertion for adding custom properties
     (enhancedError as any).originalError = error;
     (enhancedError as any).status = error.response?.status;
     return Promise.reject(enhancedError);
@@ -58,7 +53,7 @@ export const getJobsList = async (): Promise<Job[]> => {
     return response.data || [];
   } catch (error) {
     console.error("Failed to fetch jobs list:", error);
-    throw error; // Re-throw to be caught by React Query
+    throw error;
   }
 };
 
@@ -84,7 +79,7 @@ export const startJob = async (stagedJobId: string): Promise<{ message: string; 
         console.error(`Failed to start job ${stagedJobId}:`, error);
         throw error;
     }
-}; // <<< Ensure semicolon or proper syntax separation
+};
 
 export const stopJob = async (jobId: string): Promise<{ message: string; job_id: string }> => {
     if (!jobId) throw new Error("Job ID is required to stop.");
@@ -95,7 +90,7 @@ export const stopJob = async (jobId: string): Promise<{ message: string; job_id:
          console.error(`Failed to stop job ${jobId}:`, error);
         throw error;
     }
-}; // <<< Ensure semicolon or proper syntax separation
+};
 
 export const removeJob = async (jobId: string): Promise<{ message: string; removed_id: string }> => {
     if (!jobId) throw new Error("Job ID is required to remove.");
@@ -106,7 +101,7 @@ export const removeJob = async (jobId: string): Promise<{ message: string; remov
          console.error(`Failed to remove job ${jobId}:`, error);
         throw error;
     }
-}; // <<< Ensure semicolon or proper syntax separation
+};
 
 export const rerunJob = async (jobId: string): Promise<{ message: string; staged_job_id: string }> => {
      if (!jobId) throw new Error("Job ID is required to rerun.");
@@ -117,7 +112,7 @@ export const rerunJob = async (jobId: string): Promise<{ message: string; staged
         console.error(`Failed to rerun job ${jobId}:`, error);
         throw error;
     }
-}; // <<< Ensure semicolon or proper syntax separation
+};
 
 // ========================
 // Results Data Functions
@@ -130,7 +125,7 @@ export const getResultsList = async (): Promise<ResultRun[]> => {
     console.error("Error fetching results list:", error);
     throw error;
   }
-}; // <<< Ensure semicolon or proper syntax separation
+};
 
 export const getResultRunFiles = async (runDirName: string): Promise<ResultItem[]> => {
   if (!runDirName) throw new Error("Run directory name is required.");
@@ -141,21 +136,18 @@ export const getResultRunFiles = async (runDirName: string): Promise<ResultItem[
     console.error(`Error fetching files for run ${runDirName}:`, error);
     throw error;
   }
-}; // <<< Ensure semicolon or proper syntax separation
+};
 
 export const getResultRunParameters = async (runDirName: string): Promise<RunParameters> => {
     if (!runDirName) throw new Error("Run directory name is required to fetch parameters.");
     try {
         const response = await apiClient.get<RunParameters>(`/api/results/${encodeURIComponent(runDirName)}/parameters`);
-        // Ensure an object is always returned, even if backend sends null/undefined
         return response.data || {};
     } catch (error) {
         console.error(`Error fetching parameters for run ${runDirName}:`, error);
-        // Return empty object on error to potentially prevent issues in components expecting an object
-        // Although throwing might be better for error handling in useQuery
         throw error;
     }
-}; // <<< Ensure semicolon or proper syntax separation
+};
 
 export const downloadResultRun = async (runDirName: string): Promise<Blob> => {
     if (!runDirName) throw new Error("Run directory name is required for download.");
@@ -171,12 +163,11 @@ export const downloadResultRun = async (runDirName: string): Promise<Blob> => {
         console.error(`Error downloading result run ${runDirName}:`, error);
         throw error;
     }
-}; // <<< Ensure semicolon or proper syntax separation
+};
 
 export const downloadResultFile = async (runDirName: string, filePath: string): Promise<Blob> => {
     if (!runDirName || !filePath) throw new Error("Run directory and file path are required for download.");
     try {
-        // Re-encode file path properly, handling potential slashes
         const encodedFilePath = filePath.split('/').map(segment => encodeURIComponent(segment)).join('/');
         const response = await apiClient.get(`/api/download_file/${encodeURIComponent(runDirName)}/${encodedFilePath}`, {
             responseType: 'blob',
@@ -189,15 +180,37 @@ export const downloadResultFile = async (runDirName: string, filePath: string): 
         console.error(`Error downloading file ${filePath} from ${runDirName}:`, error);
         throw error;
     }
-}; // <<< Ensure semicolon or proper syntax separation
+};
+
+// --- MultiQC Path API FUNCTION ---
+export const getMultiQCReportPath = async (runDirName: string): Promise<string | null> => {
+  console.log(`[API getMultiQCReportPath DEBUG] Function called with runDirName: '${runDirName}'`); // <<< DEBUG LOG
+  if (!runDirName) {
+    console.warn("[API getMultiQCReportPath DEBUG] runDirName is empty, returning null."); // <<< DEBUG LOG
+    return null;
+  }
+  try {
+    console.log(`[API getMultiQCReportPath DEBUG] Attempting apiClient.get for /api/results/${encodeURIComponent(runDirName)}/multiqc_path`); // <<< DEBUG LOG
+    const response = await apiClient.get<string | null>(`/api/results/${encodeURIComponent(runDirName)}/multiqc_path`);
+    console.log(`[API getMultiQCReportPath DEBUG] for ${runDirName} - Response Status: ${response.status}, Data:`, response.data); // <<< DEBUG LOG
+    return response.data;
+  } catch (error) {
+    const axiosError = error as any;
+    if (axiosError.isAxiosError && axiosError.response && axiosError.response.status === 404) {
+      console.log(`[API getMultiQCReportPath DEBUG] MultiQC report path not found for run ${runDirName} (API returned 404).`); // <<< DEBUG LOG
+      return null;
+    }
+    console.error(`[API getMultiQCReportPath DEBUG] Error fetching MultiQC path for run ${runDirName}:`, error); // <<< DEBUG LOG
+    throw error;
+  }
+};
+// --- END MultiQC Path API FUNCTION ---
 
 // ========================
 // Pipeline Staging Function
 // ========================
-// Use the imported PipelineInput type directly
 export const stagePipelineJob = async (values: PipelineInput): Promise<{ message: string; staged_job_id: string }> => {
-    const apiPayload: PipelineInput = values;
-
+  const apiPayload: PipelineInput = values;
   try {
     console.log("Staging Job with API Payload:", apiPayload);
     const response = await apiClient.post('/api/run_pipeline', apiPayload);
@@ -206,7 +219,7 @@ export const stagePipelineJob = async (values: PipelineInput): Promise<{ message
     console.error("Error staging pipeline job:", error);
     throw error;
   }
-}; // <<< Ensure semicolon or proper syntax separation
+};
 
 // ========================
 // Data File Listing
@@ -215,7 +228,6 @@ export const getDataFiles = async (type?: string, extensions?: string[]): Promis
   try {
     const response = await apiClient.get<DataFile[]>("/api/get_data");
     let files = response.data || [];
-    // Ensure extensions array exists and has items before filtering
     if (extensions && extensions.length > 0) {
         files = files.filter(file =>
             extensions.some(ext => file.name.toLowerCase().endsWith(ext.toLowerCase()))
@@ -226,11 +238,10 @@ export const getDataFiles = async (type?: string, extensions?: string[]): Promis
     console.error(`Error fetching data files (type: ${type}):`, error);
     throw error;
   }
-}; // <<< Ensure semicolon or proper syntax separation
-
+};
 
 // ========================
-// Profile Management Functions - CHECK THESE CAREFULLY
+// Profile Management Functions
 // ========================
 export const listProfileNames = async (): Promise<string[]> => {
     try {
@@ -238,26 +249,24 @@ export const listProfileNames = async (): Promise<string[]> => {
         return response.data || [];
     } catch (error) {
         console.error("Failed to fetch profile names:", error);
-        throw error; // Re-throw to be caught by useQuery
+        throw error;
     }
-}; // <<< Check semicolon
+};
 
 export const getProfileData = async (profileName: string): Promise<ProfileData> => {
     if (!profileName) throw new Error("Profile name is required.");
     try {
         const response = await apiClient.get<ProfileData>(`/api/profiles/${encodeURIComponent(profileName)}`);
-        // Ensure it returns an object, even if empty, or handle 404 appropriately in the component
         return response.data || {};
     } catch (error) {
          console.error(`Failed to fetch profile data for ${profileName}:`, error);
         throw error;
     }
-}; // <<< Check semicolon
+};
 
 export const saveProfile = async (profileName: string, data: ProfileData): Promise<{ message: string; profile_name: string }> => {
     if (!profileName) throw new Error("Profile name is required to save.");
     try {
-        // ProfileData includes step now, this is correct
         const payload = { name: profileName, data: data };
         const response = await apiClient.post("/api/profiles", payload);
         return response.data;
@@ -265,7 +274,7 @@ export const saveProfile = async (profileName: string, data: ProfileData): Promi
          console.error(`Failed to save profile ${profileName}:`, error);
         throw error;
     }
-}; // <<< Check semicolon
+};
 
 export const deleteProfile = async (profileName: string): Promise<{ message: string; profile_name: string }> => {
      if (!profileName) throw new Error("Profile name is required to delete.");
@@ -276,6 +285,4 @@ export const deleteProfile = async (profileName: string): Promise<{ message: str
          console.error(`Failed to delete profile ${profileName}:`, error);
         throw error;
     }
-}; // <<< Check semicolon
-// --- <<< END NEW PROFILE API FUNCTIONS >>> ---
-
+};
