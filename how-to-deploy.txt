@@ -50,8 +50,8 @@ docker run \
   --name bio_filebrowser_local \
   -p 8081:8080 \
   -u "$(id -u):$(id -g)" \
-  -v "/home/admin01/work/mnt/nas/sarek_webapp/data:/srv/data" \
-  -v "/home/admin01/work/mnt/nas/sarek_webapp/results:/srv/results" \
+  -v "/home/admin01/work/mnt/nas/sarek-webapp/data:/srv/data" \
+  -v "/home/admin01/work/mnt/nas/sarek-webapp/results:/srv/results" \
   -v "$(pwd)/docker/filebrowser.db:/config/filebrowser.db" \
   -v "$(pwd)/docker/settings.json:/config/settings.json" \
   -v "$(pwd)/tls/server.crt:/config/server.crt" \
