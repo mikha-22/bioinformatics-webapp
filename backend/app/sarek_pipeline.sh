@@ -31,15 +31,14 @@ elif [ ! -w "$NXF_HOME" ]; then
 fi
 
 # --- Input Validation (Argument Count) ---
-# <<< INCREASED EXPECTED ARGUMENT COUNT BY 1 (for run_name) >>>
-if [ $# -lt 19 ]; then
-    log "ERROR: Insufficient arguments provided. Expected 19, got $#."
-    log "Usage: $0 <run_name> <input_csv> <outdir_base> <genome> <tools> <step> <profile> <aligner> <intervals> <dbsnp> <known_indels> <pon> <joint_germline> <wes> <trim_fastq> <skip_qc> <skip_annotation> <skip_baserecalibrator> <is_rerun>"
+# <<< UPDATED EXPECTED ARGUMENT COUNT TO 20 >>>
+if [ $# -lt 20 ]; then
+    log "ERROR: Insufficient arguments provided. Expected 20, got $#."
+    log "Usage: $0 <run_name> <input_csv> <outdir_base> <genome> <tools> <step> <profile> <aligner> <intervals> <dbsnp> <known_indels> <pon> <joint_germline> <wes> <trim_fastq> <skip_qc> <skip_annotation> <skip_baserecalibrator> <is_rerun> <job_id_suffix>"
     exit 1
 fi
 
 # --- Argument Parsing (Positional, MUST match order in tasks.py) ---
-# <<< ADDED run_name AS FIRST ARGUMENT >>>
 run_name_input="$1"
 input_csv="$2"
 outdir_base="$3"
@@ -59,13 +58,11 @@ skip_qc_flag="${16}"
 skip_annotation_flag="${17}"
 skip_baserecalibrator_flag="${18}"
 is_rerun="${19}"
+job_id_suffix_arg="${20}" # <<< NEW: Job ID Suffix Argument
 
 # --- Basic Validation (Required Args) ---
 log "Validating required arguments..."
-if [ -z "$run_name_input" ]; then
-    log "ERROR: Missing required argument: run_name_input (Argument #1)" >&2
-    exit 1
-fi
+if [ -z "$run_name_input" ]; then log "ERROR: Missing required argument: run_name_input (Argument #1)" >&2; exit 1; fi
 if [ -z "$input_csv" ]; then log "ERROR: Missing required argument: input_csv (Argument #2)" >&2; exit 1; fi
 if [ -z "$outdir_base" ]; then log "ERROR: Missing required argument: outdir_base (Argument #3)" >&2; exit 1; fi
 if [ -z "$genome" ]; then log "ERROR: Missing required argument: genome (Argument #4)" >&2; exit 1; fi
@@ -89,22 +86,19 @@ log "Skip QC: $skip_qc_flag"
 log "Skip Annotation: $skip_annotation_flag"
 log "Skip Base Recalibrator: $skip_baserecalibrator_flag"
 log "Is Rerun: $is_rerun"
+log "Job ID Suffix Arg: $job_id_suffix_arg" # <<< Log the new argument
 
-# --- Sanitize run_name_input for use in directory names (already mostly done in backend) ---
-# Further sanitize: remove any characters not suitable for directory names
-# Allows alphanumeric, underscore, hyphen. Replaces others with underscore.
-sanitized_run_name=$(echo "$run_name_input" | sed 's/[^a-zA-Z0-9_-]/_/g')
-if [ -z "$sanitized_run_name" ]; then
+# --- Sanitize run_name_input for use in directory names ---
+final_sanitized_run_name=$(echo "$run_name_input" | sed 's/[^a-zA-Z0-9_-]/_/g')
+if [ -z "$final_sanitized_run_name" ]; then
     log "ERROR: Sanitized run name is empty. Original was '$run_name_input'." >&2
-    sanitized_run_name="unnamed_run" # Fallback if sanitization results in empty
+    final_sanitized_run_name="unnamed_run" # Fallback
 fi
-log "Sanitized Run Name (for dir): $sanitized_run_name"
-
+log "Final Sanitized Run Name (for dir): $final_sanitized_run_name"
 
 # --- Determine Project Root, Artifact Dirs, and Run Identifier ---
 log "Determining project root and artifact directories..."
-SCRIPT_CWD=$(pwd) # Should be backend/app
-# Assuming this script is in backend/app, project root is two levels up
+SCRIPT_CWD=$(pwd)
 PROJECT_ROOT_ABS=$(realpath "${SCRIPT_CWD}/../../")
 
 log "Script current working directory (from where sarek_pipeline.sh is run): ${SCRIPT_CWD}"
@@ -112,8 +106,8 @@ log "Project root identified as: ${PROJECT_ROOT_ABS}"
 
 NEXTFLOW_RUN_ARTIFACTS_DIR="${PROJECT_ROOT_ABS}/nextflow_run_artifacts"
 NEXTFLOW_CONFIG_DIR="${NEXTFLOW_RUN_ARTIFACTS_DIR}/config"
-NEXTFLOW_WORK_BASE_DIR="${NEXTFLOW_RUN_ARTIFACTS_DIR}/work" # Base for all work dirs
-NEXTFLOW_LOG_BASE_DIR="${NEXTFLOW_RUN_ARTIFACTS_DIR}/logs" # Base for all .nextflow.log files
+NEXTFLOW_WORK_BASE_DIR="${NEXTFLOW_RUN_ARTIFACTS_DIR}/work"
+NEXTFLOW_LOG_BASE_DIR="${NEXTFLOW_RUN_ARTIFACTS_DIR}/logs"
 
 log "Ensuring Nextflow artifact directories exist under ${NEXTFLOW_RUN_ARTIFACTS_DIR}..."
 mkdir -p "$NEXTFLOW_CONFIG_DIR" || { log "ERROR: Failed to create Nextflow config dir: $NEXTFLOW_CONFIG_DIR" >&2; exit 1; }
@@ -126,9 +120,18 @@ if [ ! -f "$NEXTFLOW_CONFIG_FILE" ]; then log "ERROR: Nextflow config file not f
 if [ ! -r "$NEXTFLOW_CONFIG_FILE" ]; then log "ERROR: Nextflow config file not readable at ${NEXTFLOW_CONFIG_FILE}" >&2; exit 1; fi
 
 log "Generating Sarek results directory name..."
-timestamp=$(date +"%Y%m%d_%H%M%S")
-# <<< USE SANITIZED RUN NAME AND TIMESTAMP FOR RESULTS DIRECTORY >>>
-results_dir_name="${sanitized_run_name}_${timestamp}"
+# <<< MODIFIED: Construct RUN_SPECIFIC_IDENTIFIER using run name and job ID suffix >>>
+if [ -n "$job_id_suffix_arg" ] && [ "$job_id_suffix_arg" != " " ] && [ "$job_id_suffix_arg" != "NOSUFF" ]; then
+    RUN_SPECIFIC_IDENTIFIER="${final_sanitized_run_name}_${job_id_suffix_arg}"
+else
+    # Fallback if suffix is problematic (should be rare if tasks.py sends it correctly)
+    timestamp_fallback=$(date +"%Y%m%d%H%M%S")
+    RUN_SPECIFIC_IDENTIFIER="${final_sanitized_run_name}_${timestamp_fallback}"
+    log "WARNING: Job ID suffix problematic ('$job_id_suffix_arg'), using timestamp for uniqueness in folder/run name: ${RUN_SPECIFIC_IDENTIFIER}"
+fi
+log "Using RUN_SPECIFIC_IDENTIFIER for output directory and Nextflow run name: ${RUN_SPECIFIC_IDENTIFIER}"
+
+results_dir_name="${RUN_SPECIFIC_IDENTIFIER}" # Sarek output folder name
 results_dir="${outdir_base}/${results_dir_name}" # Full path to results
 
 mkdir -p "$results_dir"
@@ -137,8 +140,7 @@ if [ ! -w "$results_dir" ]; then log "ERROR: Sarek results directory (${results_
 echo "Results directory: ${results_dir}" # This line is parsed by tasks.py
 log "Successfully created Sarek results directory: ${results_dir}"
 
-# Use the same unique identifier for work and log files for consistency
-RUN_SPECIFIC_IDENTIFIER="${results_dir_name}" # Use the same name as the results folder for clarity
+# Use RUN_SPECIFIC_IDENTIFIER for Nextflow work directory and log file
 RUN_SPECIFIC_WORK_DIR="${NEXTFLOW_WORK_BASE_DIR}/${RUN_SPECIFIC_IDENTIFIER}"
 RUN_SPECIFIC_LOG_FILE="${NEXTFLOW_LOG_BASE_DIR}/${RUN_SPECIFIC_IDENTIFIER}.nextflow.log"
 
@@ -148,28 +150,28 @@ log "Run-specific Nextflow log file will be: ${RUN_SPECIFIC_LOG_FILE}"
 mkdir -p "$RUN_SPECIFIC_WORK_DIR" || { log "ERROR: Failed to create run-specific work dir: $RUN_SPECIFIC_WORK_DIR" >&2; exit 1; }
 
 # --- Define Paths ---
-NXF_EXECUTABLE="/usr/local/bin/nextflow" # Assuming Nextflow is installed here in the worker container
+NXF_EXECUTABLE="/usr/local/bin/nextflow"
 
 # --- Build the Sarek Command ---
 log "Building Nextflow command..."
 cmd="$NXF_EXECUTABLE run nf-core/sarek -r 3.5.1"
 cmd+=" --input ${input_csv}"
-cmd+=" --outdir ${results_dir}" # Use the newly constructed results_dir
+cmd+=" --outdir ${results_dir}"
 cmd+=" --genome ${genome}"
 cmd+=" -c ${NEXTFLOW_CONFIG_FILE}"
-cmd+=" -name ${RUN_SPECIFIC_IDENTIFIER}" # <<< ADDED -name for Nextflow run name (useful in Tower/logs)
+cmd+=" -name ${RUN_SPECIFIC_IDENTIFIER}" # <<< USE THE NEW IDENTIFIER FOR NEXTFLOW RUN NAME
 
-export NXF_WORK="${RUN_SPECIFIC_WORK_DIR}" # Explicitly set work directory
-export NXF_LOG_FILE="${RUN_SPECIFIC_LOG_FILE}" # Explicitly set log file
+export NXF_WORK="${RUN_SPECIFIC_WORK_DIR}"
+export NXF_LOG_FILE="${RUN_SPECIFIC_LOG_FILE}"
 log "Setting NXF_WORK=${NXF_WORK}"
 log "Setting NXF_LOG_FILE=${NXF_LOG_FILE}"
 
-
+# ... (rest of the command building logic remains the same)
 if [ "$wes_flag" = "true" ]; then cmd+=" --wes"; fi
-if [ "$skip_baserecalibrator_flag" = "true" ]; then cmd+=" --skip_tools baserecalibrator"; fi # Sarek specific way
+if [ "$skip_baserecalibrator_flag" = "true" ]; then cmd+=" --skip_tools baserecalibrator"; fi
 if [ -n "$tools" ] && [ "$tools" != " " ]; then cmd+=" --tools ${tools}"; fi
 if [ -n "$step" ] && [ "$step" != " " ]; then cmd+=" --step ${step}"; fi
-effective_profile="${profile:-docker}" # Default to docker if not provided
+effective_profile="${profile:-docker}"
 if [ -n "$effective_profile" ] && [ "$effective_profile" != " " ]; then cmd+=" -profile ${effective_profile}"; fi
 if [ -n "$aligner" ] && [ "$aligner" != " " ]; then cmd+=" --aligner ${aligner}"; fi
 if [ -n "$intervals" ] && [ "$intervals" != " " ]; then cmd+=" --intervals ${intervals}"; fi
@@ -184,6 +186,7 @@ if [ "$is_rerun" = "true" ]; then cmd+=" -resume"; fi
 
 
 log "--- Worker Environment & Sanity Checks ---"
+# ... (Sanity checks remain the same) ...
 log "User: $(whoami) (UID: $(id -u))"
 log "Current Directory (of script execution): $(pwd)"
 log "PROJECT_ROOT_ABS (Determined): ${PROJECT_ROOT_ABS}"
@@ -207,28 +210,24 @@ log "--- End Sanity Checks ---"
 # --- Execute the pipeline ---
 log "Executing Nextflow Command:"
 log "$cmd"
-# Store command and details in a log file within the results directory
 COMMAND_LOG_FILE="${results_dir}/pipeline_execution_details.log"
 echo "Timestamp: $(date)" > "${COMMAND_LOG_FILE}"
 echo "Executing User: $(whoami) (UID: $(id -u))" >> "${COMMAND_LOG_FILE}"
 echo "Working Directory (of script): $(pwd)" >> "${COMMAND_LOG_FILE}"
 echo "Run Name (Input): ${run_name_input}" >> "${COMMAND_LOG_FILE}"
-echo "Sanitized Run Name (for dir): ${sanitized_run_name}" >> "${COMMAND_LOG_FILE}"
+echo "Job ID Suffix: ${job_id_suffix_arg}" >> "${COMMAND_LOG_FILE}" # <<< Log suffix
+echo "RUN_SPECIFIC_IDENTIFIER (Folder/NF Run Name): ${RUN_SPECIFIC_IDENTIFIER}" >> "${COMMAND_LOG_FILE}" # <<< Log identifier
 echo "Results Directory: ${results_dir}" >> "${COMMAND_LOG_FILE}"
 echo "NXF_WORK (run-specific): ${NXF_WORK}" >> "${COMMAND_LOG_FILE}"
 echo "NXF_LOG_FILE (run-specific): ${NXF_LOG_FILE}" >> "${COMMAND_LOG_FILE}"
 echo "Nextflow Command: ${cmd}" >> "${COMMAND_LOG_FILE}"
 echo "---------------------" >> "${COMMAND_LOG_FILE}"
 
-# Execute the command, tee output to both the command log and stdout/stderr
-# This allows live logging via tasks.py and also captures it in the results folder.
-# Using a pipe to tee might affect how exit codes are handled by `set -e` if it were active.
-# Since `set -e` is not active here, we capture $? manually.
 {
-    eval "$cmd" # Use eval to correctly handle quoted arguments within the cmd string
+    eval "$cmd"
 } 2>&1 | tee -a "${COMMAND_LOG_FILE}"
 
-exit_code=${PIPESTATUS[0]} # Get exit code of the eval "$cmd" part
+exit_code=${PIPESTATUS[0]}
 
 log "Nextflow command finished with exit code: ${exit_code}"
 echo "---------------------" >> "${COMMAND_LOG_FILE}"
@@ -237,10 +236,10 @@ echo "Finished: $(date)" >> "${COMMAND_LOG_FILE}"
 
 if [ $exit_code -eq 0 ]; then
     log "Pipeline completed successfully (Exit Code 0)."
-    echo "status::success" # Parsed by tasks.py
+    echo "status::success"
     exit 0
 else
     log "ERROR: Pipeline failed with exit code ${exit_code}" >&2
-    echo "status::failed" # Parsed by tasks.py
+    echo "status::failed"
     exit ${exit_code}
 fi
