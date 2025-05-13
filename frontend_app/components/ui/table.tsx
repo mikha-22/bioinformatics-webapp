@@ -4,7 +4,7 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-// Main table component
+// Main table component - CORRECTED
 function Table({ className, children, ...props }: React.ComponentProps<"table">) {
   return (
     <div
@@ -14,10 +14,10 @@ function Table({ className, children, ...props }: React.ComponentProps<"table">)
       <table
         data-slot="table"
         className={cn("w-full caption-bottom text-sm", className)}
-        {...props}
-      >
-        {children} {/* Render children directly */}
-      </table>
+        {...props} // Spread props here
+      >{/* Ensure no space before children */}
+        {children}
+      {/* Ensure no space after children before closing tag */}</table>
     </div>
   )
 }
@@ -32,40 +32,40 @@ function TableRow({ className, children, ...props }: React.ComponentProps<"tr">)
         "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors",
         className
       )}
-      {...props}
-    >
-      {children} {/* Render children directly without extraneous characters */}
-    </tr>
+      {...props} // Spread props here
+    >{/* Ensure no space before children */}
+      {children}
+    {/* Ensure no space after children before closing tag */}</tr>
   );
 }
 TableRow.displayName = "TableRow"
 
 // TableHeader component
-function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
+function TableHeader({ className, children, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
       className={cn("[&_tr]:border-b", className)}
       {...props}
-    />
+    >{children}</thead>
   )
 }
 TableHeader.displayName = "TableHeader"
 
 // TableBody component
-function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
+function TableBody({ className, children, ...props }: React.ComponentProps<"tbody">) {
   return (
     <tbody
       data-slot="table-body"
       className={cn("[&_tr:last-child]:border-0", className)}
       {...props}
-    />
+    >{children}</tbody>
   )
 }
 TableBody.displayName = "TableBody"
 
 // TableFooter component
-function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
+function TableFooter({ className, children, ...props }: React.ComponentProps<"tfoot">) {
   return (
     <tfoot
       data-slot="table-footer"
@@ -74,13 +74,13 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
         className
       )}
       {...props}
-    />
+    >{children}</tfoot>
   )
 }
 TableFooter.displayName = "TableFooter"
 
 // TableHead component
-function TableHead({ className, ...props }: React.ComponentProps<"th">) {
+function TableHead({ className, children, ...props }: React.ComponentProps<"th">) {
   return (
     <th
       data-slot="table-head"
@@ -89,13 +89,13 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
         className
       )}
       {...props}
-    />
+    >{children}</th>
   )
 }
 TableHead.displayName = "TableHead"
 
 // TableCell component
-function TableCell({ className, ...props }: React.ComponentProps<"td">) {
+function TableCell({ className, children, ...props }: React.ComponentProps<"td">) {
   return (
     <td
       data-slot="table-cell"
@@ -104,14 +104,14 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
         className
       )}
       {...props}
-    />
+    >{children}</td>
   )
 }
 TableCell.displayName = "TableCell"
 
 // TableCaption component
 function TableCaption({
-  className,
+  className, children,
   ...props
 }: React.ComponentProps<"caption">) {
   return (
@@ -119,7 +119,7 @@ function TableCaption({
       data-slot="table-caption"
       className={cn("text-muted-foreground mt-4 text-sm", className)}
       {...props}
-    />
+    >{children}</caption>
   )
 }
 TableCaption.displayName = "TableCaption"
