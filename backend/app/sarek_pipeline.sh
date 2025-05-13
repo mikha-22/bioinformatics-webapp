@@ -30,9 +30,42 @@ elif [ ! -w "$NXF_HOME" ]; then
      log "ERROR: NXF_HOME directory ($NXF_HOME) is not writable by user $(whoami)." >&2; exit 1;
 fi
 
+# --- BEGIN JAVA_HOME INFERENCE ---
+if [ -z "$JAVA_HOME" ]; then
+    log "JAVA_HOME not set. Attempting to infer..."
+    if command -v java >/dev/null 2>&1; then
+        JAVA_PATH_CMD_V=$(command -v java)
+        # Resolve symlinks to get the actual path
+        JAVA_REAL_PATH=$(realpath "$JAVA_PATH_CMD_V")
+        log "Found java executable at: $JAVA_REAL_PATH (from $JAVA_PATH_CMD_V)"
+        # Heuristic: JAVA_HOME is usually two directories up from 'bin/java'
+        POTENTIAL_JAVA_HOME=$(dirname "$(dirname "$JAVA_REAL_PATH")")
+        log "Potential JAVA_HOME based on dirname: $POTENTIAL_JAVA_HOME"
+
+        # Check if this potential JAVA_HOME looks like a valid JDK/JRE root
+        # (e.g., contains a 'release' file or a 'jre' subdirectory)
+        if [ -f "$POTENTIAL_JAVA_HOME/release" ] || [ -d "$POTENTIAL_JAVA_HOME/jre" ] || [ -d "$POTENTIAL_JAVA_HOME/lib/jli" ]; then
+            export JAVA_HOME="$POTENTIAL_JAVA_HOME"
+            log "Successfully inferred and set JAVA_HOME: $JAVA_HOME"
+        else
+            log "WARNING: Could not reliably infer JAVA_HOME from java path: $JAVA_REAL_PATH. Structure doesn't match typical JDK/JRE. JAVA_HOME remains unset by this script."
+            # As a last resort, if /usr/lib/jvm/default-java exists, try that (common on some Debian/Ubuntu)
+            if [ -d "/usr/lib/jvm/default-java" ]; then
+                export JAVA_HOME="/usr/lib/jvm/default-java"
+                log "Fallback: Set JAVA_HOME to /usr/lib/jvm/default-java"
+            fi
+        fi
+    else
+        log "WARNING: 'java' command not found in PATH. JAVA_HOME cannot be set by this script."
+    fi
+else
+    log "JAVA_HOME is already set to: $JAVA_HOME"
+fi
+# --- END JAVA_HOME INFERENCE ---
+
+
 # --- Input Validation (Argument Count) ---
-# <<< UPDATED EXPECTED ARGUMENT COUNT TO 20 >>>
-if [ $# -lt 20 ]; then
+if [ $# -lt 20 ]; then # Expecting 20 arguments now
     log "ERROR: Insufficient arguments provided. Expected 20, got $#."
     log "Usage: $0 <run_name> <input_csv> <outdir_base> <genome> <tools> <step> <profile> <aligner> <intervals> <dbsnp> <known_indels> <pon> <joint_germline> <wes> <trim_fastq> <skip_qc> <skip_annotation> <skip_baserecalibrator> <is_rerun> <job_id_suffix>"
     exit 1
@@ -58,7 +91,7 @@ skip_qc_flag="${16}"
 skip_annotation_flag="${17}"
 skip_baserecalibrator_flag="${18}"
 is_rerun="${19}"
-job_id_suffix_arg="${20}" # <<< NEW: Job ID Suffix Argument
+job_id_suffix_arg="${20}" # Job ID Suffix Argument
 
 # --- Basic Validation (Required Args) ---
 log "Validating required arguments..."
@@ -71,14 +104,14 @@ log "Run Name (Input): $run_name_input"
 log "Input CSV: $input_csv"
 log "Output Base Dir: $outdir_base"
 log "Genome: $genome"
-[ -n "$tools" ] && log "Tools: $tools"
-[ -n "$step" ] && log "Step: $step"
-[ -n "$profile" ] && log "Profile: $profile"
-[ -n "$aligner" ] && log "Aligner: $aligner"
-[ -n "$intervals" ] && log "Intervals: $intervals"
-[ -n "$dbsnp" ] && log "dbSNP: $dbsnp"
-[ -n "$known_indels" ] && log "Known Indels: $known_indels"
-[ -n "$pon" ] && log "PoN: $pon"
+[ -n "$tools" ] && [ "$tools" != " " ] && log "Tools: $tools"
+[ -n "$step" ] && [ "$step" != " " ] && log "Step: $step"
+[ -n "$profile" ] && [ "$profile" != " " ] && log "Profile: $profile"
+[ -n "$aligner" ] && [ "$aligner" != " " ] && log "Aligner: $aligner"
+[ -n "$intervals" ] && [ "$intervals" != " " ] && log "Intervals: $intervals"
+[ -n "$dbsnp" ] && [ "$dbsnp" != " " ] && log "dbSNP: $dbsnp"
+[ -n "$known_indels" ] && [ "$known_indels" != " " ] && log "Known Indels: $known_indels"
+[ -n "$pon" ] && [ "$pon" != " " ] && log "PoN: $pon"
 log "Joint Germline: $joint_germline_flag"
 log "WES: $wes_flag"
 log "Trim FASTQ: $trim_fastq_flag"
@@ -86,19 +119,20 @@ log "Skip QC: $skip_qc_flag"
 log "Skip Annotation: $skip_annotation_flag"
 log "Skip Base Recalibrator: $skip_baserecalibrator_flag"
 log "Is Rerun: $is_rerun"
-log "Job ID Suffix Arg: $job_id_suffix_arg" # <<< Log the new argument
+log "Job ID Suffix Arg: $job_id_suffix_arg"
 
 # --- Sanitize run_name_input for use in directory names ---
 final_sanitized_run_name=$(echo "$run_name_input" | sed 's/[^a-zA-Z0-9_-]/_/g')
 if [ -z "$final_sanitized_run_name" ]; then
     log "ERROR: Sanitized run name is empty. Original was '$run_name_input'." >&2
-    final_sanitized_run_name="unnamed_run" # Fallback
+    final_sanitized_run_name="unnamed_run_$(date +"%Y%m%d%H%M%S")" # Fallback with timestamp
 fi
 log "Final Sanitized Run Name (for dir): $final_sanitized_run_name"
 
 # --- Determine Project Root, Artifact Dirs, and Run Identifier ---
 log "Determining project root and artifact directories..."
 SCRIPT_CWD=$(pwd)
+# Assuming sarek_pipeline.sh is in backend/app/, so ../../ is project root
 PROJECT_ROOT_ABS=$(realpath "${SCRIPT_CWD}/../../")
 
 log "Script current working directory (from where sarek_pipeline.sh is run): ${SCRIPT_CWD}"
@@ -120,19 +154,18 @@ if [ ! -f "$NEXTFLOW_CONFIG_FILE" ]; then log "ERROR: Nextflow config file not f
 if [ ! -r "$NEXTFLOW_CONFIG_FILE" ]; then log "ERROR: Nextflow config file not readable at ${NEXTFLOW_CONFIG_FILE}" >&2; exit 1; fi
 
 log "Generating Sarek results directory name..."
-# <<< MODIFIED: Construct RUN_SPECIFIC_IDENTIFIER using run name and job ID suffix >>>
+# Construct RUN_SPECIFIC_IDENTIFIER using run name and job ID suffix
 if [ -n "$job_id_suffix_arg" ] && [ "$job_id_suffix_arg" != " " ] && [ "$job_id_suffix_arg" != "NOSUFF" ]; then
     RUN_SPECIFIC_IDENTIFIER="${final_sanitized_run_name}_${job_id_suffix_arg}"
 else
-    # Fallback if suffix is problematic (should be rare if tasks.py sends it correctly)
     timestamp_fallback=$(date +"%Y%m%d%H%M%S")
     RUN_SPECIFIC_IDENTIFIER="${final_sanitized_run_name}_${timestamp_fallback}"
     log "WARNING: Job ID suffix problematic ('$job_id_suffix_arg'), using timestamp for uniqueness in folder/run name: ${RUN_SPECIFIC_IDENTIFIER}"
 fi
 log "Using RUN_SPECIFIC_IDENTIFIER for output directory and Nextflow run name: ${RUN_SPECIFIC_IDENTIFIER}"
 
-results_dir_name="${RUN_SPECIFIC_IDENTIFIER}" # Sarek output folder name
-results_dir="${outdir_base}/${results_dir_name}" # Full path to results
+results_dir_name="${RUN_SPECIFIC_IDENTIFIER}"
+results_dir="${outdir_base}/${results_dir_name}"
 
 mkdir -p "$results_dir"
 if [ $? -ne 0 ]; then log "ERROR: Failed to create Sarek results directory: ${results_dir}. Check permissions for base: $outdir_base" >&2; exit 1; fi
@@ -140,7 +173,6 @@ if [ ! -w "$results_dir" ]; then log "ERROR: Sarek results directory (${results_
 echo "Results directory: ${results_dir}" # This line is parsed by tasks.py
 log "Successfully created Sarek results directory: ${results_dir}"
 
-# Use RUN_SPECIFIC_IDENTIFIER for Nextflow work directory and log file
 RUN_SPECIFIC_WORK_DIR="${NEXTFLOW_WORK_BASE_DIR}/${RUN_SPECIFIC_IDENTIFIER}"
 RUN_SPECIFIC_LOG_FILE="${NEXTFLOW_LOG_BASE_DIR}/${RUN_SPECIFIC_IDENTIFIER}.nextflow.log"
 
@@ -150,34 +182,35 @@ log "Run-specific Nextflow log file will be: ${RUN_SPECIFIC_LOG_FILE}"
 mkdir -p "$RUN_SPECIFIC_WORK_DIR" || { log "ERROR: Failed to create run-specific work dir: $RUN_SPECIFIC_WORK_DIR" >&2; exit 1; }
 
 # --- Define Paths ---
-NXF_EXECUTABLE="/usr/local/bin/nextflow"
+NXF_EXECUTABLE="/usr/local/bin/nextflow" # Assuming Nextflow is in PATH or adjust as needed
 
 # --- Build the Sarek Command ---
 log "Building Nextflow command..."
 cmd="$NXF_EXECUTABLE run nf-core/sarek -r 3.5.1"
-cmd+=" --input ${input_csv}"
-cmd+=" --outdir ${results_dir}"
-cmd+=" --genome ${genome}"
-cmd+=" -c ${NEXTFLOW_CONFIG_FILE}"
-cmd+=" -name ${RUN_SPECIFIC_IDENTIFIER}" # <<< USE THE NEW IDENTIFIER FOR NEXTFLOW RUN NAME
+cmd+=" --input \"${input_csv}\"" # Quote paths
+cmd+=" --outdir \"${results_dir}\"" # Quote paths
+cmd+=" --genome \"${genome}\""
+cmd+=" -c \"${NEXTFLOW_CONFIG_FILE}\"" # Quote path
+cmd+=" -name \"${RUN_SPECIFIC_IDENTIFIER}\"" # Quote run name
 
 export NXF_WORK="${RUN_SPECIFIC_WORK_DIR}"
 export NXF_LOG_FILE="${RUN_SPECIFIC_LOG_FILE}"
 log "Setting NXF_WORK=${NXF_WORK}"
 log "Setting NXF_LOG_FILE=${NXF_LOG_FILE}"
 
-# ... (rest of the command building logic remains the same)
 if [ "$wes_flag" = "true" ]; then cmd+=" --wes"; fi
-if [ "$skip_baserecalibrator_flag" = "true" ]; then cmd+=" --skip_tools baserecalibrator"; fi
-if [ -n "$tools" ] && [ "$tools" != " " ]; then cmd+=" --tools ${tools}"; fi
-if [ -n "$step" ] && [ "$step" != " " ]; then cmd+=" --step ${step}"; fi
-effective_profile="${profile:-docker}"
-if [ -n "$effective_profile" ] && [ "$effective_profile" != " " ]; then cmd+=" -profile ${effective_profile}"; fi
-if [ -n "$aligner" ] && [ "$aligner" != " " ]; then cmd+=" --aligner ${aligner}"; fi
-if [ -n "$intervals" ] && [ "$intervals" != " " ]; then cmd+=" --intervals ${intervals}"; fi
-if [ -n "$dbsnp" ] && [ "$dbsnp" != " " ]; then cmd+=" --dbsnp ${dbsnp}"; fi
-if [ -n "$known_indels" ] && [ "$known_indels" != " " ]; then cmd+=" --known_indels ${known_indels}"; fi
-if [ -n "$pon" ] && [ "$pon" != " " ]; then cmd+=" --pon ${pon}"; fi
+if [ "$skip_baserecalibrator_flag" = "true" ]; then cmd+=" --skip_tools baserecalibrator"; fi # Sarek uses --skip_tools
+if [ -n "$tools" ] && [ "$tools" != " " ]; then cmd+=" --tools \"${tools}\""; fi
+if [ -n "$step" ] && [ "$step" != " " ]; then cmd+=" --step \"${step}\""; fi
+
+effective_profile="${profile:-docker}" # Default to docker if not provided
+if [ -n "$effective_profile" ] && [ "$effective_profile" != " " ]; then cmd+=" -profile \"${effective_profile}\""; fi
+
+if [ -n "$aligner" ] && [ "$aligner" != " " ]; then cmd+=" --aligner \"${aligner}\""; fi
+if [ -n "$intervals" ] && [ "$intervals" != " " ]; then cmd+=" --intervals \"${intervals}\""; fi # Quote path
+if [ -n "$dbsnp" ] && [ "$dbsnp" != " " ]; then cmd+=" --dbsnp \"${dbsnp}\""; fi # Quote path
+if [ -n "$known_indels" ] && [ "$known_indels" != " " ]; then cmd+=" --known_indels \"${known_indels}\""; fi # Quote path
+if [ -n "$pon" ] && [ "$pon" != " " ]; then cmd+=" --pon \"${pon}\""; fi # Quote path
 if [ "$joint_germline_flag" = "true" ]; then cmd+=" --joint_germline"; fi
 if [ "$trim_fastq_flag" = "true" ]; then cmd+=" --trim_fastq"; fi
 if [ "$skip_qc_flag" = "true" ]; then cmd+=" --skip_qc"; fi
@@ -186,17 +219,16 @@ if [ "$is_rerun" = "true" ]; then cmd+=" -resume"; fi
 
 
 log "--- Worker Environment & Sanity Checks ---"
-# ... (Sanity checks remain the same) ...
 log "User: $(whoami) (UID: $(id -u))"
 log "Current Directory (of script execution): $(pwd)"
 log "PROJECT_ROOT_ABS (Determined): ${PROJECT_ROOT_ABS}"
 log "NEXTFLOW_RUN_ARTIFACTS_DIR: ${NEXTFLOW_RUN_ARTIFACTS_DIR}"
 log "PATH: $PATH"
-log "JAVA_HOME: ${JAVA_HOME:-<not set>}"
+log "JAVA_HOME: ${JAVA_HOME:-<not set by script or environment>}" # Updated message
 log "NXF_HOME (for assets/plugins): $NXF_HOME"
 log "NXF_WORK (explicitly set for this run): $NXF_WORK"
 log "NXF_LOG_FILE (explicitly set for this run): $NXF_LOG_FILE"
-log "NXF_VER used in script: $(${NXF_EXECUTABLE} -v | head -n 1 || echo '<failed>') "
+log "NXF_VER used in script: $(${NXF_EXECUTABLE} -v | head -n 1 || echo '<failed to get nextflow version>') "
 log "Checking Java..."
 if command -v java >/dev/null 2>&1; then log "Java Path: $(command -v java)"; log "Java Version: $(java -version 2>&1 | head -n 1)"; else log "ERROR: 'java' command not found in PATH ($PATH)" >&2; fi
 log "Checking Nextflow executable..."
@@ -215,19 +247,22 @@ echo "Timestamp: $(date)" > "${COMMAND_LOG_FILE}"
 echo "Executing User: $(whoami) (UID: $(id -u))" >> "${COMMAND_LOG_FILE}"
 echo "Working Directory (of script): $(pwd)" >> "${COMMAND_LOG_FILE}"
 echo "Run Name (Input): ${run_name_input}" >> "${COMMAND_LOG_FILE}"
-echo "Job ID Suffix: ${job_id_suffix_arg}" >> "${COMMAND_LOG_FILE}" # <<< Log suffix
-echo "RUN_SPECIFIC_IDENTIFIER (Folder/NF Run Name): ${RUN_SPECIFIC_IDENTIFIER}" >> "${COMMAND_LOG_FILE}" # <<< Log identifier
+echo "Job ID Suffix: ${job_id_suffix_arg}" >> "${COMMAND_LOG_FILE}"
+echo "RUN_SPECIFIC_IDENTIFIER (Folder/NF Run Name): ${RUN_SPECIFIC_IDENTIFIER}" >> "${COMMAND_LOG_FILE}"
 echo "Results Directory: ${results_dir}" >> "${COMMAND_LOG_FILE}"
 echo "NXF_WORK (run-specific): ${NXF_WORK}" >> "${COMMAND_LOG_FILE}"
 echo "NXF_LOG_FILE (run-specific): ${NXF_LOG_FILE}" >> "${COMMAND_LOG_FILE}"
+echo "JAVA_HOME (effective): ${JAVA_HOME:-<not set>}" >> "${COMMAND_LOG_FILE}" # Log effective JAVA_HOME
 echo "Nextflow Command: ${cmd}" >> "${COMMAND_LOG_FILE}"
 echo "---------------------" >> "${COMMAND_LOG_FILE}"
 
+# Execute the command, tee output to both the command log file and stdout (which tasks.py reads)
+# Use eval to handle quotes in the command string properly
 {
     eval "$cmd"
 } 2>&1 | tee -a "${COMMAND_LOG_FILE}"
 
-exit_code=${PIPESTATUS[0]}
+exit_code=${PIPESTATUS[0]} # Get exit code of 'eval "$cmd"'
 
 log "Nextflow command finished with exit code: ${exit_code}"
 echo "---------------------" >> "${COMMAND_LOG_FILE}"
@@ -236,10 +271,10 @@ echo "Finished: $(date)" >> "${COMMAND_LOG_FILE}"
 
 if [ $exit_code -eq 0 ]; then
     log "Pipeline completed successfully (Exit Code 0)."
-    echo "status::success"
+    echo "status::success" # Marker for tasks.py
     exit 0
 else
     log "ERROR: Pipeline failed with exit code ${exit_code}" >&2
-    echo "status::failed"
+    echo "status::failed" # Marker for tasks.py
     exit ${exit_code}
 fi
