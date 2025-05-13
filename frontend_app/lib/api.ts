@@ -278,3 +278,4 @@ export const deleteProfile = async (profileName: string): Promise<{ message: str
     }
 }; // <<< Check semicolon
 // --- <<< END NEW PROFILE API FUNCTIONS >>> ---
+

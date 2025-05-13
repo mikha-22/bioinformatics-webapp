@@ -57,7 +57,7 @@ def zip_directory_generator(directory: Path) -> Generator[bytes, None, None]:
     buffer.seek(0)
     yield buffer.read()
 
-# --- Existing Endpoints (Unchanged from your provided codebase) ---
+# --- Existing Endpoints (Assumed to be correct from your codebase) ---
 
 @router.get("/get_data", response_model=List[Dict[str, str]], summary="List Data Files")
 async def get_data():
@@ -102,6 +102,10 @@ async def get_results_run_files(run_dir_name: str, fb_config: Dict = Depends(get
     except Exception as e:
         logger.exception(f"Unexpected error validating path for run '{run_dir_name}': {e}")
         raise HTTPException(status_code=500, detail="Internal server error during path validation.")
+    # IMPORTANT: This get_directory_contents call might need to be recursive or
+    # the FileList component needs to handle subdirectory navigation if MultiQC is deeply nested
+    # and not found by the targeted /multiqc_path endpoint.
+    # For now, assuming /multiqc_path handles finding it.
     return get_directory_contents(
         target_run_dir, RESULTS_DIR, list_dirs=True, list_files=True, fb_base_url=fb_config["baseURL"]
     )
@@ -122,7 +126,7 @@ async def get_run_parameters(run_dir_name: str):
                      data = json.load(f)
                      parameters = RunParametersResponse(
                          run_name=data.get("run_name"),
-                         run_description=data.get("description"),
+                         run_description=data.get("description"), # This should be user's run description
                          input_filenames=data.get("input_params"),
                          sarek_params=data.get("sarek_params"),
                          sample_info=data.get("sample_info"),
@@ -184,46 +188,76 @@ async def download_result_file(run_dir_name: str, file_path: str):
         logger.exception(f"Unexpected error downloading file '{file_path}' from run '{run_dir_name}': {e}")
         raise HTTPException(status_code=500, detail="Internal server error downloading file.")
 
-# --- UPDATED ENDPOINT FOR SERVING STATIC FILES FROM RESULTS ---
+# --- Endpoint to get MultiQC report path ---
+@router.get("/results/{run_dir_name}/multiqc_path", response_model=Optional[str], summary="Get Relative Path to MultiQC Report")
+async def get_multiqc_report_path(run_dir_name: str):
+    logger.info(f"Request for MultiQC report path in run: '{run_dir_name}'")
+    try:
+        target_run_dir = get_safe_path(RESULTS_DIR, run_dir_name)
+        if not target_run_dir.is_dir():
+            logger.warning(f"Run directory '{run_dir_name}' not found when searching for MultiQC.")
+            raise HTTPException(status_code=404, detail=f"Run directory '{run_dir_name}' not found.")
+
+        common_paths = [
+            Path("multiqc/multiqc_report.html"),
+            Path("multiqc_report.html"),
+            Path("Reports/multiqc_report.html"),
+            Path("Reports/MultiQC/multiqc_report.html")
+        ]
+
+        for rel_path_obj in common_paths:
+            potential_file = target_run_dir / rel_path_obj
+            if potential_file.is_file():
+                try:
+                    actual_relative_path = potential_file.relative_to(target_run_dir)
+                    logger.info(f"Found MultiQC report for run '{run_dir_name}' at relative path: {actual_relative_path.as_posix()}")
+                    return actual_relative_path.as_posix()
+                except ValueError:
+                    logger.error(f"Could not make path {potential_file} relative to {target_run_dir}")
+                    return rel_path_obj.as_posix() # Fallback
+
+        logger.info(f"MultiQC report not found in common locations for run '{run_dir_name}'.")
+        return None # Explicitly return None if not found, will result in a 200 OK with null body
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.exception(f"Unexpected error finding MultiQC report for run '{run_dir_name}': {e}")
+        raise HTTPException(status_code=500, detail="Server error finding MultiQC report.")
+
+# --- Endpoint for serving static files (HTML, CSS, JS, images) ---
 @router.get("/results/{run_dir_name}/static/{file_path:path}", summary="Serve Static File from Results")
 async def serve_static_result_file(run_dir_name: str, file_path: str):
     logger.info(f"Request to serve static file '{file_path}' from run '{run_dir_name}'")
-
-    # Whitelist of allowed static file extensions for security
     ALLOWED_STATIC_EXTENSIONS = [
         ".html", ".htm",
         ".css",
-        ".js", ".json", # JSON might be used for data by JS
+        ".js", ".json",
         ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
-        ".woff", ".woff2", ".ttf", ".otf", ".eot", # Fonts
-        ".txt", # For any plain text data files MultiQC might link
-        # Add other extensions if MultiQC or other HTML reports use them
-        ".csv", ".tsv", # If data tables are linked as separate files
+        ".woff", ".woff2", ".ttf", ".otf", ".eot",
+        ".txt", ".csv", ".tsv",
     ]
-
     file_extension = Path(file_path).suffix.lower()
     if not file_extension or file_extension not in ALLOWED_STATIC_EXTENSIONS:
         logger.warning(f"Attempt to access non-whitelisted file type via static endpoint: {file_path} (ext: {file_extension})")
         raise HTTPException(status_code=403, detail=f"Access denied: File type '{file_extension}' is not allowed.")
-
     try:
         target_run_dir = get_safe_path(RESULTS_DIR, run_dir_name)
         if not target_run_dir.is_dir():
-            logger.warning(f"Run directory not found: {target_run_dir}")
             raise HTTPException(status_code=404, detail=f"Run directory '{run_dir_name}' not found.")
 
-        target_file = get_safe_path(target_run_dir, file_path)
+        target_file = get_safe_path(target_run_dir, file_path) # This ensures file_path is within target_run_dir
 
         if not target_file.is_file():
-            logger.warning(f"Static file not found: {target_file}")
             raise HTTPException(status_code=404, detail=f"File '{file_path}' not found in run '{run_dir_name}'.")
 
-        if RESULTS_DIR.resolve() not in target_file.resolve().parents:
-            logger.error(f"SECURITY ALERT: Resolved static file path '{target_file.resolve()}' is outside RESULTS_DIR '{RESULTS_DIR.resolve()}'. Original request: run='{run_dir_name}', file='{file_path}'")
-            raise HTTPException(status_code=403, detail="Access to the requested file is forbidden.")
+        # Extra check: Ensure the resolved path is still within the base RESULTS_DIR
+        # This is a defense-in-depth measure. get_safe_path should already prevent traversal.
+        if RESULTS_DIR.resolve() not in target_file.resolve().parents and RESULTS_DIR.resolve() != target_file.resolve().parent :
+             logger.error(f"SECURITY ALERT: Resolved static file path '{target_file.resolve()}' is outside allowed scope. Base: '{RESULTS_DIR.resolve()}', Target Parent: '{target_file.resolve().parent}'. Original request: run='{run_dir_name}', file='{file_path}'")
+             raise HTTPException(status_code=403, detail="Access to the requested file is forbidden.")
 
         media_type, _ = mimetypes.guess_type(str(target_file))
-        if not media_type:
+        if not media_type: # Fallback for common web types
             if file_extension == ".js": media_type = "application/javascript"
             elif file_extension == ".css": media_type = "text/css"
             elif file_extension == ".json": media_type = "application/json"
@@ -233,7 +267,6 @@ async def serve_static_result_file(run_dir_name: str, file_path: str):
         else:
             logger.info(f"MIME type for {target_file.name} identified as {media_type}")
 
-        logger.info(f"Serving static file: {target_file} with media_type: {media_type}")
         return FileResponse(
             path=str(target_file),
             media_type=media_type,
