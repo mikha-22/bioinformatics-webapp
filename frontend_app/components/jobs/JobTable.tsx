@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Job } from "@/lib/types"; // Job type now uses job_id
+import { Job } from "@/lib/types";
 import { formatDistanceToNow } from 'date-fns';
 import { formatDuration } from "@/lib/utils";
 import JobActions from "./JobActions";
@@ -20,7 +20,7 @@ interface JobTableProps {
   jobs: Job[];
 }
 
-// --- Helper Functions ---
+// --- Helper Functions (keep as they are) ---
 function mapToUiStatus(internalStatus: string | null | undefined): string {
     const status = internalStatus?.toLowerCase();
     switch (status) {
@@ -30,7 +30,7 @@ function mapToUiStatus(internalStatus: string | null | undefined): string {
         case 'running': return 'Running';
         case 'finished': return 'Finished';
         case 'failed': return 'Failed';
-        case 'canceled': return 'Stopped';
+        case 'canceled': return 'Stopped'; // Map canceled to Stopped for UI
         case 'stopped': return 'Stopped';
         default: return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown';
     }
@@ -79,6 +79,28 @@ export default function JobTable({ jobs }: JobTableProps) {
     return <p className="text-center text-muted-foreground py-8">No jobs found.</p>;
   }
 
+  // --- NEW: Helper function to format Job ID for display ---
+  const formatDisplayJobId = (fullJobId: string): string => {
+    if (!fullJobId) return "N/A";
+    const prefix = fullJobId.startsWith("staged_") ? "STG" :
+                   fullJobId.startsWith("rqjob_") ? "RQ" : "ID";
+    
+    // Extract the part after the known prefix, or use the whole ID if no known prefix
+    let mainIdPart = fullJobId;
+    if (fullJobId.startsWith("staged_")) {
+        mainIdPart = fullJobId.substring("staged_".length);
+    } else if (fullJobId.startsWith("rqjob_")) {
+        mainIdPart = fullJobId.substring("rqjob_".length);
+    }
+
+    if (mainIdPart.length > 6) {
+      return `${prefix}_...${mainIdPart.slice(-6)}`;
+    }
+    return `${prefix}_${mainIdPart}`; // If shorter than 6 chars after prefix, show all of it
+  };
+  // --- END NEW Helper ---
+
+
   return (
     <div className="border rounded-lg overflow-hidden overflow-x-auto">
       <Table>
@@ -99,10 +121,9 @@ export default function JobTable({ jobs }: JobTableProps) {
         <TableBody>
           {validJobs.map((job) => (
             <TableRow key={job.job_id} data-state={job.status === 'finished' ? 'completed' : job.status === 'failed' ? 'error' : undefined}>
+              {/* --- MODIFIED Job ID Cell for Large Screens --- */}
               <TableCell className="font-mono text-xs hidden lg:table-cell" title={job.job_id}>
-                {job.job_id.startsWith("staged_") ? "STAGED" : "RQ"}
-                <span className="text-muted-foreground">_</span>
-                {job.job_id.substring(job.job_id.indexOf('_') + 1, job.job_id.indexOf('_') + 9)}...
+                {formatDisplayJobId(job.job_id)}
               </TableCell>
 
               <TableCell className="font-medium min-w-[150px] max-w-[250px] truncate" title={job.run_name ?? "N/A"}>
@@ -118,8 +139,9 @@ export default function JobTable({ jobs }: JobTableProps) {
                         )}
                     </Tooltip>
                 </TooltipProvider>
+                {/* --- MODIFIED Job ID Display for Smaller Screens (within Run Name cell) --- */}
                 <div className="lg:hidden text-xs text-muted-foreground font-mono mt-0.5" title={job.job_id}>
-                    {job.job_id.startsWith("staged_") ? "STG" : "RQ"}_{job.job_id.substring(job.job_id.indexOf('_') + 1, job.job_id.indexOf('_') + 9)}...
+                    {formatDisplayJobId(job.job_id)}
                 </div>
               </TableCell>
 
