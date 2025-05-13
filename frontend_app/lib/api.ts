@@ -1,12 +1,10 @@
 // File: frontend_app/lib/api.ts
 import axios from "axios";
-// Ensure all necessary types are imported
 import { Job, PipelineInput, ResultRun, ResultItem, DataFile, JobStatusDetails, RunParameters, ProfileData } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-// <<< DEBUG LOG for API_BASE_URL >>>
-console.log("[API Init DEBUG] NEXT_PUBLIC_API_BASE_URL:", API_BASE_URL);
+console.log("[API Init DEBUG] NEXT_PUBLIC_API_BASE_URL:", API_BASE_URL); // For debugging
 if (!API_BASE_URL && typeof window !== 'undefined') {
   console.error("CRITICAL: NEXT_PUBLIC_API_BASE_URL is not defined. API calls will likely fail.");
 }
@@ -18,6 +16,7 @@ const apiClient = axios.create({
   },
 });
 
+// ... (interceptors as before) ...
 apiClient.interceptors.request.use(
   (config) => {
     return config;
@@ -42,7 +41,6 @@ apiClient.interceptors.response.use(
   }
 );
 
-// --- API Functions ---
 
 // ========================
 // Job Management Functions
@@ -184,23 +182,23 @@ export const downloadResultFile = async (runDirName: string, filePath: string): 
 
 // --- MultiQC Path API FUNCTION ---
 export const getMultiQCReportPath = async (runDirName: string): Promise<string | null> => {
-  console.log(`[API getMultiQCReportPath DEBUG] Function called with runDirName: '${runDirName}'`); // <<< DEBUG LOG
+  console.log(`[API getMultiQCReportPath DEBUG] Function called with runDirName: '${runDirName}'`);
   if (!runDirName) {
-    console.warn("[API getMultiQCReportPath DEBUG] runDirName is empty, returning null."); // <<< DEBUG LOG
+    console.warn("[API getMultiQCReportPath DEBUG] runDirName is empty, returning null.");
     return null;
   }
   try {
-    console.log(`[API getMultiQCReportPath DEBUG] Attempting apiClient.get for /api/results/${encodeURIComponent(runDirName)}/multiqc_path`); // <<< DEBUG LOG
+    console.log(`[API getMultiQCReportPath DEBUG] Attempting apiClient.get for /api/results/${encodeURIComponent(runDirName)}/multiqc_path`);
     const response = await apiClient.get<string | null>(`/api/results/${encodeURIComponent(runDirName)}/multiqc_path`);
-    console.log(`[API getMultiQCReportPath DEBUG] for ${runDirName} - Response Status: ${response.status}, Data:`, response.data); // <<< DEBUG LOG
-    return response.data;
+    console.log(`[API getMultiQCReportPath DEBUG] for ${runDirName} - Response Status: ${response.status}, Data:`, response.data);
+    return response.data; // This will be the path string or null
   } catch (error) {
     const axiosError = error as any;
     if (axiosError.isAxiosError && axiosError.response && axiosError.response.status === 404) {
-      console.log(`[API getMultiQCReportPath DEBUG] MultiQC report path not found for run ${runDirName} (API returned 404).`); // <<< DEBUG LOG
+      console.log(`[API getMultiQCReportPath DEBUG] MultiQC report path not found for run ${runDirName} (API returned 404).`);
       return null;
     }
-    console.error(`[API getMultiQCReportPath DEBUG] Error fetching MultiQC path for run ${runDirName}:`, error); // <<< DEBUG LOG
+    console.error(`[API getMultiQCReportPath DEBUG] Error fetching MultiQC path for run ${runDirName}:`, error);
     throw error;
   }
 };
@@ -212,7 +210,7 @@ export const getMultiQCReportPath = async (runDirName: string): Promise<string |
 export const stagePipelineJob = async (values: PipelineInput): Promise<{ message: string; staged_job_id: string }> => {
   const apiPayload: PipelineInput = values;
   try {
-    console.log("Staging Job with API Payload:", apiPayload);
+    // console.log("Staging Job with API Payload:", apiPayload); // Already have this
     const response = await apiClient.post('/api/run_pipeline', apiPayload);
     return response.data;
   } catch (error) {

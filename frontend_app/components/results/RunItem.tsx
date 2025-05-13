@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { useFileBrowser } from "@/components/layout/FileBrowserContext";
 
 import { ResultRun, ResultItem, RunParameters } from "@/lib/types";
-import * as api from "@/lib/api"; // This imports all exported functions from api.ts
+import * as api from "@/lib/api";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
 import ErrorDisplay from "@/components/common/ErrorDisplay";
 import { cn } from "@/lib/utils";
@@ -31,7 +31,6 @@ interface RunItemProps {
   isExpanded: boolean;
 }
 
-// Helper functions (keep as they are)
 const formatParamValue = (value: string | number | boolean | null | undefined | any[] | Record<string, any>): string => {
     if (value === true) return 'Yes';
     if (value === false) return 'No';
@@ -55,7 +54,6 @@ const formatParamKey = (key: string): string => {
         .replace(/\b\w/g, l => l.toUpperCase());
 };
 
-
 export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded }: RunItemProps) {
   const [isParamsOpen, setIsParamsOpen] = useState(false);
   const { openFileBrowser } = useFileBrowser();
@@ -77,12 +75,11 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
     refetchOnWindowFocus: false,
   });
 
-  // Query specifically for the MultiQC path
   const { data: multiqcRelativePath, isLoading: isLoadingMultiQCPath, isError: isErrorMultiQCPath, error: errorMultiQCPath } = useQuery<string | null, Error>({
     queryKey: ["multiqcPath", run.name],
     queryFn: () => {
       console.log(`[RunItem ${run.name} QUERYFN_DEBUG] Calling api.getMultiQCReportPath for run: ${run.name}`);
-      return api.getMultiQCReportPath(run.name); // Make sure 'api.' prefix is used
+      return api.getMultiQCReportPath(run.name);
     },
     enabled: true,
     staleTime: 15 * 60 * 1000,
@@ -117,7 +114,6 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
     return null;
   }, [multiqcRelativePath, run.name]);
 
-  // Parameters Query - Ensure queryFn is present
   const {
     data: parameters,
     isLoading: isLoadingParams,
@@ -125,7 +121,7 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
     error: errorParams,
   } = useQuery<RunParameters, Error>({
     queryKey: ["resultParams", run.name],
-    queryFn: () => api.getResultRunParameters(run.name), // <<< FIXED: Added queryFn
+    queryFn: () => api.getResultRunParameters(run.name), // Fixed: Added queryFn
     enabled: isParamsOpen,
     staleTime: 5 * 60 * 1000,
     retry: 1,
@@ -134,8 +130,26 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
 
   const downloadRunMutation = useMutation({
      mutationFn: (runName: string) => api.downloadResultRun(runName),
-     onSuccess: (blob, runName) => { /* ... (existing code) ... */ },
-     onError: (error: Error, runName) => { /* ... (existing code) ... */ }
+     onSuccess: (blob, runName) => {
+        try {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${runName}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            toast.success(`Started download for ${runName}.zip`);
+        } catch (e) {
+             console.error("Error creating download link:", e);
+             toast.error("Failed to initiate download.");
+        }
+     },
+     onError: (error: Error, runName) => {
+        console.error(`Error downloading ${runName}:`, error);
+        toast.error(`Download failed: ${error.message}`);
+     }
   });
 
   const handleDownloadRun = () => { downloadRunMutation.mutate(run.name); };
@@ -178,9 +192,7 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
               </div>
             </div>
 
-            {/* Action Buttons Container */}
             <div className="flex items-center gap-1 py-3" onClick={e => e.stopPropagation()}>
-              {/* View Parameters Button */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -192,7 +204,6 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
                 <span className="sr-only">View Parameters</span>
               </Button>
 
-              {/* MultiQC Button */}
               {/* {console.log(`[RunItem ${run.name} RENDER_DEBUG] isLoadingMultiQCPath: ${isLoadingMultiQCPath}, multiqcReportUrl: ${multiqcReportUrl}`)} */}
               {isLoadingMultiQCPath ? (
                 <Button variant="ghost" size="icon" className="h-7 w-7" disabled>
@@ -212,10 +223,9 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
                   </Link>
                 </Button>
               ) : (
-                 null // Render nothing if not loading and no URL
+                 null
               )}
 
-              {/* Open in FileBrowser Button */}
               {run.filebrowser_link && (
                 <Button
                   variant="ghost"
@@ -228,8 +238,6 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
                   <span className="sr-only">Open in File Browser</span>
                 </Button>
               )}
-
-              {/* Download Run Button */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -241,8 +249,6 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
                 {downloadRunMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4" />}
                 <span className="sr-only">Download Run</span>
               </Button>
-
-              {/* Expand/Collapse Chevron Button */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -283,7 +289,6 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
         </AccordionItem>
       </Accordion>
 
-      {/* Parameters Dialog */}
       <Dialog open={isParamsOpen} onOpenChange={setIsParamsOpen}>
           <DialogContent className="sm:max-w-xl">
               <DialogHeader>

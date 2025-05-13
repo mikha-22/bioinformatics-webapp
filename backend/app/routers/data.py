@@ -5,9 +5,9 @@ import os
 import zipfile
 import io
 from pathlib import Path
-import mimetypes
+import mimetypes # Ensure mimetypes is imported
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse, FileResponse # Ensure FileResponse is imported
 from typing import List, Dict, Any, Generator, Optional
 from pydantic import BaseModel
 
@@ -35,6 +35,7 @@ class RunParametersResponse(BaseModel):
 
 # --- Helper Functions ---
 def zip_directory_generator(directory: Path) -> Generator[bytes, None, None]:
+    """ Generator function to stream a zip archive of a directory. """
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zipf:
         for file_path in directory.rglob('*'):
@@ -48,18 +49,18 @@ def zip_directory_generator(directory: Path) -> Generator[bytes, None, None]:
                     buffer.truncate()
                 except Exception as e:
                      logger.warning(f"Error adding file {file_path} to zip: {e}")
-            elif file_path.is_dir() and not any(file_path.iterdir()):
+            elif file_path.is_dir() and not any(file_path.iterdir()): # Add empty directories
                  arcname = file_path.relative_to(directory).as_posix() + '/'
                  zipi = zipfile.ZipInfo(arcname)
-                 zipi.external_attr = 0o40755 << 16 # type: ignore
+                 zipi.external_attr = 0o40755 << 16 # type: ignore # Set directory permissions
                  zipf.writestr(zipi, '')
     buffer.seek(0)
     yield buffer.read()
 
-# --- Existing Endpoints ---
+# --- Existing Endpoints (Assumed to be correct from your codebase) ---
+
 @router.get("/get_data", response_model=List[Dict[str, str]], summary="List Data Files")
 async def get_data():
-    # ... (implementation as provided before)
     if not DATA_DIR.exists() or not DATA_DIR.is_dir():
         logger.error(f"Configured DATA_DIR does not exist or is not a directory: {DATA_DIR}")
         raise HTTPException(status_code=500, detail="Server configuration error: Data directory not found.")
@@ -80,17 +81,17 @@ async def get_data():
         logger.exception(f"Unexpected error listing data directory contents for /get_data: {e}")
         raise HTTPException(status_code=500, detail="Internal server error processing data list.")
 
+
 @router.get("/get_results", response_model=List[Dict[str, Any]], summary="List Result Run Directories")
 async def get_results_runs(fb_config: Dict = Depends(get_filebrowser_config)):
-    # ... (implementation as provided before)
     if not RESULTS_DIR.exists():
         logger.warning(f"Results directory not found: {RESULTS_DIR}. Returning empty list.")
         return []
     return get_directory_contents(RESULTS_DIR, RESULTS_DIR, list_dirs=True, list_files=False, fb_base_url=fb_config["baseURL"])
 
+
 @router.get("/get_results/{run_dir_name:path}", response_model=List[Dict[str, Any]], summary="List Files in a Specific Run Directory")
 async def get_results_run_files(run_dir_name: str, fb_config: Dict = Depends(get_filebrowser_config)):
-    # ... (implementation as provided before)
     logger.info(f"Request to list files for run directory: '{run_dir_name}'")
     try:
         target_run_dir = get_safe_path(RESULTS_DIR, run_dir_name)
@@ -107,7 +108,6 @@ async def get_results_run_files(run_dir_name: str, fb_config: Dict = Depends(get
 
 @router.get("/results/{run_dir_name:path}/parameters", response_model=RunParametersResponse, summary="Get Parameters for a Run")
 async def get_run_parameters(run_dir_name: str):
-    # ... (implementation as provided before)
     logger.info(f"Request for parameters for run: '{run_dir_name}'")
     try:
         target_run_dir = get_safe_path(RESULTS_DIR, run_dir_name)
@@ -143,9 +143,9 @@ async def get_run_parameters(run_dir_name: str):
         logger.exception(f"Unexpected error fetching parameters for run '{run_dir_name}': {e}")
         raise HTTPException(status_code=500, detail="Internal server error fetching run parameters.")
 
+
 @router.get("/download_result/{run_dir_name:path}", summary="Download Run Directory as Zip")
 async def download_result_run(run_dir_name: str):
-    # ... (implementation as provided before)
     logger.info(f"Request to download run directory: '{run_dir_name}'")
     try:
         target_run_dir = get_safe_path(RESULTS_DIR, run_dir_name)
@@ -162,9 +162,9 @@ async def download_result_run(run_dir_name: str):
         logger.exception(f"Unexpected error creating zip for run '{run_dir_name}': {e}")
         raise HTTPException(status_code=500, detail="Internal server error creating zip archive.")
 
+
 @router.get("/download_file/{run_dir_name:path}/{file_path:path}", summary="Download Single Result File")
 async def download_result_file(run_dir_name: str, file_path: str):
-    # ... (implementation as provided before)
     logger.info(f"Request to download file '{file_path}' from run '{run_dir_name}'")
     try:
         target_run_dir = get_safe_path(RESULTS_DIR, run_dir_name)
@@ -175,9 +175,9 @@ async def download_result_file(run_dir_name: str, file_path: str):
              raise HTTPException(status_code=404, detail=f"File '{file_path}' not found within run '{run_dir_name}'.")
         filename = target_file_path.name
         return FileResponse(
-            path=target_file_path,
+            path=str(target_file_path),
             filename=filename,
-            media_type='application/octet-stream'
+            media_type='application/octet-stream' # Generic binary for download
         )
     except HTTPException as e: raise e
     except Exception as e:
@@ -194,7 +194,6 @@ async def get_multiqc_report_path(run_dir_name: str):
             logger.warning(f"Run directory '{run_dir_name}' not found when searching for MultiQC.")
             raise HTTPException(status_code=404, detail=f"Run directory '{run_dir_name}' not found.")
 
-        # <<< ADDED DEBUG LOG >>>
         logger.info(f"[MultiQC Debug] Checking run dir: {target_run_dir.resolve()}")
 
         common_paths = [
@@ -206,53 +205,90 @@ async def get_multiqc_report_path(run_dir_name: str):
 
         for rel_path_obj in common_paths:
             potential_file = target_run_dir / rel_path_obj
-            # <<< ADDED DEBUG LOG >>>
             logger.info(f"[MultiQC Debug] Checking potential path: {potential_file.resolve()} (exists: {potential_file.exists()}, is_file: {potential_file.is_file() if potential_file.exists() else 'N/A'}) for rel_path_obj: {rel_path_obj}")
             if potential_file.is_file():
                 try:
                     actual_relative_path = potential_file.relative_to(target_run_dir)
                     logger.info(f"Found MultiQC report for run '{run_dir_name}' at relative path: {actual_relative_path.as_posix()}")
                     return actual_relative_path.as_posix()
-                except ValueError:
+                except ValueError: # Should not happen if rel_path_obj is truly relative
                     logger.error(f"Could not make path {potential_file} relative to {target_run_dir}")
+                    # Fallback to the constructed relative path if relative_to fails unexpectedly
                     return rel_path_obj.as_posix()
 
         logger.info(f"MultiQC report not found in common locations for run '{run_dir_name}'.")
-        return None
-    except HTTPException as e:
+        return None # Return None if not found, frontend will get a 200 OK with null body
+    except HTTPException as e: # Re-raise HTTPExceptions from get_safe_path or our own 404
         raise e
     except Exception as e:
         logger.exception(f"Unexpected error finding MultiQC report for run '{run_dir_name}': {e}")
         raise HTTPException(status_code=500, detail="Server error finding MultiQC report.")
 
-# --- Endpoint for serving static files (HTML, CSS, JS, images) ---
+# --- UPDATED Endpoint for serving static files (HTML, CSS, JS, images) ---
 @router.get("/results/{run_dir_name}/static/{file_path:path}", summary="Serve Static File from Results")
 async def serve_static_result_file(run_dir_name: str, file_path: str):
     logger.info(f"Request to serve static file '{file_path}' from run '{run_dir_name}'")
-    ALLOWED_STATIC_EXTENSIONS = [ ".html", ".htm", ".css", ".js", ".json", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".otf", ".eot", ".txt", ".csv", ".tsv",]
+
+    ALLOWED_STATIC_EXTENSIONS = [
+        ".html", ".htm",
+        ".css",
+        ".js", ".json", # JSON might be used for data by JS
+        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
+        ".woff", ".woff2", ".ttf", ".otf", ".eot", # Fonts
+        ".txt", ".csv", ".tsv", # For any plain text data files MultiQC might link
+    ]
+
     file_extension = Path(file_path).suffix.lower()
-    if not file_extension or file_extension not in ALLOWED_STATIC_EXTENSIONS:
+
+    if not file_path or not file_extension: # Check if file_path or extension is empty
+        logger.warning(f"Invalid file_path (empty or no extension): {file_path}")
+        raise HTTPException(status_code=400, detail="Invalid file path.")
+
+    if file_extension not in ALLOWED_STATIC_EXTENSIONS:
         logger.warning(f"Attempt to access non-whitelisted file type via static endpoint: {file_path} (ext: {file_extension})")
         raise HTTPException(status_code=403, detail=f"Access denied: File type '{file_extension}' is not allowed.")
     try:
         target_run_dir = get_safe_path(RESULTS_DIR, run_dir_name)
         if not target_run_dir.is_dir():
             raise HTTPException(status_code=404, detail=f"Run directory '{run_dir_name}' not found.")
+
         target_file = get_safe_path(target_run_dir, file_path)
+
         if not target_file.is_file():
             raise HTTPException(status_code=404, detail=f"File '{file_path}' not found in run '{run_dir_name}'.")
+
         if RESULTS_DIR.resolve() not in target_file.resolve().parents and RESULTS_DIR.resolve() != target_file.resolve().parent :
              logger.error(f"SECURITY ALERT: Resolved static file path '{target_file.resolve()}' is outside allowed scope. Base: '{RESULTS_DIR.resolve()}', Target Parent: '{target_file.resolve().parent}'. Original request: run='{run_dir_name}', file='{file_path}'")
              raise HTTPException(status_code=403, detail="Access to the requested file is forbidden.")
+
         media_type, _ = mimetypes.guess_type(str(target_file))
-        if not media_type:
+
+        # Explicitly set media_type for HTML files to ensure rendering
+        if file_extension in [".html", ".htm"]:
+            media_type = "text/html"
+        elif not media_type: # Fallback for common web types if mimetypes doesn't guess them well
             if file_extension == ".js": media_type = "application/javascript"
             elif file_extension == ".css": media_type = "text/css"
             elif file_extension == ".json": media_type = "application/json"
             elif file_extension == ".svg": media_type = "image/svg+xml"
             else: media_type = "application/octet-stream"
-        return FileResponse(path=str(target_file), media_type=media_type, filename=target_file.name)
-    except HTTPException as e: raise e
+            logger.info(f"MIME type for {target_file.name} determined as {media_type} (extension fallback: {file_extension})")
+        else:
+            logger.info(f"MIME type for {target_file.name} identified by mimetypes as {media_type}")
+
+        logger.info(f"Serving static file: {target_file} with media_type: {media_type}")
+
+        # For HTML and other web content, we want it displayed inline.
+        # For other types, filename is useful for "Save As".
+        # FileResponse generally handles Content-Disposition correctly based on media_type.
+        # If media_type is 'text/html', it should default to 'inline'.
+        return FileResponse(
+            path=str(target_file),
+            media_type=media_type,
+            filename=target_file.name if media_type != "text/html" else None # Suggest download only for non-HTML
+        )
+    except HTTPException as e:
+        raise e
     except Exception as e:
         logger.exception(f"Unexpected error serving static file '{file_path}' from run '{run_dir_name}': {e}")
         raise HTTPException(status_code=500, detail="Internal server error serving file.")
