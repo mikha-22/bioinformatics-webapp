@@ -488,12 +488,14 @@ async def rerun_job(
             raise HTTPException(status_code=400, detail=f"Missing original parameters for job {job_id}.")
 
         original_meta = JobMeta(**original_job.meta)
-        original_user_run_description = original_job.description
-        # sarek_config_desc_orig = original_meta.sarek_params.get("description") if original_meta.sarek_params else None // <<< REMOVED
+        
+        # --- MODIFICATION: Use original run name and description ---
         original_run_name_from_meta = original_meta.run_name or f"run_{job_id.replace('rqjob_','')[:8]}"
+        original_user_run_description = original_job.description # This is the user's overall description
 
-        new_rerun_name = f"{original_run_name_from_meta}_rerun_{time.strftime('%Y%m%d%H%M%S')}"
-        new_rerun_user_description = f"Re-run of '{original_run_name_from_meta}'. Original desc: {original_user_run_description or 'N/A'}"
+        new_rerun_name = original_run_name_from_meta
+        new_rerun_user_description = original_user_run_description
+        # --- END MODIFICATION ---
 
         if not original_meta.input_type or not original_meta.sarek_params or not original_meta.sarek_params.get("step") or not original_meta.sample_info:
             raise HTTPException(status_code=400, detail="Essential original parameters missing for re-run.")
@@ -550,8 +552,8 @@ async def rerun_job(
         input_p_orig = original_meta.input_params or {}
 
         new_job_details_for_redis = {
-            "run_name": new_rerun_name, "run_description": new_rerun_user_description,
-            # "sarek_internal_description": sarek_config_desc_orig, // <<< REMOVED
+            "run_name": new_rerun_name, # Uses original run name
+            "run_description": new_rerun_user_description, # Uses original run description
             "input_csv_path": new_temp_csv_file_path, "outdir_base_path": str(RESULTS_DIR),
             "genome": sarek_p_orig.get("genome"), "tools": sarek_p_orig.get("tools"), "step": sarek_p_orig.get("step"),
             "profile": sarek_p_orig.get("profile"), "aligner": sarek_p_orig.get("aligner"),
