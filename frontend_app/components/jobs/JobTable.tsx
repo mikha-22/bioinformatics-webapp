@@ -115,7 +115,7 @@ export default function JobTable({ jobs }: JobTableProps) {
             <TableHead className="w-[120px] hidden md:table-cell">Duration</TableHead>
             <TableHead className="w-[150px] hidden sm:table-cell">Last Updated</TableHead>
             <TableHead className="w-[100px]">Status</TableHead>
-            <TableHead className="text-middle w-[60px]">Actions</TableHead>
+            <TableHead className="text-center w-[60px]">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
