@@ -12,7 +12,8 @@ import redis
 import re # <<< --- ADDED IMPORT FOR REGEX ---
 from typing import Optional, List, Dict, Any
 
-from rq import get_current_job, Queue, JobStatus # <<< --- ADDED JobStatus ---
+from rq import get_current_job, Queue
+from rq.job import JobStatus # <<< --- ADDED JobStatus ---
 
 from .core.config import (
     RESULTS_DIR, REDIS_HOST, REDIS_PORT, REDIS_DB,
