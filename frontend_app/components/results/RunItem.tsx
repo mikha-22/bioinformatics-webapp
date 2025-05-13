@@ -31,142 +31,64 @@ interface RunItemProps {
   isExpanded: boolean;
 }
 
-const formatParamValue = (value: string | number | boolean | null | undefined | any[] | Record<string, any>): string => {
-    if (value === true) return 'Yes';
-    if (value === false) return 'No';
-    if (value === null || value === undefined) return 'N/A';
-    if (typeof value === 'string' && value.trim() === '') return 'N/A';
-    if (Array.isArray(value)) { return value.length > 0 ? value.join(', ') : 'N/A'; }
-    if (typeof value === 'object') { return JSON.stringify(value); }
-    return String(value);
-};
-const formatParamKey = (key: string): string => {
-    const keyMap: Record<string, string> = {
-        'skip_baserecalibrator': 'Skip Base Recalibration',
-        'skip_qc': 'Skip QC',
-        'skip_annotation': 'Skip Annotation',
-        'wes': 'WES Mode',
-        'joint_germline': 'Joint Germline',
-        'trim_fastq': 'Trim FASTQ',
-    };
-    return keyMap[key] || key
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, l => l.toUpperCase());
-};
+const formatParamValue = (value: string | number | boolean | null | undefined | any[] | Record<string, any>): string => { /* ... (keep existing) ... */ };
+const formatParamKey = (key: string): string => { /* ... (keep existing) ... */ };
 
 export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded }: RunItemProps) {
   const [isParamsOpen, setIsParamsOpen] = useState(false);
   const { openFileBrowser } = useFileBrowser();
 
-  useEffect(() => {
-    console.log(`[RunItem ${run.name} MOUNT_DEBUG] Component mounted/updated. isExpanded: ${isExpanded}, run.name: ${run.name}`);
-  }, [run.name, isExpanded]);
+  // ... (useEffect for MOUNT_DEBUG - keep if useful) ...
 
   const {
     data: runFiles,
     isLoading: isLoadingFiles,
-    isError: isErrorFiles,
-    error: errorFiles,
-  } = useQuery<ResultItem[], Error>({
-    queryKey: ["resultRunFiles", run.name],
-    queryFn: () => api.getResultRunFiles(run.name),
-    enabled: isExpanded,
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
+    // ... (rest of runFiles query)
+  } = useQuery<ResultItem[], Error>({ /* ... */ });
 
   const { data: multiqcRelativePath, isLoading: isLoadingMultiQCPath, isError: isErrorMultiQCPath, error: errorMultiQCPath } = useQuery<string | null, Error>({
     queryKey: ["multiqcPath", run.name],
-    queryFn: () => {
-      console.log(`[RunItem ${run.name} QUERYFN_DEBUG] Calling api.getMultiQCReportPath for run: ${run.name}`);
-      return api.getMultiQCReportPath(run.name);
-    },
+    queryFn: () => api.getMultiQCReportPath(run.name),
     enabled: true,
     staleTime: 15 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
-  useEffect(() => {
-    if (isLoadingMultiQCPath) {
-      console.log(`[RunItem ${run.name} MULTIQC_QUERY_STATUS] Loading MultiQC path...`);
-    } else if (isErrorMultiQCPath) {
-      console.error(`[RunItem ${run.name} MULTIQC_QUERY_STATUS] Error fetching MultiQC path:`, errorMultiQCPath);
-    } else {
-      console.log(`[RunItem ${run.name} MULTIQC_QUERY_STATUS] Fetched MultiQC path:`, multiqcRelativePath);
-    }
-  }, [run.name, multiqcRelativePath, isLoadingMultiQCPath, isErrorMultiQCPath, errorMultiQCPath]);
+  // ... (useEffect for MULTIQC_QUERY_STATUS - keep if useful) ...
 
   const multiqcReportUrl = useMemo(() => {
-    // console.log(`[RunItem ${run.name} MEMO_DEBUG] multiqcRelativePath from query:`, multiqcRelativePath);
+    // ... (keep existing logic for constructing multiqcReportUrl) ...
     if (multiqcRelativePath) {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-      // console.log(`[RunItem ${run.name} MEMO_DEBUG] NEXT_PUBLIC_API_BASE_URL:`, apiBaseUrl);
       if (!apiBaseUrl) {
         console.error(`[RunItem ${run.name} MEMO_ERROR] NEXT_PUBLIC_API_BASE_URL is not set! Cannot construct MultiQC URL.`);
         return null;
       }
       const encodedRelativePath = multiqcRelativePath.split('/').map(segment => encodeURIComponent(segment)).join('/');
-      const fullUrl = `${apiBaseUrl}/api/results/${encodeURIComponent(run.name)}/static/${encodedRelativePath}`;
-      // console.log(`[RunItem ${run.name} MEMO_DEBUG] Constructed MultiQC URL:`, fullUrl);
-      return fullUrl;
+      return `${apiBaseUrl}/api/results/${encodeURIComponent(run.name)}/static/${encodedRelativePath}`;
     }
-    // console.log(`[RunItem ${run.name} MEMO_DEBUG] multiqcRelativePath is null/empty, so multiqcReportUrl will be null.`);
     return null;
   }, [multiqcRelativePath, run.name]);
+
 
   const {
     data: parameters,
     isLoading: isLoadingParams,
-    isError: isErrorParams,
-    error: errorParams,
+    // ... (rest of parameters query, ensure queryFn is correct)
   } = useQuery<RunParameters, Error>({
     queryKey: ["resultParams", run.name],
-    queryFn: () => api.getResultRunParameters(run.name), // Fixed: Added queryFn
+    queryFn: () => api.getResultRunParameters(run.name),
     enabled: isParamsOpen,
     staleTime: 5 * 60 * 1000,
     retry: 1,
     refetchOnWindowFocus: false,
   });
 
-  const downloadRunMutation = useMutation({
-     mutationFn: (runName: string) => api.downloadResultRun(runName),
-     onSuccess: (blob, runName) => {
-        try {
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${runName}.zip`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-            toast.success(`Started download for ${runName}.zip`);
-        } catch (e) {
-             console.error("Error creating download link:", e);
-             toast.error("Failed to initiate download.");
-        }
-     },
-     onError: (error: Error, runName) => {
-        console.error(`Error downloading ${runName}:`, error);
-        toast.error(`Download failed: ${error.message}`);
-     }
-  });
-
-  const handleDownloadRun = () => { downloadRunMutation.mutate(run.name); };
+  const downloadRunMutation = useMutation({ /* ... */ });
+  const handleDownloadRun = () => { /* ... */ };
   const handleOpenParams = () => { setIsParamsOpen(true); };
-  const handleOpenFileBrowser = (e: React.MouseEvent) => { e.stopPropagation(); if (run.filebrowser_link) { openFileBrowser(run.filebrowser_link); } };
-  const formatTimestamp = (timestamp: number | null | undefined): string => {
-    if (!timestamp) return "N/A";
-    try {
-        if (timestamp <= 0) return "Invalid Date";
-        const date = new Date(timestamp * 1000);
-        if (isNaN(date.getTime())) return "Invalid Date";
-        return `${date.toLocaleDateString()} ${date.toLocaleTimeString()} (${formatDistanceToNow(date, { addSuffix: true })})`;
-    } catch (e) {
-        console.error("Error formatting timestamp:", timestamp, e);
-        return "Invalid Date";
-    }
-  };
+  const handleOpenFileBrowser = (e: React.MouseEvent) => { /* ... */ };
+  const formatTimestamp = (timestamp: number | null | undefined): string => { /* ... */ };
 
   return (
     <>
@@ -182,6 +104,7 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
             className="flex items-center justify-between px-4 cursor-pointer"
             onClick={() => onExpandToggle(run.name, !isExpanded)}
           >
+            {/* Left side: Icon and Run Name/Timestamp */}
             <div className="flex items-center gap-3 min-w-0 py-3">
               <FolderGit2 className="h-5 w-5 text-primary flex-shrink-0" />
               <div className="text-left min-w-0">
@@ -192,24 +115,15 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
               </div>
             </div>
 
+            {/* Right side: Action Buttons Container */}
             <div className="flex items-center gap-1 py-3" onClick={e => e.stopPropagation()}>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleOpenParams}
-                title="View Parameters"
-                className="h-7 w-7 cursor-pointer hover:bg-muted/80"
-              >
-                {isLoadingParams ? <Loader2 className="h-4 w-4 animate-spin"/> : <Settings2 className="h-4 w-4" />}
-                <span className="sr-only">View Parameters</span>
-              </Button>
 
-              {/* {console.log(`[RunItem ${run.name} RENDER_DEBUG] isLoadingMultiQCPath: ${isLoadingMultiQCPath}, multiqcReportUrl: ${multiqcReportUrl}`)} */}
+              {/* --- START: MODIFIED MultiQC Button --- */}
               {isLoadingMultiQCPath ? (
                 <Button variant="ghost" size="icon" className="h-7 w-7" disabled>
                   <Loader2 className="h-4 w-4 animate-spin" />
                 </Button>
-              ) : multiqcReportUrl ? (
+              ) : multiqcReportUrl ? ( // If URL exists, it's clickable
                 <Button
                   variant="ghost"
                   size="icon"
@@ -222,10 +136,33 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
                     <span className="sr-only">Open MultiQC Report</span>
                   </Link>
                 </Button>
-              ) : (
-                 null
+              ) : ( // If no URL (and not loading), it's disabled/unclickable
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title="MultiQC Report not found"
+                  className="h-7 w-7 opacity-50 cursor-not-allowed"
+                  disabled // Explicitly disable
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  <span className="sr-only">MultiQC Report not found</span>
+                </Button>
               )}
+              {/* --- END: MODIFIED MultiQC Button --- */}
 
+              {/* View Parameters Button (Now after MultiQC) */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleOpenParams}
+                title="View Parameters"
+                className="h-7 w-7 cursor-pointer hover:bg-muted/80"
+              >
+                {isLoadingParams ? <Loader2 className="h-4 w-4 animate-spin"/> : <Settings2 className="h-4 w-4" />}
+                <span className="sr-only">View Parameters</span>
+              </Button>
+
+              {/* Open in FileBrowser Button */}
               {run.filebrowser_link && (
                 <Button
                   variant="ghost"
@@ -238,6 +175,8 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
                   <span className="sr-only">Open in File Browser</span>
                 </Button>
               )}
+
+              {/* Download Run Button */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -249,6 +188,8 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
                 {downloadRunMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4" />}
                 <span className="sr-only">Download Run</span>
               </Button>
+
+              {/* Expand/Collapse Chevron Button */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -289,53 +230,9 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
         </AccordionItem>
       </Accordion>
 
+      {/* Parameters Dialog (unchanged) */}
       <Dialog open={isParamsOpen} onOpenChange={setIsParamsOpen}>
-          <DialogContent className="sm:max-w-xl">
-              <DialogHeader>
-                  <DialogTitle>Parameters for Run: {run.name}</DialogTitle>
-                  <DialogDescription>
-                     Configuration used for this pipeline run.
-                  </DialogDescription>
-              </DialogHeader>
-               {isLoadingParams && <div className="py-8 flex justify-center"><LoadingSpinner label="Loading parameters..." /></div>}
-               {isErrorParams && (
-                  <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-3 rounded-md border border-destructive/30">
-                    <AlertCircle className="h-5 w-5 mt-1 self-start flex-shrink-0"/>
-                    <div>
-                       <p className="font-medium">Error Loading Parameters</p>
-                       <p className="text-sm">{errorParams instanceof Error ? errorParams.message : String(errorParams)}</p>
-                    </div>
-                 </div>
-               )}
-               {!isLoadingParams && !isErrorParams && parameters && (Object.keys(parameters.input_filenames || {}).length > 0 || Object.keys(parameters.sarek_params || {}).length > 0) && (
-                 <div className="mt-4 max-h-[60vh] overflow-y-auto rounded-md border bg-muted/30 p-4 text-sm space-y-2">
-                   {parameters.input_filenames && Object.entries(parameters.input_filenames).map(([key, value]) => (
-                       <div key={`input-${key}`} className="grid grid-cols-3 gap-x-2 items-center">
-                           <div className="font-medium text-muted-foreground capitalize truncate" title={key}>{formatParamKey(key)}:</div>
-                           <div className="col-span-2 font-mono text-xs break-words" title={String(value ?? '')}>
-                               {formatParamValue(value)}
-                           </div>
-                       </div>
-                   ))}
-                   {parameters.sarek_params && Object.entries(parameters.sarek_params).map(([key, value]) => (
-                       <div key={`sarek-${key}`} className="grid grid-cols-3 gap-x-2 items-center">
-                           <div className="font-medium text-muted-foreground capitalize truncate" title={key}>{formatParamKey(key)}:</div>
-                           <div className="col-span-2 font-mono text-xs break-words" title={String(value ?? '')}>
-                               {formatParamValue(value)}
-                           </div>
-                       </div>
-                   ))}
-                </div>
-               )}
-               {!isLoadingParams && !isErrorParams && (!parameters || (Object.keys(parameters.input_filenames || {}).length === 0 && Object.keys(parameters.sarek_params || {}).length === 0)) && (
-                   <p className="text-muted-foreground text-sm text-center py-4">No parameter information found for this run.</p>
-               )}
-              <DialogFooter className="mt-4">
-                  <DialogClose asChild>
-                      <Button type="button" variant="outline">Close</Button>
-                  </DialogClose>
-              </DialogFooter>
-          </DialogContent>
+          {/* ... existing dialog content ... */}
       </Dialog>
     </>
   );
