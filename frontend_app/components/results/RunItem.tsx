@@ -1,9 +1,9 @@
 // File: frontend_app/components/results/RunItem.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
-import { FolderGit2, Cog, Download, ExternalLink, Loader2, AlertCircle, Settings2, ChevronDown } from "lucide-react";
+import { FolderGit2, Cog, Download, ExternalLink, Loader2, AlertCircle, Settings2, ChevronDown, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -16,7 +16,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useFileBrowser } from "@/components/layout/FileBrowserContext";
 
-// Import RunParameters type, remove unused JobMetaInputParams
 import { ResultRun, ResultItem, RunParameters } from "@/lib/types";
 import * as api from "@/lib/api";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
@@ -34,7 +33,7 @@ interface RunItemProps {
 
 // Helper function to format parameters for display
 const formatParamValue = (value: string | number | boolean | null | undefined | any[] | Record<string, any>): string => {
-    if (value === true) return 'Yes'; 
+    if (value === true) return 'Yes';
     if (value === false) return 'No';
     if (value === null || value === undefined) return 'N/A';
     if (typeof value === 'string' && value.trim() === '') return 'N/A';
@@ -63,7 +62,6 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
   const [isParamsOpen, setIsParamsOpen] = useState(false);
   const { openFileBrowser } = useFileBrowser();
 
-  // Query for run files (only enabled when expanded)
   const {
     data: runFiles,
     isLoading: isLoadingFiles,
@@ -77,13 +75,30 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
     refetchOnWindowFocus: false,
   });
 
-  // Query for parameters (only enabled when param dialog is opened)
-   const {
+  const multiqcReportInfo = useMemo(() => {
+    if (!runFiles) return null;
+    const multiqcFile = runFiles.find(
+      (file) => file.name === 'multiqc_report.html' && !file.is_dir
+    );
+    if (multiqcFile) {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+      // Use relative_path which includes subdirectories like "multiqc/" or "Reports/MultiQC/"
+      const filePathForUrl = multiqcFile.relative_path || multiqcFile.name;
+
+      return {
+        url: `${apiBaseUrl}/api/results/${encodeURIComponent(run.name)}/static/${filePathForUrl.split('/').map(segment => encodeURIComponent(segment)).join('/')}`,
+        filebrowserLink: multiqcFile.filebrowser_link // Keep for other potential uses
+      };
+    }
+    return null;
+  }, [runFiles, run.name]);
+
+  const {
     data: parameters,
     isLoading: isLoadingParams,
     isError: isErrorParams,
     error: errorParams,
-  } = useQuery<RunParameters, Error>({ // Use RunParameters type
+  } = useQuery<RunParameters, Error>({
     queryKey: ["resultParams", run.name],
     queryFn: () => api.getResultRunParameters(run.name),
     enabled: isParamsOpen,
@@ -92,7 +107,6 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
     refetchOnWindowFocus: false,
   });
 
-  // Mutation for downloading the run zip
   const downloadRunMutation = useMutation({
      mutationFn: (runName: string) => api.downloadResultRun(runName),
      onSuccess: (blob, runName) => {
@@ -155,8 +169,8 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
           "transition-all duration-200 hover:bg-muted/50",
           isHighlighted && "ring-4 ring-blue-500/30 ring-offset-2"
         )}>
-          <div 
-            className="flex items-center justify-between px-4 cursor-pointer" 
+          <div
+            className="flex items-center justify-between px-4 cursor-pointer"
             onClick={() => onExpandToggle(run.name, !isExpanded)}
           >
             <div className="flex items-center gap-3 min-w-0 py-3">
@@ -170,34 +184,50 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
             </div>
 
             <div className="flex items-center gap-1 py-3" onClick={e => e.stopPropagation()}>
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={handleOpenParams}
-                title="View Parameters" 
+                title="View Parameters"
                 className="h-7 w-7 cursor-pointer hover:bg-muted/80"
               >
                 {isLoadingParams ? <Loader2 className="h-4 w-4 animate-spin"/> : <Settings2 className="h-4 w-4" />}
                 <span className="sr-only">View Parameters</span>
               </Button>
+
+              {multiqcReportInfo && multiqcReportInfo.url && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title="Open MultiQC Report"
+                  className="h-7 w-7 cursor-pointer hover:bg-muted/80"
+                  asChild
+                >
+                  <Link href={multiqcReportInfo.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                    <BarChart3 className="h-4 w-4" />
+                    <span className="sr-only">Open MultiQC Report</span>
+                  </Link>
+                </Button>
+              )}
+
               {run.filebrowser_link && (
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  title="Open in File Browser" 
-                  className="h-7 w-7 cursor-pointer hover:bg-muted/80" 
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title="Open in File Browser"
+                  className="h-7 w-7 cursor-pointer hover:bg-muted/80"
                   onClick={handleOpenFileBrowser}
                 >
                   <ExternalLink className="h-4 w-4" />
                   <span className="sr-only">Open in File Browser</span>
                 </Button>
               )}
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={handleDownloadRun}
-                title="Download Run (.zip)" 
-                disabled={downloadRunMutation.isPending} 
+                title="Download Run (.zip)"
+                disabled={downloadRunMutation.isPending}
                 className="h-7 w-7 cursor-pointer hover:bg-muted/80"
               >
                 {downloadRunMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4" />}
@@ -213,11 +243,11 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
                 className="h-7 w-7 cursor-pointer hover:bg-muted/80"
                 title={isExpanded ? "Collapse" : "Expand"}
               >
-                <ChevronDown 
+                <ChevronDown
                   className={cn(
                     "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
                     isExpanded && "rotate-180"
-                  )} 
+                  )}
                 />
                 <span className="sr-only">{isExpanded ? "Collapse" : "Expand"}</span>
               </Button>
@@ -227,7 +257,7 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
             "bg-card",
             "border-t border-border",
             "overflow-hidden",
-            "!border-b !border-b-border"
+            "!border-b !border-b-border" // Ensure bottom border is applied correctly
           )}>
              <div className="p-4">
                {isLoadingFiles && <div className="text-center p-4"><LoadingSpinner label="Loading files..." /></div>}
@@ -243,7 +273,6 @@ export default function RunItem({ run, isHighlighted, onExpandToggle, isExpanded
         </AccordionItem>
       </Accordion>
 
-       {/* Parameters Dialog */}
       <Dialog open={isParamsOpen} onOpenChange={setIsParamsOpen}>
           <DialogContent className="sm:max-w-xl">
               <DialogHeader>

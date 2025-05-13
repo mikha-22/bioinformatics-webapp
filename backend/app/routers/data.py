@@ -5,15 +5,14 @@ import os
 import zipfile
 import io
 from pathlib import Path
+import mimetypes # Import mimetypes
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse, FileResponse # Ensure FileResponse is imported
 from typing import List, Dict, Any, Generator, Optional
 from pydantic import BaseModel
 
 from ..core.config import DATA_DIR, RESULTS_DIR
 from ..utils.files import get_directory_contents, get_safe_path, get_filebrowser_config
-# Ensure models from pipeline are available if needed for type hinting or structure reference
-# from ..models.pipeline import SampleInfo as PipelineSampleInfo, InputFilenames as PipelineInputFilenames, SarekParams as PipelineSarekParams
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -22,12 +21,11 @@ router = APIRouter(
 
 # --- Models ---
 class RunParametersResponse(BaseModel):
-    run_name: Optional[str] = None # <<< NEW
-    run_description: Optional[str] = None # <<< NEW
-    input_filenames: Optional[Dict[str, Optional[str]]] = None # Corresponds to InputFilenames in types.ts
-    sarek_params: Optional[Dict[str, Any]] = None # Corresponds to SarekParams in types.ts
-    sample_info: Optional[List[Dict[str, Any]]] = None # Corresponds to SampleInfo[] in types.ts
-    # Add other fields if the metadata file contains more, like input_type, staged_job_id_origin etc.
+    run_name: Optional[str] = None
+    run_description: Optional[str] = None
+    input_filenames: Optional[Dict[str, Optional[str]]] = None
+    sarek_params: Optional[Dict[str, Any]] = None
+    sample_info: Optional[List[Dict[str, Any]]] = None
     input_type: Optional[str] = None
     staged_job_id_origin: Optional[str] = None
     original_job_id: Optional[str] = None
@@ -54,12 +52,12 @@ def zip_directory_generator(directory: Path) -> Generator[bytes, None, None]:
             elif file_path.is_dir() and not any(file_path.iterdir()):
                  arcname = file_path.relative_to(directory).as_posix() + '/'
                  zipi = zipfile.ZipInfo(arcname)
-                 zipi.external_attr = 0o40755 << 16
+                 zipi.external_attr = 0o40755 << 16 # type: ignore
                  zipf.writestr(zipi, '')
     buffer.seek(0)
     yield buffer.read()
 
-# --- Existing Endpoints (Modified) ---
+# --- Existing Endpoints (Unchanged from your provided codebase) ---
 
 @router.get("/get_data", response_model=List[Dict[str, str]], summary="List Data Files")
 async def get_data():
@@ -108,8 +106,6 @@ async def get_results_run_files(run_dir_name: str, fb_config: Dict = Depends(get
         target_run_dir, RESULTS_DIR, list_dirs=True, list_files=True, fb_base_url=fb_config["baseURL"]
     )
 
-# --- New Endpoints ---
-
 @router.get("/results/{run_dir_name:path}/parameters", response_model=RunParametersResponse, summary="Get Parameters for a Run")
 async def get_run_parameters(run_dir_name: str):
     logger.info(f"Request for parameters for run: '{run_dir_name}'")
@@ -118,17 +114,15 @@ async def get_run_parameters(run_dir_name: str):
         if not target_run_dir.is_dir():
             raise HTTPException(status_code=404, detail=f"Run directory '{run_dir_name}' not found.")
 
-        metadata_file = target_run_dir / "run_metadata.json" # Defined in tasks.py
+        metadata_file = target_run_dir / "run_metadata.json"
         parameters = {}
         if metadata_file.is_file():
              try:
                  with open(metadata_file, 'r') as f:
                      data = json.load(f)
-                     # Extract relevant parts for the response model
-                     # The 'description' field in job.meta (which is run_description) will be used for run_description here
                      parameters = RunParametersResponse(
-                         run_name=data.get("run_name"), # <<< GET run_name
-                         run_description=data.get("description"), # <<< GET run_description (from job.meta.description)
+                         run_name=data.get("run_name"),
+                         run_description=data.get("description"),
                          input_filenames=data.get("input_params"),
                          sarek_params=data.get("sarek_params"),
                          sample_info=data.get("sample_info"),
@@ -143,7 +137,7 @@ async def get_run_parameters(run_dir_name: str):
              except (json.JSONDecodeError, OSError, KeyError) as e:
                  logger.warning(f"Failed to read or parse parameters from {metadata_file}: {e}")
         logger.warning(f"No parameter metadata found for run '{run_dir_name}' or file was unreadable.")
-        return RunParametersResponse().model_dump(exclude_none=True) # Return empty with exclude_none
+        return RunParametersResponse().model_dump(exclude_none=True)
     except HTTPException as e: raise e
     except Exception as e:
         logger.exception(f"Unexpected error fetching parameters for run '{run_dir_name}': {e}")
@@ -189,3 +183,64 @@ async def download_result_file(run_dir_name: str, file_path: str):
     except Exception as e:
         logger.exception(f"Unexpected error downloading file '{file_path}' from run '{run_dir_name}': {e}")
         raise HTTPException(status_code=500, detail="Internal server error downloading file.")
+
+# --- UPDATED ENDPOINT FOR SERVING STATIC FILES FROM RESULTS ---
+@router.get("/results/{run_dir_name}/static/{file_path:path}", summary="Serve Static File from Results")
+async def serve_static_result_file(run_dir_name: str, file_path: str):
+    logger.info(f"Request to serve static file '{file_path}' from run '{run_dir_name}'")
+
+    # Whitelist of allowed static file extensions for security
+    ALLOWED_STATIC_EXTENSIONS = [
+        ".html", ".htm",
+        ".css",
+        ".js", ".json", # JSON might be used for data by JS
+        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
+        ".woff", ".woff2", ".ttf", ".otf", ".eot", # Fonts
+        ".txt", # For any plain text data files MultiQC might link
+        # Add other extensions if MultiQC or other HTML reports use them
+        ".csv", ".tsv", # If data tables are linked as separate files
+    ]
+
+    file_extension = Path(file_path).suffix.lower()
+    if not file_extension or file_extension not in ALLOWED_STATIC_EXTENSIONS:
+        logger.warning(f"Attempt to access non-whitelisted file type via static endpoint: {file_path} (ext: {file_extension})")
+        raise HTTPException(status_code=403, detail=f"Access denied: File type '{file_extension}' is not allowed.")
+
+    try:
+        target_run_dir = get_safe_path(RESULTS_DIR, run_dir_name)
+        if not target_run_dir.is_dir():
+            logger.warning(f"Run directory not found: {target_run_dir}")
+            raise HTTPException(status_code=404, detail=f"Run directory '{run_dir_name}' not found.")
+
+        target_file = get_safe_path(target_run_dir, file_path)
+
+        if not target_file.is_file():
+            logger.warning(f"Static file not found: {target_file}")
+            raise HTTPException(status_code=404, detail=f"File '{file_path}' not found in run '{run_dir_name}'.")
+
+        if RESULTS_DIR.resolve() not in target_file.resolve().parents:
+            logger.error(f"SECURITY ALERT: Resolved static file path '{target_file.resolve()}' is outside RESULTS_DIR '{RESULTS_DIR.resolve()}'. Original request: run='{run_dir_name}', file='{file_path}'")
+            raise HTTPException(status_code=403, detail="Access to the requested file is forbidden.")
+
+        media_type, _ = mimetypes.guess_type(str(target_file))
+        if not media_type:
+            if file_extension == ".js": media_type = "application/javascript"
+            elif file_extension == ".css": media_type = "text/css"
+            elif file_extension == ".json": media_type = "application/json"
+            elif file_extension == ".svg": media_type = "image/svg+xml"
+            else: media_type = "application/octet-stream"
+            logger.info(f"MIME type for {target_file.name} guessed as {media_type} (extension fallback: {file_extension})")
+        else:
+            logger.info(f"MIME type for {target_file.name} identified as {media_type}")
+
+        logger.info(f"Serving static file: {target_file} with media_type: {media_type}")
+        return FileResponse(
+            path=str(target_file),
+            media_type=media_type,
+            filename=target_file.name
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.exception(f"Unexpected error serving static file '{file_path}' from run '{run_dir_name}': {e}")
+        raise HTTPException(status_code=500, detail="Internal server error serving file.")
