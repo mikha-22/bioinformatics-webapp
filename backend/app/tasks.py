@@ -9,11 +9,11 @@ import json
 import os
 import select
 import redis
-import re # <<< --- ADDED IMPORT FOR REGEX ---
+import re
 from typing import Optional, List, Dict, Any
 
 from rq import get_current_job, Queue
-from rq.job import JobStatus # <<< --- ADDED JobStatus ---
+from rq.job import JobStatus
 
 from .core.config import (
     RESULTS_DIR, REDIS_HOST, REDIS_PORT, REDIS_DB,
@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 MONITORING_INTERVAL_SECONDS = 5
 METADATA_FILENAME = "run_metadata.json"
+APP_NOTIFICATIONS_CHANNEL = "app_notifications" # <<< --- ADDED: Notification Channel ---
 
 try:
     redis_log_handler = redis.Redis(
@@ -60,7 +61,7 @@ def publish_and_store_log(job_id: str, log_type: str, line: str):
         return
     channel = f"{LOG_CHANNEL_PREFIX}{job_id}"
     list_key = f"{LOG_HISTORY_PREFIX}{job_id}"
-    message = json.dumps({"type": log_type, "line": line.strip()}) # Ensure line is stripped
+    message = json.dumps({"type": log_type, "line": line.strip()})
     try:
         pipe = redis_log_handler.pipeline()
         pipe.publish(channel, message)
@@ -95,7 +96,7 @@ def run_pipeline_task(
     job = get_current_job()
     job_id = job.id if job else get_current_job_id()
     final_results_dir = None
-    job_succeeded = False
+    job_succeeded = False # Initialize job_succeeded
 
     current_run_name = run_name_from_caller
     if not current_run_name:
@@ -156,14 +157,7 @@ def run_pipeline_task(
     process_psutil = None
     start_time = time.time()
     process = None
-
-    # --- BEGIN REGEX FOR CURRENT TASK ---
-    # Regex to capture the full Nextflow process name from "Submitted process" or "Starting process" lines
-    # Example: "[hash] Submitted process > NFCORE_SAREK:MODULE:PROCESS_NAME (input_name)"
-    # Example: "Starting process > NFCORE_SAREK:MODULE:PROCESS_NAME"
-    # This regex looks for the pattern and captures the process name part.
     nf_process_regex = re.compile(r"(?:Submitted process|Starting process) >\s*([^\s\(]+)")
-    # --- END REGEX FOR CURRENT TASK ---
 
     try:
         logger.info(f"[Job {job_id}] Preparing to execute Popen...")
@@ -185,8 +179,8 @@ def run_pipeline_task(
 
         try:
             process_psutil = psutil.Process(process.pid)
-            process_psutil.cpu_percent(interval=None) # Initialize
-            time.sleep(0.1) # Allow a short time for cpu_percent to get a baseline
+            process_psutil.cpu_percent(interval=None)
+            time.sleep(0.1)
         except psutil.NoSuchProcess:
             logger.warning(f"[Job {job_id}] Process {process.pid} finished before monitoring could start.")
             process_psutil = None
@@ -198,7 +192,6 @@ def run_pipeline_task(
         stderr_lines = []
         stdout_buffer = ""
         stderr_buffer = ""
-
         streams_to_select = []
         if process.stdout: streams_to_select.append(process.stdout)
         if process.stderr: streams_to_select.append(process.stderr)
@@ -220,57 +213,54 @@ def run_pipeline_task(
                  error_msg = f"Error during select (stream likely closed unexpectedly): {select_err}"
                  logger.error(f"[Job {job_id}] {error_msg}")
                  publish_and_store_log(job_id, "warning", f"Stream error during log capture: {select_err}")
-                 for stream in streams_to_select[:]: # Iterate over a copy for safe removal
-                     if stream and not stream.closed:
+                 for stream_item in streams_to_select[:]:
+                     if stream_item and not stream_item.closed:
                          try:
-                             if stream.fileno() < 0: streams_to_select.remove(stream)
-                         except Exception: streams_to_select.remove(stream)
-                     elif stream in streams_to_select: streams_to_select.remove(stream)
+                             if stream_item.fileno() < 0: streams_to_select.remove(stream_item)
+                         except Exception: streams_to_select.remove(stream_item)
+                     elif stream_item in streams_to_select: streams_to_select.remove(stream_item)
                  if not streams_to_select: break
                  continue
 
-            if not readable and return_code is not None: # Process finished, select timed out
+            if not readable and return_code is not None:
                  logger.debug(f"[Job {job_id}] Process finished, select timed out, checking streams for remaining data.")
                  all_closed = True
-                 for stream in streams_to_select[:]:
-                     if stream and not stream.closed:
+                 for stream_item in streams_to_select[:]:
+                     if stream_item and not stream_item.closed:
                          all_closed = False
                          try:
-                             data = stream.read() # Read all remaining
+                             data = stream_item.read()
                              if data:
-                                 logger.warning(f"[Job {job_id}] Read remaining data after process end: {len(data)} bytes from stream {stream.fileno()}")
-                                 if stream is process.stdout: stdout_buffer += data
-                                 elif stream is process.stderr: stderr_buffer += data
-                             stream.close(); streams_to_select.remove(stream)
+                                 logger.warning(f"[Job {job_id}] Read remaining data after process end: {len(data)} bytes from stream {stream_item.fileno()}")
+                                 if stream_item is process.stdout: stdout_buffer += data
+                                 elif stream_item is process.stderr: stderr_buffer += data
+                             stream_item.close(); streams_to_select.remove(stream_item)
                          except Exception as final_read_err:
-                             logger.error(f"[Job {job_id}] Error during final read from stream {stream.fileno()}: {final_read_err}")
-                             if stream in streams_to_select: streams_to_select.remove(stream)
-                     elif stream in streams_to_select: streams_to_select.remove(stream)
+                             logger.error(f"[Job {job_id}] Error during final read from stream {stream_item.fileno()}: {final_read_err}")
+                             if stream_item in streams_to_select: streams_to_select.remove(stream_item)
+                     elif stream_item in streams_to_select: streams_to_select.remove(stream_item)
                  if all_closed or not streams_to_select: break
 
-
-            for stream in readable:
-                if not stream or stream.closed:
-                    if stream in streams_to_select: streams_to_select.remove(stream)
+            for stream_item in readable:
+                if not stream_item or stream_item.closed:
+                    if stream_item in streams_to_select: streams_to_select.remove(stream_item)
                     continue
                 try:
-                    data = stream.read(4096) # Read in chunks
-                    if not data: # EOF
-                        logger.debug(f"[Job {job_id}] EOF reached for stream {stream.fileno()}. Closing.")
-                        stream.close()
-                        streams_to_select.remove(stream)
+                    data = stream_item.read(4096)
+                    if not data:
+                        logger.debug(f"[Job {job_id}] EOF reached for stream {stream_item.fileno()}. Closing.")
+                        stream_item.close()
+                        streams_to_select.remove(stream_item)
                         continue
 
-                    if stream is process.stdout:
+                    if stream_item is process.stdout:
                         stdout_buffer += data
                         while '\n' in stdout_buffer:
                             line, stdout_buffer = stdout_buffer.split('\n', 1)
-                            stdout_lines.append(line + '\n') # Keep newline for full_stdout
+                            stdout_lines.append(line + '\n')
                             log_line = line.strip()
                             logger.info(f"[Job {job_id}][STDOUT] {log_line}")
                             publish_and_store_log(job_id, "stdout", log_line)
-
-                            # --- BEGIN CURRENT TASK PARSING FROM STDOUT ---
                             match_process = nf_process_regex.search(log_line)
                             if match_process:
                                 extracted_full_process_name = match_process.group(1)
@@ -283,59 +273,53 @@ def run_pipeline_task(
                                         publish_and_store_log(job_id, "info", f"Current task: {simple_process_name}")
                                     except Exception as e_meta:
                                         logger.error(f"[Job {job_id}] Failed to save meta for current_task update: {e_meta}")
-                            # --- END CURRENT TASK PARSING FROM STDOUT ---
-
-                            if "Results directory:" in line: # Check for results dir
+                            if "Results directory:" in line:
                                 try:
                                     final_results_dir = line.split("Results directory:", 1)[1].strip()
                                     logger.info(f"[Job {job_id}] Parsed results directory from stdout: {final_results_dir}")
                                 except IndexError:
                                     logger.warning(f"[Job {job_id}] Could not parse results directory from line: {log_line}")
-                    elif stream is process.stderr:
+                    elif stream_item is process.stderr:
                         stderr_buffer += data
                         while '\n' in stderr_buffer:
                             line, stderr_buffer = stderr_buffer.split('\n', 1)
-                            stderr_lines.append(line + '\n') # Keep newline
+                            stderr_lines.append(line + '\n')
                             log_line = line.strip()
                             logger.warning(f"[Job {job_id}][STDERR] {log_line}")
                             publish_and_store_log(job_id, "stderr", log_line)
-                except (OSError, ValueError) as e: # Catch errors like "read on closed file"
-                     error_msg = f"Error reading from stream {stream.fileno()}: {e}"
+                except (OSError, ValueError) as e:
+                     error_msg = f"Error reading from stream {stream_item.fileno()}: {e}"
                      logger.error(f"[Job {job_id}] {error_msg}")
                      publish_and_store_log(job_id, "warning", f"Error reading log stream: {e}")
-                     if stream in streams_to_select:
-                         try: stream.close()
+                     if stream_item in streams_to_select:
+                         try: stream_item.close()
                          except Exception: pass
-                         streams_to_select.remove(stream)
+                         streams_to_select.remove(stream_item)
 
-            # Resource Monitoring
-            if process_psutil and process.poll() is None: # Check if process is still running
+            if process_psutil and process.poll() is None:
                  try:
-                     cpu = process_psutil.cpu_percent(interval=0.1) # Non-blocking after first call
+                     cpu = process_psutil.cpu_percent(interval=0.1)
                      if cpu is not None: cpu_percentages.append(cpu)
                      mem_info = process_psutil.memory_info()
                      current_memory_mb = mem_info.rss / (1024 * 1024)
                      peak_memory_mb = max(peak_memory_mb, current_memory_mb)
                  except psutil.NoSuchProcess:
                      logger.warning(f"[Job {job_id}] Process {process.pid} ended during resource monitoring.")
-                     process_psutil = None # Stop monitoring
+                     process_psutil = None
                  except Exception as monitor_err:
                      logger.error(f"[Job {job_id}] Error during resource monitoring: {monitor_err}")
 
-            # Check process status again after reads and monitoring
             if return_code is None: return_code = process.poll()
-            if return_code is not None and not streams_to_select: # Process ended and streams are empty/closed
+            if return_code is not None and not streams_to_select:
                 break
-        # End of while streams_to_select loop
 
         logger.info(f"[Job {job_id}] Exited read loop.")
-        # Process any remaining buffered output
         if stdout_buffer:
             log_line = stdout_buffer.strip()
             logger.info(f"[Job {job_id}][STDOUT] {log_line}")
-            stdout_lines.append(stdout_buffer) # Append remaining buffer
+            stdout_lines.append(stdout_buffer)
             publish_and_store_log(job_id, "stdout", log_line)
-            if not final_results_dir and "Results directory:" in stdout_buffer: # Check again
+            if not final_results_dir and "Results directory:" in stdout_buffer:
                  for rem_line in stdout_buffer.splitlines():
                      if "Results directory:" in rem_line:
                           try:
@@ -346,13 +330,12 @@ def run_pipeline_task(
         if stderr_buffer:
              log_line = stderr_buffer.strip()
              logger.warning(f"[Job {job_id}][STDERR] {log_line}")
-             stderr_lines.append(stderr_buffer) # Append remaining buffer
+             stderr_lines.append(stderr_buffer)
              publish_and_store_log(job_id, "stderr", log_line)
 
-        # Ensure we get a final return code
         if return_code is None:
             logger.warning(f"[Job {job_id}] Process return code was None after loop, calling process.wait().")
-            return_code = process.wait() # Blocking call
+            return_code = process.wait()
 
         end_time = time.time()
         duration_seconds = end_time - start_time
@@ -366,22 +349,18 @@ def run_pipeline_task(
             job.meta['peak_memory_mb'] = round(peak_memory_mb, 1)
             job.meta['average_cpu_percent'] = round(average_cpu, 1)
             job.meta['duration_seconds'] = round(duration_seconds, 2)
-            # --- BEGIN SETTING FINAL CURRENT_TASK STATUS ---
             if return_code == 0:
                 job.meta['current_task'] = "Completed"
             else:
                 last_known_task = job.meta.get('current_task', 'Unknown Step')
                 job.meta['current_task'] = f"Failed: {last_known_task}"
-            # --- END SETTING FINAL CURRENT_TASK STATUS ---
             job.save_meta()
             logger.info(f"[Job {job_id}] Saved final resource stats and task status to job meta.")
 
         full_stdout = "".join(stdout_lines)
         full_stderr = "".join(stderr_lines)
-
-        # Determine success based on exit code and "status::success" marker from script
         script_reported_success = "status::success" in full_stdout
-        job_succeeded = (return_code == 0 and script_reported_success)
+        job_succeeded = (return_code == 0 and script_reported_success) # Update job_succeeded based on final status
 
         if job_succeeded:
             success_message = f"Sarek pipeline finished successfully (Exit Code {return_code})."
@@ -394,8 +373,8 @@ def run_pipeline_task(
                      publish_and_store_log(job_id, "info", f"Results directory: {final_results_dir}")
                      if job:
                           job.meta['results_path'] = final_results_dir
-                          job.save_meta() # Save meta with results_path
-                          try: # Save metadata to results directory
+                          job.save_meta()
+                          try:
                               metadata_to_save = job.meta.copy()
                               metadata_file_path = results_path_obj / METADATA_FILENAME
                               with open(metadata_file_path, 'w') as f:
@@ -404,27 +383,28 @@ def run_pipeline_task(
                           except Exception as meta_err:
                               logger.error(f"[Job {job_id}] Failed to save run metadata file: {meta_err}")
                      return { "status": "success", "results_path": final_results_dir, "resources": job.meta if job else {} }
-                else: # Should not happen if script output is correct
+                else:
                      error_message = f"Pipeline reported success, but results directory '{final_results_dir}' not found!"
                      logger.error(f"[Job {job_id}] {error_message}")
                      publish_and_store_log(job_id, "error", error_message)
                      if job: job.meta['error_message'] = error_message; job.save_meta()
+                     job_succeeded = False # Mark as failed if results dir not found
                      raise RuntimeError(error_message)
-            else: # Should not happen if script output is correct
+            else:
                 warn_message = "Pipeline finished successfully, but could not determine results directory from output."
                 logger.warning(f"[Job {job_id}] {warn_message}")
                 publish_and_store_log(job_id, "warning", warn_message)
                 if job: job.meta['warning_message'] = "Pipeline finished, results dir unclear."; job.save_meta()
                 return { "status": "success", "message": "Pipeline finished, results directory unclear.", "resources": job.meta if job else {} }
-        else: # Job failed
+        else:
             error_message = f"Sarek pipeline failed. Exit Code: {return_code}."
             if "status::failed" in full_stdout: error_message += " Script explicitly reported failure."
-            elif "ERROR" in full_stderr.upper(): error_message += " Error detected in STDERR." # General check
+            elif "ERROR" in full_stderr.upper(): error_message += " Error detected in STDERR."
             logger.error(f"[Job {job_id}] {error_message}")
             publish_and_store_log(job_id, "error", error_message)
-            stderr_to_log = full_stderr[-2000:] # Last 2000 chars of stderr
+            stderr_to_log = full_stderr[-2000:]
             logger.error(f"[Job {job_id}] STDERR Tail:\n{stderr_to_log}")
-            for err_line in stderr_to_log.strip().split('\n'): # Publish line by line
+            for err_line in stderr_to_log.strip().split('\n'):
                 publish_and_store_log(job_id, "stderr", err_line)
             if job:
                 job.meta['error_message'] = error_message
@@ -440,51 +420,81 @@ def run_pipeline_task(
         if job:
             job.meta['error_message'] = error_msg
             job.meta['stderr_snippet'] = stderr_output[:1000]
-            job.meta['current_task'] = "Timed Out" # <<< --- SET FINAL TASK STATUS ---
+            job.meta['current_task'] = "Timed Out"
             job.save_meta()
+        job_succeeded = False # Mark as failed
         raise
-    except FileNotFoundError as e: # e.g. sarek_pipeline.sh not found
+    except FileNotFoundError as e:
          error_msg = f"Error executing pipeline: {e}"
          logger.error(f"[Job {job_id}] {error_msg}")
          publish_and_store_log(job_id, "error", error_msg)
          if job:
              job.meta['error_message'] = f"Task execution error: {e}"
-             job.meta['current_task'] = "Setup Error" # <<< --- SET FINAL TASK STATUS ---
+             job.meta['current_task'] = "Setup Error"
              job.save_meta()
+         job_succeeded = False # Mark as failed
          raise
-    except Exception as e: # Catch-all for other unexpected errors
+    except Exception as e:
         error_msg = f"An unexpected error occurred during pipeline execution: {type(e).__name__}"
-        logger.exception(f"[Job {job_id}] {error_msg}") # Log full traceback
+        logger.exception(f"[Job {job_id}] {error_msg}")
         publish_and_store_log(job_id, "error", f"{error_msg}: {e}")
         if job:
             job.meta['error_message'] = error_msg
             job.meta['error_details'] = str(e)
-            job.meta['current_task'] = "Unexpected Error" # <<< --- SET FINAL TASK STATUS ---
+            job.meta['current_task'] = "Unexpected Error"
             job.save_meta()
+        job_succeeded = False # Mark as failed
         raise
     finally:
         list_key = f"{LOG_HISTORY_PREFIX}{job_id}"
         try:
             if job_id and not job_id.startswith("N/A") and redis_log_handler:
-                publish_and_store_log(job_id, "control", "EOF") # Signal end of stream
-                logger.info(f"[Job {job_id}] Published EOF marker to channel and list.")
+                publish_and_store_log(job_id, "control", "EOF")
+                logger.info(f"[Job {job_id}] Published EOF marker to log channel and list.")
 
-                # Determine TTL for log history
+                # <<< --- ADDED: Publish Job Status Notification --- >>>
+                if job: # Ensure job object exists
+                    event_type = "job_completed" if job_succeeded else "job_failed"
+                    status_text = "completed successfully" if job_succeeded else "failed"
+                    user_message = f"Job '{job.meta.get('run_name', job_id)}' {status_text}."
+
+                    if not job_succeeded:
+                        failure_reason = job.meta.get('error_message', 'Unknown error')
+                        # Truncate if too long
+                        if len(failure_reason) > 150:
+                            failure_reason = failure_reason[:147] + "..."
+                        user_message += f" Reason: {failure_reason}"
+
+                    notification_payload = {
+                        "event_type": event_type,
+                        "job_id": job_id,
+                        "run_name": job.meta.get('run_name', job_id),
+                        "message": user_message,
+                        "status_variant": "success" if job_succeeded else "error" # For frontend toast styling
+                    }
+                    try:
+                        redis_log_handler.publish(APP_NOTIFICATIONS_CHANNEL, json.dumps(notification_payload))
+                        logger.info(f"[Job {job_id}] Published '{event_type}' notification to '{APP_NOTIFICATIONS_CHANNEL}'.")
+                    except Exception as e_pub:
+                        logger.error(f"[Job {job_id}] Failed to publish job status notification: {e_pub}")
+                # <<< --- END: Publish Job Status Notification --- >>>
+
+
                 final_ttl = DEFAULT_RESULT_TTL if job_succeeded else DEFAULT_FAILURE_TTL
-                if job: # If job object exists, respect its specific TTLs if set
+                if job:
                     ttl_to_use = job.result_ttl if job_succeeded else job.failure_ttl
-                    if ttl_to_use is not None and ttl_to_use >= 0 : # 0 means expire immediately (useful for testing)
+                    if ttl_to_use is not None and ttl_to_use >= 0 :
                         final_ttl = ttl_to_use
-                    elif ttl_to_use == -1: # -1 means persist indefinitely
+                    elif ttl_to_use == -1:
                         final_ttl = -1
 
                 if final_ttl > 0:
                     redis_log_handler.expire(list_key, final_ttl)
                     logger.info(f"[Job {job_id}] Set TTL={final_ttl}s for log history list: {list_key}")
-                elif final_ttl == -1: # Persist
+                elif final_ttl == -1:
                      redis_log_handler.persist(list_key)
                      logger.info(f"[Job {job_id}] Persisted log history list (infinite TTL): {list_key}")
-                else: # final_ttl is 0 or invalid negative, delete immediately
+                else:
                     logger.warning(f"[Job {job_id}] TTL is 0 or invalid ({final_ttl}). Deleting log history list: {list_key}")
                     redis_log_handler.delete(list_key)
 
@@ -493,7 +503,6 @@ def run_pipeline_task(
         except Exception as e:
             logger.error(f"[Job {job_id}] Unexpected error during final log cleanup/TTL setting: {e}")
 
-        # Cleanup temporary CSV file
         if input_csv_path_str and Path(input_csv_path_str).exists():
             try:
                 os.remove(input_csv_path_str)

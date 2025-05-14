@@ -1,19 +1,21 @@
 // File: frontend_app/app/layout.tsx
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
-import "./globals.css"; // Keep this import
+import "./globals.css";
 
 // Layout Components
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import FileBrowserIntegration from "@/components/layout/FileBrowserIntegration";
+import FloatingNotificationButton from "@/components/layout/FloatingNotificationButton"; // <<< --- ADDED IMPORT ---
 
 // Providers and UI Elements
 import QueryProvider from "@/components/providers/QueryProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
-import { cn } from "@/lib/utils"; // Import cn
 import { FileBrowserProvider } from "@/components/layout/FileBrowserContext";
+import { NotificationProvider } from "@/components/providers/NotificationProvider"; // <<< --- ADDED IMPORT ---
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Bioinformatics Pipeline UI",
@@ -27,7 +29,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={cn("h-full", GeistSans.variable)} suppressHydrationWarning>
-       {/* Body is the main flex container taking full height */}
       <body className={cn(
           "bg-background text-foreground font-sans antialiased"
         )}>
@@ -37,24 +38,24 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <FileBrowserProvider>
-            <QueryProvider>
-               {/* Navbar is sticky relative to the body */}
-              <Navbar />
-              {/* This div becomes the scrollable container */}
-              <div className="flex flex-col flex-grow overflow-y-auto"> {/* Scrollable container */}
-                {/* Main content area with padding and centering */}
-                <main className="flex-grow container mx-auto px-4 py-8 relative"> {/* flex-grow pushes footer down */}
-                  {children}
-                </main>
-                {/* Footer is inside scrollable area, but outside main's container/padding */}
-                <Footer />
-              </div>
-              {/* These are outside the scrollable area */}
-              <Toaster richColors position="top-right" />
-              <FileBrowserIntegration />
-            </QueryProvider>
-          </FileBrowserProvider>
+          {/* --- WRAP with NotificationProvider --- */}
+          <NotificationProvider>
+            <FileBrowserProvider>
+              <QueryProvider>
+                <Navbar />
+                <div className="flex flex-col flex-grow overflow-y-auto">
+                  <main className="flex-grow container mx-auto px-4 py-8 relative">
+                    {children}
+                  </main>
+                  <Footer />
+                </div>
+                <Toaster richColors position="top-right" />
+                <FileBrowserIntegration />
+                <FloatingNotificationButton /> {/* <<< --- ADDED FloatingNotificationButton --- */}
+              </QueryProvider>
+            </FileBrowserProvider>
+          </NotificationProvider>
+          {/* --- END WRAP --- */}
         </ThemeProvider>
       </body>
     </html>
