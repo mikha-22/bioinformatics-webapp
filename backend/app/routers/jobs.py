@@ -9,7 +9,7 @@ from pathlib import Path
 import tempfile
 import csv
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field # <<< --- CORRECTED IMPORT --- >>>
 from fastapi import APIRouter, Depends, HTTPException, Body
 from fastapi.responses import JSONResponse
 
@@ -103,10 +103,7 @@ async def stage_pipeline_job(
             "staged_at": time.time(),
             "input_type": input_data.input_type,
             "input_filenames": {k: getattr(input_data, k) for k in ["intervals_file", "dbsnp", "known_indels", "pon"] if getattr(input_data, k) is not None},
-            "sample_info": [s.model_dump(exclude_unset=True) for s in input_data.samples],
-            # For new staged jobs, these are not set initially
-            "is_rerun": False,
-            "original_job_id": None
+            "sample_info": [s.model_dump(exclude_unset=True) for s in input_data.samples]
         }
         redis_conn.hset(STAGED_JOBS_KEY, staged_job_id, json.dumps(job_details_for_redis))
         logger.info(f"Staged Sarek job '{staged_job_id}' (Run Name: '{sanitized_run_name}').")
@@ -155,7 +152,7 @@ async def start_job(
         details.get("wes", False), details.get("trim_fastq", False),
         details.get("skip_qc", False), details.get("skip_annotation", False),
         details.get("skip_baserecalibrator", False),
-        details.get("is_rerun", False), # Pass the is_rerun flag to the task
+        details.get("is_rerun", False),
     )
 
     rq_job_id = staged_job_id.replace("staged_", "rqjob_")
@@ -180,8 +177,8 @@ async def start_job(
         sample_info=details.get("sample_info"),
         staged_job_id_origin=staged_job_id,
         input_csv_path_used=details.get("input_csv_path"),
-        is_rerun_execution=details.get("is_rerun", False), # Carry over from staged details
-        original_job_id=details.get("original_job_id")   # Carry over from staged details
+        is_rerun_execution=details.get("is_rerun", False),
+        original_job_id=details.get("original_job_id"),
     )
     meta_as_dict_for_rq = meta_for_rq_job_obj.model_dump(exclude_none=True)
 
@@ -228,9 +225,7 @@ async def get_jobs_list(
                     },
                     sample_info=details.get("sample_info"),
                     staged_job_id_origin=job_id_str,
-                    input_csv_path_used=details.get("input_csv_path"),
-                    is_rerun_execution=details.get("is_rerun"), # <<< CORRECTLY POPULATED
-                    original_job_id=details.get("original_job_id") # <<< CORRECTLY POPULATED
+                    input_csv_path_used=details.get("input_csv_path")
                 )
                 all_jobs_for_frontend.append(JobStatusDetails(
                     job_id=job_id_str,
@@ -242,10 +237,8 @@ async def get_jobs_list(
                     meta=meta_obj
                 ))
                 processed_rq_ids.add(job_id_str)
-            except Exception as e:
-                logger.error(f"Error parsing staged job {job_id_str} for job list: {e}", exc_info=True)
-    except redis.exceptions.RedisError as e:
-        logger.error(f"Redis error fetching staged jobs for job list: {e}")
+            except Exception as e: logger.error(f"Error parsing staged job {job_id_str}: {e}")
+    except redis.exceptions.RedisError as e: logger.error(f"Redis error fetching staged jobs: {e}")
 
     registries_config = {
         "queued": {"registry": queue, "limit": -1},
@@ -271,24 +264,7 @@ async def get_jobs_list(
                 if job:
                     current_status = job.get_status(refresh=False)
                     job_meta_dict = job.meta or {}
-                    meta_obj = JobMeta(
-                        run_name=job_meta_dict.get("run_name", job.description),
-                        input_type=job_meta_dict.get("input_type"),
-                        input_params=job_meta_dict.get("input_params"),
-                        sarek_params=job_meta_dict.get("sarek_params"),
-                        sample_info=job_meta_dict.get("sample_info"),
-                        staged_job_id_origin=job_meta_dict.get("staged_job_id_origin"),
-                        error_message=job_meta_dict.get("error_message"),
-                        stderr_snippet=job_meta_dict.get("stderr_snippet"),
-                        progress=job_meta_dict.get("progress"),
-                        current_task=job_meta_dict.get("current_task"),
-                        results_path=job_meta_dict.get("results_path"),
-                        warning_message=job_meta_dict.get("warning_message"),
-                        input_csv_path_used=job_meta_dict.get("input_csv_path_used"),
-                        is_rerun_execution=job_meta_dict.get("is_rerun_execution"), # <<< CORRECTLY POPULATED
-                        original_job_id=job_meta_dict.get("original_job_id")       # <<< CORRECTLY POPULATED
-                    )
-
+                    meta_obj = JobMeta(**job_meta_dict)
                     error_summary = None
                     if current_status == JobStatus.FAILED:
                         error_summary = meta_obj.error_message or "Job failed"
@@ -296,7 +272,6 @@ async def get_jobs_list(
                             try: error_summary = job.exc_info.strip().split('\n')[-1]
                             except: pass
                         if meta_obj.stderr_snippet: error_summary += f" (stderr: ...{meta_obj.stderr_snippet[-100:]})"
-
                     resources = JobResourceInfo(
                         peak_memory_mb=job_meta_dict.get("peak_memory_mb"),
                         average_cpu_percent=job_meta_dict.get("average_cpu_percent"),
@@ -314,14 +289,11 @@ async def get_jobs_list(
                         result=job.result, error=error_summary, meta=meta_obj,
                         resources=resources if any(v is not None for v in resources.model_dump().values()) else None
                     ))
-        except Exception as e:
-            logger.exception("Error fetching RQ job details for list.")
+        except Exception as e: logger.exception("Error fetching RQ job details for list.")
 
     def get_sort_key(job_detail: JobStatusDetails) -> float:
-        return job_detail.ended_at or \
-               job_detail.started_at or \
-               job_detail.enqueued_at or \
-               job_detail.staged_at or 0
+        return job_detail.ended_at or job_detail.started_at or \
+               job_detail.enqueued_at or job_detail.staged_at or 0
     all_jobs_for_frontend.sort(key=get_sort_key, reverse=True)
     return all_jobs_for_frontend
 
@@ -351,37 +323,18 @@ async def get_job_status_endpoint(
                 },
                 sample_info=details.get("sample_info"),
                 staged_job_id_origin=job_id,
-                input_csv_path_used=details.get("input_csv_path"),
-                is_rerun_execution=details.get("is_rerun"), # <<< CORRECTLY POPULATED
-                original_job_id=details.get("original_job_id") # <<< CORRECTLY POPULATED
+                input_csv_path_used=details.get("input_csv_path")
             )
             return JobStatusDetails(
                 job_id=job_id, run_name=details.get("run_name"), status="staged",
                 description=details.get("run_description"), staged_at=details.get("staged_at"),
                 enqueued_at=None, started_at=None, ended_at=None, meta=meta_obj
             )
-        else: # RQ Job
+        else:
             job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer)
             status = job.get_status(refresh=True)
             job_meta_dict = job.meta or {}
-            # Ensure all fields, including rerun info, are part of meta_obj for RQ jobs too
-            meta_obj = JobMeta(
-                run_name=job_meta_dict.get("run_name", job.description),
-                input_type=job_meta_dict.get("input_type"),
-                input_params=job_meta_dict.get("input_params"),
-                sarek_params=job_meta_dict.get("sarek_params"),
-                sample_info=job_meta_dict.get("sample_info"),
-                staged_job_id_origin=job_meta_dict.get("staged_job_id_origin"),
-                error_message=job_meta_dict.get("error_message"),
-                stderr_snippet=job_meta_dict.get("stderr_snippet"),
-                progress=job_meta_dict.get("progress"),
-                current_task=job_meta_dict.get("current_task"),
-                results_path=job_meta_dict.get("results_path"),
-                warning_message=job_meta_dict.get("warning_message"),
-                input_csv_path_used=job_meta_dict.get("input_csv_path_used"),
-                is_rerun_execution=job_meta_dict.get("is_rerun_execution"), # <<< CORRECTLY POPULATED
-                original_job_id=job_meta_dict.get("original_job_id")       # <<< CORRECTLY POPULATED
-            )
+            meta_obj = JobMeta(**job_meta_dict)
             error_summary = None
             if status == JobStatus.FAILED:
                 error_summary = meta_obj.error_message or "Job failed"
@@ -417,7 +370,7 @@ async def get_job_status_endpoint(
 
 
 @router.post("/stop_job/{job_id}", status_code=200, summary="Cancel Running/Queued RQ Job")
-async def stop_job(
+async def stop_job( # Renamed back to stop_job for consistency with frontend call
     job_id: str,
     redis_conn: redis.Redis = Depends(get_redis_connection),
     queue: Queue = Depends(get_pipeline_queue)
@@ -444,6 +397,7 @@ async def stop_job(
         else:
             message = f"Job {job_id} has status '{current_job_status}', cannot directly stop/cancel via this action."
             action_status = "not_stoppable"
+        # Return action_status for frontend to potentially use
         return JSONResponse(content={"message": message, "job_id": job_id, "action_status": action_status})
     except NoSuchJobError:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
@@ -453,7 +407,7 @@ async def stop_job(
 
 
 @router.delete("/remove_job/{job_id}", status_code=200, summary="Remove Job Data")
-async def remove_job(
+async def remove_job( # Renamed back to remove_job for consistency
     job_id: str,
     redis_conn: redis.Redis = Depends(get_redis_connection),
     queue: Queue = Depends(get_pipeline_queue)
@@ -482,13 +436,13 @@ async def remove_job(
             action_status = "not_found"
             message = f"Staged job '{job_id}' not found for removal."
             logger.warning(message)
-            raise HTTPException(status_code=404, detail=message)
+            raise HTTPException(status_code=404, detail=message) # Explicit 404 if not found
         else:
             job_removed_flag = False
             action_status = "error"
             message = f"Failed to remove staged job {job_id} (hdel returned 0)."
             logger.error(message)
-            raise HTTPException(status_code=500, detail=message)
+            raise HTTPException(status_code=500, detail=message) # Error if hdel failed
 
     else: # RQ Job
         try:
@@ -515,11 +469,12 @@ async def remove_job(
             action_status = "not_found"
             message = f"RQ Job '{job_id}' not found for removal."
             logger.warning(message)
-            if not redis_conn.exists(f"rq:job:{job_id}"):
-                job_removed_flag = True
+            if not redis_conn.exists(f"rq:job:{job_id}"): # Check if hash is also gone
+                job_removed_flag = True # If truly gone, consider it a success for removal
                 if redis_conn.delete(log_history_key) > 0: logger.info(f"Cleaned up orphaned log history for {job_id}")
+                # For a single delete, if not found, it should be a 404
                 raise HTTPException(status_code=404, detail=message)
-            else:
+            else: # Hash exists but fetch failed - inconsistent
                  job_removed_flag = False; action_status = "error"; message = f"RQ Job '{job_id}' inconsistent state."
                  logger.error(message)
                  raise HTTPException(status_code=500, detail=message)
@@ -539,6 +494,9 @@ async def remove_job(
         except Exception as e:
             logger.warning(f"Error cleaning up CSV {csv_path_to_remove} for job {job_id}: {e}")
 
+    # This part is reached only if job_removed_flag was true from the staged job logic
+    # or if an RQ job was successfully deleted.
+    # If an exception was raised above (like 404 or 500), this won't be reached.
     return JSONResponse(content={"message": message, "removed_id": job_id, "action_status": action_status})
 
 
@@ -583,7 +541,7 @@ async def rerun_job(
             def _resolve_path_for_rerun(relative_path_str: Optional[str], is_required: bool, allowed_extensions: Optional[List[str]] = None) -> Optional[str]:
                 if not relative_path_str:
                     if is_required: validation_errors_rerun.append(f"Sample {i+1}: Missing required path string for a field."); return None
-                    return ""
+                    return "" # Return empty string for optional non-provided paths
                 try:
                     base_dir = Path(DATA_DIR)
                     abs_path = get_safe_path(base_dir, relative_path_str)
@@ -631,10 +589,8 @@ async def rerun_job(
             "trim_fastq": sarek_p_orig.get("trim_fastq", False), "skip_qc": sarek_p_orig.get("skip_qc", False),
             "skip_annotation": sarek_p_orig.get("skip_annotation", False), "skip_baserecalibrator": sarek_p_orig.get("skip_baserecalibrator", False),
             "staged_at": time.time(), "input_type": original_meta.input_type,
-            "input_filenames": input_p_orig, # This should be input_params from original_meta
-            "sample_info": original_meta.sample_info,
-            "is_rerun": True, # Key used when storing staged job details
-            "original_job_id": job_id, # Key used when storing staged job details
+            "input_filenames": input_p_orig, "sample_info": original_meta.sample_info,
+            "is_rerun": True, "original_job_id": job_id,
         }
         redis_conn.hset(STAGED_JOBS_KEY, new_staged_job_id, json.dumps(new_job_details_for_redis))
         logger.info(f"Re-staged job {job_id} as {new_staged_job_id} with run name '{new_rerun_name}'.")
