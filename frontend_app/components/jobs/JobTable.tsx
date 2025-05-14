@@ -7,8 +7,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"; // Using the reverted, known-good table.tsx
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox"; // <<< --- ADDED IMPORT ---
 import { Job } from "@/lib/types";
 import { formatDistanceToNow } from 'date-fns';
 import { formatDuration } from "@/lib/utils";
@@ -19,10 +20,15 @@ import LiveDuration from "./LiveDuration";
 
 interface JobTableProps {
   jobs: Job[];
+  // <<< --- ADDED PROPS FOR SELECTION --- >>>
+  selectedJobIds: string[];
+  onSelectJob: (jobId: string, isSelected: boolean) => void;
+  onSelectAllJobs: (isSelected: boolean) => void;
+  isJobSelectable?: (job: Job) => boolean; // Optional: to disable selection for certain jobs
+  // <<< --- END ADDED PROPS --- >>>
 }
 
-// --- Helper Functions (mapToUiStatus, getStatusVariant, formatTimestamp) ---
-// (These are assumed to be correct and are not the source of the hydration error)
+// Helper Functions (mapToUiStatus, getStatusVariant, formatTimestamp) remain the same
 function mapToUiStatus(internalStatus: string | null | undefined): string {
     const status = internalStatus?.toLowerCase();
     switch (status) {
@@ -32,7 +38,7 @@ function mapToUiStatus(internalStatus: string | null | undefined): string {
         case 'running': return 'Running';
         case 'finished': return 'Finished';
         case 'failed': return 'Failed';
-        case 'canceled': return 'Stopped';
+        case 'canceled': return 'Stopped'; // mapToUiStatus can be more user-friendly
         case 'stopped': return 'Stopped';
         default: return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown';
     }
@@ -66,19 +72,26 @@ function formatTimestamp(timestamp: number | null | undefined): React.ReactEleme
     return "Invalid Date";
   }
 }
-// --- End Helper Functions ---
 
-export default function JobTable({ jobs }: JobTableProps) {
+
+export default function JobTable({
+  jobs,
+  selectedJobIds,
+  onSelectJob,
+  onSelectAllJobs,
+  isJobSelectable
+}: JobTableProps) {
 
   const validJobs = jobs?.filter(job => job && typeof job.job_id === 'string') || [];
 
-  if (!validJobs || validJobs.length === 0) {
-    if (jobs && jobs.length > 0 && validJobs.length === 0) {
-        console.warn("JobTable: All jobs received were invalid or missing a job_id.", jobs);
-        return <p className="text-center text-destructive py-8">Error: Received invalid job data.</p>;
-    }
+  if (!jobs || jobs.length === 0) { // Check original jobs prop for the "No jobs found" message
     return <p className="text-center text-muted-foreground py-8">No jobs found.</p>;
   }
+  if (validJobs.length === 0 && jobs.length > 0) {
+      console.warn("JobTable: All jobs received were invalid or missing a job_id.", jobs);
+      return <p className="text-center text-destructive py-8">Error: Received invalid job data.</p>;
+  }
+
 
   const formatDisplayJobId = (fullJobId: string): string => {
     if (!fullJobId) return "N/A";
@@ -121,13 +134,31 @@ export default function JobTable({ jobs }: JobTableProps) {
     return "N/A";
   };
 
+  // Determine if all currently displayed and selectable jobs are selected
+  const selectableJobsInView = validJobs.filter(job => isJobSelectable ? isJobSelectable(job) : true);
+  const allSelectableInViewSelected = selectableJobsInView.length > 0 && selectableJobsInView.every(job => selectedJobIds.includes(job.job_id));
+  const isIndeterminate = selectedJobIds.length > 0 && !allSelectableInViewSelected && selectableJobsInView.some(job => selectedJobIds.includes(job.job_id));
+
+
   return (
     <div className="border rounded-lg overflow-hidden overflow-x-auto">
       <Table>
-        <TableCaption className="mt-4">A list of your pipeline jobs.</TableCaption>
+        <TableCaption className="mt-4">A list of your pipeline jobs. Select jobs to perform batch actions.</TableCaption>
         <TableHeader>
-          {/* Ensure no whitespace directly inside TableRow if it's the only child of TableHeader */}
           <TableRow>
+            {/* --- ADDED Checkbox Header --- */}
+            <TableHead className="w-[60px] px-2 sm:px-4">
+              <Checkbox
+                checked={allSelectableInViewSelected}
+                onCheckedChange={(checked) => {
+                    onSelectAllJobs(checked === true);
+                }}
+                aria-label="Select all jobs in current view"
+                data-state={isIndeterminate ? "indeterminate" : (allSelectableInViewSelected ? "checked" : "unchecked")}
+                disabled={selectableJobsInView.length === 0}
+              />
+            </TableHead>
+            {/* --- END Checkbox Header --- */}
             <TableHead className="w-[120px] hidden lg:table-cell">Job ID</TableHead>
             <TableHead className="min-w-[150px] max-w-[250px]">Run Name</TableHead>
             <TableHead>Description</TableHead>
@@ -143,11 +174,24 @@ export default function JobTable({ jobs }: JobTableProps) {
             const internalStatus = job.status?.toLowerCase();
             const isActiveJob = internalStatus === 'running' || internalStatus === 'started';
             const currentTaskText = getCurrentTaskDisplay(job);
+            const isSelected = selectedJobIds.includes(job.job_id);
+            const selectable = isJobSelectable ? isJobSelectable(job) : true;
 
-            // CRITICAL: Ensure no whitespace or comments are rendered directly between <TableRow> and <TableCell>
-            // or between <TableCell> elements.
             return (
-              <TableRow key={job.job_id} data-state={job.status === 'finished' ? 'completed' : job.status === 'failed' ? 'error' : undefined}>
+              <TableRow
+                key={job.job_id}
+                data-state={isSelected ? "selected" : undefined} // For potential row styling on select
+              >
+                {/* --- ADDED Checkbox Cell --- */}
+                <TableCell className="px-2 sm:px-4">
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={(checked) => onSelectJob(job.job_id, checked === true)}
+                    aria-label={`Select job ${job.job_id}`}
+                    disabled={!selectable}
+                  />
+                </TableCell>
+                {/* --- END Checkbox Cell --- */}
                 <TableCell className="font-mono text-xs hidden lg:table-cell" title={job.job_id}>{formatDisplayJobId(job.job_id)}</TableCell>
                 <TableCell className="font-medium min-w-[150px] max-w-[250px] truncate" title={job.run_name ?? "N/A"}>
                   <TooltipProvider delayDuration={300}>

@@ -9,7 +9,8 @@ from pathlib import Path
 import tempfile
 import csv
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel # Ensure BaseModel is imported
+from fastapi import APIRouter, Depends, HTTPException, Body # Added Body
 from fastapi.responses import JSONResponse
 
 from rq import Queue
@@ -36,9 +37,25 @@ router = APIRouter(
     tags=["Jobs Management"]
 )
 
+# <<< --- ADDED Pydantic Models for Batch Actions --- >>>
+class BatchJobActionRequest(BaseModel):
+    job_ids: List[str] = Field(..., description="A list of job IDs to perform the action on.")
+
+class BatchActionDetail(BaseModel):
+    job_id: str
+    status: str # e.g., "stop_signal_sent", "canceled", "removed", "not_found", "error", "already_terminal", "not_stoppable", "not_removable"
+    message: Optional[str] = None
+
+class BatchActionResponse(BaseModel):
+    succeeded_count: int
+    failed_count: int
+    details: List[BatchActionDetail]
+# <<< --- END ADDED Pydantic Models --- >>>
+
+
 @router.post("/run_pipeline", status_code=200, summary="Stage Pipeline Job")
 async def stage_pipeline_job(
-    input_data: PipelineInput, # PipelineInput no longer has internal 'description'
+    input_data: PipelineInput,
     redis_conn: redis.Redis = Depends(get_redis_connection)
 ):
     logger.info(f"Received staging request. Run Name: '{input_data.run_name}', Input type: {input_data.input_type}")
@@ -69,9 +86,7 @@ async def stage_pipeline_job(
         staged_job_id = f"staged_{uuid.uuid4()}"
         job_details_for_redis = {
             "run_name": sanitized_run_name,
-            "run_description": input_data.run_description, # User's overall run description
-            # "sarek_internal_description": input_data.description, // <<< REMOVED
-
+            "run_description": input_data.run_description,
             "input_csv_path": str(input_csv_path),
             "outdir_base_path": str(RESULTS_DIR),
             "genome": input_data.genome,
@@ -127,7 +142,6 @@ async def start_job(
 
     run_name = details.get("run_name", f"run_{staged_job_id.replace('staged_','')[:8]}")
     user_run_description = details.get("run_description")
-    # sarek_config_description = details.get("sarek_internal_description") // <<< REMOVED
 
     job_args_for_task = (
         run_name,
@@ -152,7 +166,6 @@ async def start_job(
 
     meta_for_rq_job_obj = JobMeta(
         run_name=run_name,
-        # user_run_description is set on RQ Job.description, not in JobMeta.description
         input_type=details.get("input_type"),
         input_params=details.get("input_filenames"),
         sarek_params={
@@ -161,7 +174,6 @@ async def start_job(
             "joint_germline": details.get("joint_germline"), "wes": details.get("wes"),
             "trim_fastq": details.get("trim_fastq"), "skip_qc": details.get("skip_qc"),
             "skip_annotation": details.get("skip_annotation"), "skip_baserecalibrator": details.get("skip_baserecalibrator"),
-            # "description": sarek_config_description, // <<< REMOVED from sarek_params
         },
         sample_info=details.get("sample_info"),
         staged_job_id_origin=staged_job_id,
@@ -176,7 +188,7 @@ async def start_job(
             run_pipeline_task, args=job_args_for_task, job_timeout=DEFAULT_JOB_TIMEOUT,
             result_ttl=DEFAULT_RESULT_TTL, failure_ttl=DEFAULT_FAILURE_TTL,
             job_id=rq_job_id, meta=meta_as_dict_for_rq,
-            description=user_run_description # Set the RQ Job's own description field
+            description=user_run_description
         )
         logger.info(f"Enqueued job {rq_job.id} (Run Name: '{run_name}').")
     except Exception as e:
@@ -195,7 +207,6 @@ async def get_jobs_list(
 ):
     all_jobs_for_frontend: List[JobStatusDetails] = []
     processed_rq_ids = set()
-
     try:
         staged_jobs_raw = redis_conn.hgetall(STAGED_JOBS_KEY)
         for job_id_bytes, job_details_bytes in staged_jobs_raw.items():
@@ -212,7 +223,6 @@ async def get_jobs_list(
                         "joint_germline": details.get("joint_germline"), "wes": details.get("wes"),
                         "trim_fastq": details.get("trim_fastq"), "skip_qc": details.get("skip_qc"),
                         "skip_annotation": details.get("skip_annotation"), "skip_baserecalibrator": details.get("skip_baserecalibrator"),
-                        # "description": details.get("sarek_internal_description"), // <<< REMOVED
                     },
                     sample_info=details.get("sample_info"),
                     staged_job_id_origin=job_id_str,
@@ -256,7 +266,6 @@ async def get_jobs_list(
                     current_status = job.get_status(refresh=False)
                     job_meta_dict = job.meta or {}
                     meta_obj = JobMeta(**job_meta_dict)
-
                     error_summary = None
                     if current_status == JobStatus.FAILED:
                         error_summary = meta_obj.error_message or "Job failed"
@@ -264,7 +273,6 @@ async def get_jobs_list(
                             try: error_summary = job.exc_info.strip().split('\n')[-1]
                             except: pass
                         if meta_obj.stderr_snippet: error_summary += f" (stderr: ...{meta_obj.stderr_snippet[-100:]})"
-
                     resources = JobResourceInfo(
                         peak_memory_mb=job_meta_dict.get("peak_memory_mb"),
                         average_cpu_percent=job_meta_dict.get("average_cpu_percent"),
@@ -274,7 +282,7 @@ async def get_jobs_list(
                         job_id=job.id,
                         run_name=meta_obj.run_name,
                         status=current_status,
-                        description=job.description, # Use RQ Job's own description
+                        description=job.description,
                         staged_at=None,
                         enqueued_at=dt_to_timestamp(job.enqueued_at),
                         started_at=dt_to_timestamp(job.started_at),
@@ -313,7 +321,6 @@ async def get_job_status_endpoint(
                     "joint_germline": details.get("joint_germline"), "wes": details.get("wes"),
                     "trim_fastq": details.get("trim_fastq"), "skip_qc": details.get("skip_qc"),
                     "skip_annotation": details.get("skip_annotation"), "skip_baserecalibrator": details.get("skip_baserecalibrator"),
-                    # "description": details.get("sarek_internal_description"), // <<< REMOVED
                 },
                 sample_info=details.get("sample_info"),
                 staged_job_id_origin=job_id,
@@ -324,7 +331,7 @@ async def get_job_status_endpoint(
                 description=details.get("run_description"), staged_at=details.get("staged_at"),
                 enqueued_at=None, started_at=None, ended_at=None, meta=meta_obj
             )
-        else: # RQ Job
+        else:
             job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer)
             status = job.get_status(refresh=True)
             job_meta_dict = job.meta or {}
@@ -343,7 +350,7 @@ async def get_job_status_endpoint(
             )
             return JobStatusDetails(
                 job_id=job.id, run_name=meta_obj.run_name, status=status,
-                description=job.description, # User's run description from RQ Job object
+                description=job.description,
                 staged_at=None,
                 enqueued_at=dt_to_timestamp(job.enqueued_at),
                 started_at=dt_to_timestamp(job.started_at),
@@ -362,43 +369,50 @@ async def get_job_status_endpoint(
         logger.exception(f"Unexpected error for job {job_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error.")
 
+# <<< --- MODIFIED: Single Job Stop Endpoint --- >>>
 @router.post("/stop_job/{job_id}", status_code=200, summary="Cancel Running/Queued RQ Job")
-async def stop_job(
+async def stop_single_job( # Renamed to avoid conflict if we make a helper
     job_id: str,
-    redis_conn: redis.Redis = Depends(get_redis_connection),
+    redis_conn: redis.Redis = Depends(get_redis_connection), # Keep sync redis for direct command
     queue: Queue = Depends(get_pipeline_queue)
 ):
     if job_id.startswith("staged_"):
         raise HTTPException(status_code=400, detail="Cannot stop 'staged' job. Remove it instead.")
     logger.info(f"Request to stop/cancel RQ job: {job_id}")
     message = f"Action processed for job {job_id}."
+    action_status = "unknown_state"
     try:
         job = Job.fetch(job_id, connection=queue.connection)
-        status = job.get_status(refresh=True)
+        status = job.get_status(refresh=True) # Refresh status before checking
         if job.is_finished or job.is_failed or job.is_stopped or job.is_canceled:
-            message = f"Job already in terminal state: {status}."
+            message = f"Job {job_id} already in terminal state: {status}."
+            action_status = "already_terminal"
         elif status == JobStatus.QUEUED:
-            job.cancel(); message = f"Queued job {job_id} canceled."
+            job.cancel()
+            message = f"Queued job {job_id} canceled."
+            action_status = "canceled"
         elif status == JobStatus.STARTED or status == JobStatus.RUNNING :
-            redis_conn_for_command = redis.Redis(
-                host=queue.connection.connection_pool.connection_kwargs.get('host', 'localhost'),
-                port=queue.connection.connection_pool.connection_kwargs.get('port', 6379),
-                db=queue.connection.connection_pool.connection_kwargs.get('db', 0),
-                decode_responses=False
-            )
-            send_stop_job_command(redis_conn_for_command, job.id)
+            # Use the redis_conn passed by Depends for send_stop_job_command
+            # Ensure it's not decode_responses=True for this command if it matters
+            # For RQ commands, it's often better to use the queue's connection directly if possible,
+            # or a connection configured identically.
+            # The `redis_conn` from Depends should be fine if it's the same server.
+            send_stop_job_command(redis_conn, job.id) # Use the injected redis_conn
             message = f"Stop signal sent to job {job_id}."
-        else: message = f"Job {job_id} has status '{status}', cannot stop/cancel."
-        return JSONResponse(content={"message": message, "job_id": job_id})
+            action_status = "stop_signal_sent"
+        else: # e.g. deferred, scheduled - not typically stoppable this way by user
+            message = f"Job {job_id} has status '{status}', cannot directly stop/cancel via this action."
+            action_status = "not_stoppable"
+        return JSONResponse(content={"message": message, "job_id": job_id, "action_status": action_status})
     except NoSuchJobError:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
     except Exception as e:
         logger.exception(f"Error stopping/canceling job {job_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error stopping/canceling job: {str(e)}")
 
-
+# <<< --- MODIFIED: Single Job Remove Endpoint --- >>>
 @router.delete("/remove_job/{job_id}", status_code=200, summary="Remove Job Data")
-async def remove_job(
+async def remove_single_job( # Renamed to avoid conflict if we make a helper
     job_id: str,
     redis_conn: redis.Redis = Depends(get_redis_connection),
     queue: Queue = Depends(get_pipeline_queue)
@@ -406,7 +420,9 @@ async def remove_job(
     logger.info(f"Request to remove job/data for ID: {job_id}")
     csv_path_to_remove = None
     job_removed_flag = False
-    log_history_key = f"{LOG_HISTORY_PREFIX}{job_id}"
+    action_status = "unknown"
+    message = f"Processing removal for job {job_id}."
+    log_history_key = f"{LOG_HISTORY_PREFIX}{job_id}" # For RQ jobs
 
     if job_id.startswith("staged_"):
         details_bytes = redis_conn.hget(STAGED_JOBS_KEY, job_id)
@@ -414,62 +430,100 @@ async def remove_job(
             try:
                 details = json.loads(details_bytes.decode('utf-8'))
                 csv_path_to_remove = details.get("input_csv_path")
-            except (json.JSONDecodeError, UnicodeDecodeError, TypeError):
-                logger.warning(f"Could not parse details for staged job {job_id} during CSV path retrieval.")
+            except Exception: logger.warning(f"Could not parse details for staged job {job_id} during CSV path retrieval.")
+        
         if redis_conn.hdel(STAGED_JOBS_KEY, job_id) == 1:
             job_removed_flag = True
-            logger.info(f"Removed staged job: {job_id}")
-        elif not details_bytes:
-            logger.warning(f"Staged job '{job_id}' not found for removal (already gone).")
-            job_removed_flag = True
-        else:
-             logger.error(f"Failed to remove staged job {job_id} despite it existing (hdel returned 0).")
+            action_status = "removed"
+            message = f"Staged job {job_id} removed."
+            logger.info(message)
+        elif not details_bytes: # Was not found in the first place
+            action_status = "not_found"
+            message = f"Staged job '{job_id}' not found for removal."
+            logger.warning(message)
+            # Consider it "removed" in the sense that it's not there
+            # Frontend might expect a 200 if it's gone, or a 404 if it was never there.
+            # For batch, we'll report not_found. For single, a 404 is better if it never existed.
+            # Let's assume for single endpoint, if hdel is 0 AND it wasn't found initially, it's a 404.
+            # This logic is tricky. For now, if hdel is 0 and details_bytes was None, it's a 404.
+            if not details_bytes: raise HTTPException(status_code=404, detail=message)
+            job_removed_flag = False # It existed but hdel failed
+            action_status = "error"
+            message = f"Failed to remove staged job {job_id} (hdel returned 0)."
+            logger.error(message)
+        else: # Existed, but hdel failed
+            job_removed_flag = False
+            action_status = "error"
+            message = f"Failed to remove staged job {job_id} (hdel returned 0)."
+            logger.error(message)
+
     else: # RQ Job
         try:
             job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer)
-            logger.debug(f"Fetched RQ job {job_id} successfully for removal.")
+            logger.debug(f"Fetched RQ job {job_id} for removal.")
             if job.meta:
                 csv_path_to_remove = job.meta.get("input_csv_path_used") or job.meta.get("input_csv_path")
-            try:
-                logger.info(f"Attempting to remove/cancel job {job_id} from queue/registries...")
-                if job.is_queued: job.cancel()
-                FinishedJobRegistry(queue=queue).remove(job, delete_job=False)
-                FailedJobRegistry(queue=queue).remove(job, delete_job=False)
-                CanceledJobRegistry(queue=queue).remove(job, delete_job=False)
-                StartedJobRegistry(queue=queue).remove(job, delete_job=False)
-                DeferredJobRegistry(queue=queue).remove(job, delete_job=False)
-                ScheduledJobRegistry(queue=queue).remove(job, delete_job=False)
-                logger.info(f"Attempted removal of job {job_id} from all registries.")
-            except InvalidJobOperation as e: logger.debug(f"Job {job_id} state issue during registry removal: {e}")
-            except Exception as reg_remove_err: logger.warning(f"Error during registry removal for job {job_id}: {reg_remove_err}")
-            job.delete()
+            
+            # Attempt to remove from registries first (best effort)
+            registries_to_try = [
+                FinishedJobRegistry(queue=queue), FailedJobRegistry(queue=queue),
+                CanceledJobRegistry(queue=queue), StartedJobRegistry(queue=queue),
+                DeferredJobRegistry(queue=queue), ScheduledJobRegistry(queue=queue)
+            ]
+            for registry in registries_to_try:
+                try: registry.remove(job, delete_job=False) # delete_job=False as we delete explicitly later
+                except InvalidJobOperation: pass # Job might not be in this state
+                except Exception as e_reg: logger.warning(f"Minor error removing {job_id} from {registry.__class__.__name__}: {e_reg}")
+
+            job.delete() # This deletes the job hash from Redis
             job_removed_flag = True
-            logger.info(f"RQ Job hash for {job_id} deleted.")
+            action_status = "removed"
+            message = f"RQ Job {job_id} and its data deleted."
+            logger.info(message)
+            # Clean up log history for RQ jobs
+            if redis_conn.delete(log_history_key) > 0:
+                logger.info(f"Cleaned up log history for RQ job {job_id}: {log_history_key}")
+
         except NoSuchJobError:
-            logger.warning(f"RQ Job '{job_id}' not found for removal.")
-            if not redis_conn.exists(f"rq:job:{job_id}"): job_removed_flag = True
+            action_status = "not_found"
+            message = f"RQ Job '{job_id}' not found for removal."
+            logger.warning(message)
+            # If the job hash doesn't exist, it's effectively removed.
+            if not redis_conn.exists(f"rq:job:{job_id}"):
+                job_removed_flag = True # Consider it successfully "removed" if it's not in Redis
+                # Also try to clean up log history if it exists
+                if redis_conn.delete(log_history_key) > 0:
+                    logger.info(f"Cleaned up orphaned log history for non-existent RQ job {job_id}: {log_history_key}")
+            else: # Should not happen if NoSuchJobError was raised
+                 job_removed_flag = False
+                 action_status = "error"
+                 message = f"RQ Job '{job_id}' not found by fetch, but hash exists. Inconsistent state."
+                 logger.error(message)
+
+
         except Exception as e:
             logger.exception(f"Error removing RQ job {job_id}: {e}")
             job_removed_flag = False
+            action_status = "error"
+            message = f"Error removing RQ job {job_id}: {str(e)}"
+
+    if job_removed_flag and csv_path_to_remove:
+        try:
+            csv_p = Path(csv_path_to_remove)
+            # Only remove if it's a CSV in the temp directory
+            if csv_p.is_file() and csv_p.suffix == '.csv' and str(csv_p.parent).startswith(tempfile.gettempdir()):
+                os.remove(csv_p)
+                logger.info(f"Cleaned up temp CSV: {csv_p} for job {job_id}")
+        except Exception as e:
+            logger.warning(f"Error cleaning up CSV {csv_path_to_remove} for job {job_id}: {e}")
 
     if job_removed_flag:
-        if csv_path_to_remove:
-            try:
-                csv_p = Path(csv_path_to_remove)
-                if csv_p.is_file() and csv_p.suffix == '.csv' and str(csv_p.parent).startswith(tempfile.gettempdir()):
-                    os.remove(csv_p); logger.info(f"Cleaned up temp CSV: {csv_p}")
-            except Exception as e: logger.warning(f"Error cleaning up CSV {csv_path_to_remove} for job {job_id}: {e}")
-        if not job_id.startswith("staged_"):
-            if redis_conn.delete(log_history_key) > 0: logger.info(f"Cleaned up log history for {job_id}")
-        return JSONResponse(content={"message": f"Job {job_id} removal processed.", "removed_id": job_id})
+        return JSONResponse(content={"message": message, "removed_id": job_id, "action_status": action_status})
     else:
-        logger.warning(f"Job {job_id} not definitively removed or was not found.")
-        if job_id.startswith("staged_"):
-            if not redis_conn.hexists(STAGED_JOBS_KEY, job_id): raise HTTPException(status_code=404, detail=f"Staged job '{job_id}' not found.")
-        else:
-            try: Job.fetch(job_id, connection=queue.connection); raise HTTPException(status_code=500, detail=f"Failed to remove RQ job '{job_id}'.")
-            except NoSuchJobError: raise HTTPException(status_code=404, detail=f"RQ job '{job_id}' not found.")
-        raise HTTPException(status_code=500, detail=f"Failed to process removal for job {job_id}.")
+        # If not removed and was not_found initially (for RQ jobs specifically)
+        if action_status == "not_found" and not job_id.startswith("staged_"):
+             raise HTTPException(status_code=404, detail=message)
+        raise HTTPException(status_code=500, detail=message)
 
 
 @router.post("/rerun_job/{job_id}", status_code=200, summary="Re-stage Failed/Finished Job")
@@ -488,14 +542,10 @@ async def rerun_job(
             raise HTTPException(status_code=400, detail=f"Missing original parameters for job {job_id}.")
 
         original_meta = JobMeta(**original_job.meta)
-        
-        # --- MODIFICATION: Use original run name and description ---
         original_run_name_from_meta = original_meta.run_name or f"run_{job_id.replace('rqjob_','')[:8]}"
-        original_user_run_description = original_job.description # This is the user's overall description
-
+        original_user_run_description = original_job.description
         new_rerun_name = original_run_name_from_meta
         new_rerun_user_description = original_user_run_description
-        # --- END MODIFICATION ---
 
         if not original_meta.input_type or not original_meta.sarek_params or not original_meta.sarek_params.get("step") or not original_meta.sample_info:
             raise HTTPException(status_code=400, detail="Essential original parameters missing for re-run.")
@@ -519,11 +569,11 @@ async def rerun_job(
                     if is_required: validation_errors_rerun.append(f"Sample {i+1}: Missing required path string for a field."); return None
                     return ""
                 try:
-                    base_dir = Path(DATA_DIR)
+                    base_dir = Path(DATA_DIR) # Ensure DATA_DIR is used
                     abs_path = get_safe_path(base_dir, relative_path_str)
                     if not abs_path.is_file(): validation_errors_rerun.append(f"Sample {i+1}: File '{relative_path_str}' (abs: {abs_path}) not found."); return None
                     if allowed_extensions and not any(abs_path.name.lower().endswith(ext.lower()) for ext in allowed_extensions): validation_errors_rerun.append(f"Sample {i+1}: File '{relative_path_str}' has invalid extension. Allowed: {', '.join(allowed_extensions)}"); return None
-                    return str(abs_path)
+                    return str(abs_path) # Return absolute path for the new CSV
                 except HTTPException as e_http: validation_errors_rerun.append(f"Sample {i+1}: Path error for '{relative_path_str}': {e_http.detail}"); return None
                 except Exception as e_gen: validation_errors_rerun.append(f"Sample {i+1}: General error for '{relative_path_str}': {str(e_gen)}"); return None
 
@@ -552,8 +602,8 @@ async def rerun_job(
         input_p_orig = original_meta.input_params or {}
 
         new_job_details_for_redis = {
-            "run_name": new_rerun_name, # Uses original run name
-            "run_description": new_rerun_user_description, # Uses original run description
+            "run_name": new_rerun_name,
+            "run_description": new_rerun_user_description,
             "input_csv_path": new_temp_csv_file_path, "outdir_base_path": str(RESULTS_DIR),
             "genome": sarek_p_orig.get("genome"), "tools": sarek_p_orig.get("tools"), "step": sarek_p_orig.get("step"),
             "profile": sarek_p_orig.get("profile"), "aligner": sarek_p_orig.get("aligner"),
@@ -584,3 +634,159 @@ async def rerun_job(
             try: os.remove(new_temp_csv_file_path)
             except OSError: logger.warning(f"Failed to cleanup temp CSV {new_temp_csv_file_path} after unexpected error during rerun.")
         raise HTTPException(status_code=500, detail=f"Error re-staging job: {str(e)}")
+
+
+# <<< --- NEW Batch Stop Endpoint --- >>>
+@router.post("/jobs/batch_stop", response_model=BatchActionResponse, summary="Stop/Cancel Multiple RQ Jobs")
+async def batch_stop_jobs(
+    request_body: BatchJobActionRequest = Body(...),
+    redis_conn: redis.Redis = Depends(get_redis_connection), # Sync redis for direct command
+    queue: Queue = Depends(get_pipeline_queue)
+):
+    job_ids = request_body.job_ids
+    if not job_ids:
+        raise HTTPException(status_code=400, detail="No job IDs provided for batch stop.")
+
+    logger.info(f"Received batch stop request for {len(job_ids)} jobs: {job_ids}")
+    results: List[BatchActionDetail] = []
+    succeeded_count = 0
+    failed_count = 0
+
+    for job_id in job_ids:
+        if job_id.startswith("staged_"):
+            results.append(BatchActionDetail(job_id=job_id, status="not_stoppable", message="Cannot stop 'staged' job."))
+            failed_count += 1
+            continue
+        
+        action_status = "unknown_error"
+        message = f"Error processing stop for job {job_id}."
+        try:
+            job = Job.fetch(job_id, connection=queue.connection)
+            current_job_status = job.get_status(refresh=True)
+
+            if job.is_finished or job.is_failed or job.is_stopped or job.is_canceled:
+                message = f"Job already in terminal state: {current_job_status}."
+                action_status = "already_terminal"
+                # For batch, we might consider this a "success" in terms of not needing action
+                succeeded_count +=1 
+            elif current_job_status == JobStatus.QUEUED:
+                job.cancel()
+                message = f"Queued job {job_id} canceled."
+                action_status = "canceled"
+                succeeded_count += 1
+            elif current_job_status == JobStatus.STARTED or current_job_status == JobStatus.RUNNING:
+                send_stop_job_command(redis_conn, job.id)
+                message = f"Stop signal sent to job {job_id}."
+                action_status = "stop_signal_sent"
+                succeeded_count += 1
+            else:
+                message = f"Job {job_id} has status '{current_job_status}', cannot directly stop/cancel."
+                action_status = "not_stoppable"
+                failed_count += 1
+            results.append(BatchActionDetail(job_id=job_id, status=action_status, message=message))
+        except NoSuchJobError:
+            results.append(BatchActionDetail(job_id=job_id, status="not_found", message="Job not found."))
+            failed_count += 1
+        except Exception as e:
+            logger.error(f"Error stopping job {job_id} in batch: {e}", exc_info=True)
+            results.append(BatchActionDetail(job_id=job_id, status="error", message=str(e)))
+            failed_count += 1
+            
+    logger.info(f"Batch stop processed. Succeeded: {succeeded_count}, Failed: {failed_count}")
+    return BatchActionResponse(succeeded_count=succeeded_count, failed_count=failed_count, details=results)
+
+
+# <<< --- NEW Batch Remove Endpoint --- >>>
+@router.post("/jobs/batch_remove", response_model=BatchActionResponse, summary="Remove Multiple Jobs")
+async def batch_remove_jobs(
+    request_body: BatchJobActionRequest = Body(...),
+    redis_conn: redis.Redis = Depends(get_redis_connection),
+    queue: Queue = Depends(get_pipeline_queue)
+):
+    job_ids = request_body.job_ids
+    if not job_ids:
+        raise HTTPException(status_code=400, detail="No job IDs provided for batch remove.")
+
+    logger.info(f"Received batch remove request for {len(job_ids)} jobs: {job_ids}")
+    results: List[BatchActionDetail] = []
+    succeeded_count = 0
+    failed_count = 0
+
+    for job_id in job_ids:
+        action_status = "unknown_error"
+        message = f"Error processing removal for job {job_id}."
+        csv_path_to_remove_batch = None
+        log_history_key_batch = f"{LOG_HISTORY_PREFIX}{job_id}"
+        job_removed_this_iteration = False
+
+        try:
+            if job_id.startswith("staged_"):
+                details_bytes_batch = redis_conn.hget(STAGED_JOBS_KEY, job_id)
+                if details_bytes_batch:
+                    try:
+                        details_batch = json.loads(details_bytes_batch.decode('utf-8'))
+                        csv_path_to_remove_batch = details_batch.get("input_csv_path")
+                    except Exception: pass # Ignore parsing error for CSV path
+                
+                if redis_conn.hdel(STAGED_JOBS_KEY, job_id) == 1:
+                    job_removed_this_iteration = True
+                    action_status = "removed"
+                    message = f"Staged job {job_id} removed."
+                    succeeded_count += 1
+                elif not details_bytes_batch: # Not found initially
+                    action_status = "not_found"
+                    message = f"Staged job {job_id} not found."
+                    failed_count +=1 # Or count as success if goal is "it's gone"? For now, fail if not found.
+                else: # Existed, but hdel failed
+                    action_status = "error"
+                    message = f"Failed to remove staged job {job_id} (hdel returned 0)."
+                    failed_count += 1
+            else: # RQ Job
+                try:
+                    job = Job.fetch(job_id, connection=queue.connection, serializer=queue.serializer)
+                    if job.meta:
+                        csv_path_to_remove_batch = job.meta.get("input_csv_path_used") or job.meta.get("input_csv_path")
+                    
+                    registries_to_try = [ FinishedJobRegistry(queue=queue), FailedJobRegistry(queue=queue), CanceledJobRegistry(queue=queue), StartedJobRegistry(queue=queue), DeferredJobRegistry(queue=queue), ScheduledJobRegistry(queue=queue) ]
+                    for registry in registries_to_try:
+                        try: registry.remove(job, delete_job=False)
+                        except InvalidJobOperation: pass
+                        except Exception: pass # Best effort
+                    
+                    job.delete()
+                    job_removed_this_iteration = True
+                    action_status = "removed"
+                    message = f"RQ Job {job_id} deleted."
+                    succeeded_count += 1
+                    if redis_conn.delete(log_history_key_batch) > 0:
+                        logger.info(f"Cleaned up log history for RQ job {job_id} in batch: {log_history_key_batch}")
+
+                except NoSuchJobError:
+                    action_status = "not_found"
+                    message = f"RQ Job {job_id} not found."
+                    # If job hash doesn't exist, it's effectively gone.
+                    if not redis_conn.exists(f"rq:job:{job_id}"):
+                        succeeded_count += 1 # Count as success if it's truly gone
+                        if redis_conn.delete(log_history_key_batch) > 0:
+                             logger.info(f"Cleaned up orphaned log history for non-existent RQ job {job_id} in batch: {log_history_key_batch}")
+                    else:
+                        failed_count += 1
+            
+            if job_removed_this_iteration and csv_path_to_remove_batch:
+                try:
+                    csv_p_batch = Path(csv_path_to_remove_batch)
+                    if csv_p_batch.is_file() and csv_p_batch.suffix == '.csv' and str(csv_p_batch.parent).startswith(tempfile.gettempdir()):
+                        os.remove(csv_p_batch)
+                        logger.info(f"Cleaned up temp CSV: {csv_p_batch} for job {job_id} in batch.")
+                except Exception as e_csv:
+                    logger.warning(f"Error cleaning up CSV {csv_path_to_remove_batch} for job {job_id} in batch: {e_csv}")
+            
+            results.append(BatchActionDetail(job_id=job_id, status=action_status, message=message))
+
+        except Exception as e:
+            logger.error(f"Error removing job {job_id} in batch: {e}", exc_info=True)
+            results.append(BatchActionDetail(job_id=job_id, status="error", message=str(e)))
+            failed_count += 1
+            
+    logger.info(f"Batch remove processed. Succeeded: {succeeded_count}, Failed: {failed_count}")
+    return BatchActionResponse(succeeded_count=succeeded_count, failed_count=failed_count, details=results)

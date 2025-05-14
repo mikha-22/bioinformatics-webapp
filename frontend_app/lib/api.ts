@@ -1,10 +1,10 @@
 // File: frontend_app/lib/api.ts
 import axios from "axios";
-import { Job, PipelineInput, ResultRun, ResultItem, DataFile, JobStatusDetails, RunParameters, ProfileData } from "./types";
+import { Job, PipelineInput, ResultRun, ResultItem, DataFile, JobStatusDetails, RunParameters, ProfileData } from "./types"; // Existing types
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-console.log("[API Init DEBUG] NEXT_PUBLIC_API_BASE_URL:", API_BASE_URL); // For debugging
+console.log("[API Init DEBUG] NEXT_PUBLIC_API_BASE_URL:", API_BASE_URL);
 if (!API_BASE_URL && typeof window !== 'undefined') {
   console.error("CRITICAL: NEXT_PUBLIC_API_BASE_URL is not defined. API calls will likely fail.");
 }
@@ -16,7 +16,6 @@ const apiClient = axios.create({
   },
 });
 
-// ... (interceptors as before) ...
 apiClient.interceptors.request.use(
   (config) => {
     return config;
@@ -40,6 +39,20 @@ apiClient.interceptors.response.use(
     return Promise.reject(enhancedError);
   }
 );
+
+// <<< --- ADDED Batch Action Response Types --- >>>
+export interface BatchActionDetail {
+  job_id: string;
+  status: string; // e.g., "stop_signal_sent", "canceled", "removed", "not_found", "error"
+  message?: string;
+}
+
+export interface BatchActionResponse {
+  succeeded_count: number;
+  failed_count: number;
+  details: BatchActionDetail[];
+}
+// <<< --- END ADDED Batch Action Response Types --- >>>
 
 
 // ========================
@@ -79,10 +92,10 @@ export const startJob = async (stagedJobId: string): Promise<{ message: string; 
     }
 };
 
-export const stopJob = async (jobId: string): Promise<{ message: string; job_id: string }> => {
+export const stopJob = async (jobId: string): Promise<{ message: string; job_id: string, action_status: string }> => { // Added action_status
     if (!jobId) throw new Error("Job ID is required to stop.");
      try {
-        const response = await apiClient.post(`/api/stop_job/${jobId}`);
+        const response = await apiClient.post(`/api/stop_job/${jobId}`); // Path remains the same for single stop
         return response.data;
     } catch (error) {
          console.error(`Failed to stop job ${jobId}:`, error);
@@ -90,10 +103,10 @@ export const stopJob = async (jobId: string): Promise<{ message: string; job_id:
     }
 };
 
-export const removeJob = async (jobId: string): Promise<{ message: string; removed_id: string }> => {
+export const removeJob = async (jobId: string): Promise<{ message: string; removed_id: string, action_status: string }> => { // Added action_status
     if (!jobId) throw new Error("Job ID is required to remove.");
      try {
-        const response = await apiClient.delete(`/api/remove_job/${jobId}`);
+        const response = await apiClient.delete(`/api/remove_job/${jobId}`); // Path remains the same for single remove
         return response.data;
     } catch (error) {
          console.error(`Failed to remove job ${jobId}:`, error);
@@ -112,9 +125,39 @@ export const rerunJob = async (jobId: string): Promise<{ message: string; staged
     }
 };
 
+// <<< --- ADDED Batch Job Action API Functions --- >>>
+export const batchStopJobs = async (jobIds: string[]): Promise<BatchActionResponse> => {
+  if (!jobIds || jobIds.length === 0) {
+    throw new Error("At least one Job ID is required for batch stop.");
+  }
+  try {
+    const response = await apiClient.post<BatchActionResponse>("/api/jobs/batch_stop", { job_ids: jobIds });
+    return response.data;
+  } catch (error) {
+    console.error("Failed to batch stop jobs:", error);
+    throw error;
+  }
+};
+
+export const batchRemoveJobs = async (jobIds: string[]): Promise<BatchActionResponse> => {
+  if (!jobIds || jobIds.length === 0) {
+    throw new Error("At least one Job ID is required for batch remove.");
+  }
+  try {
+    const response = await apiClient.post<BatchActionResponse>("/api/jobs/batch_remove", { job_ids: jobIds });
+    return response.data;
+  } catch (error) {
+    console.error("Failed to batch remove jobs:", error);
+    throw error;
+  }
+};
+// <<< --- END ADDED Batch Job Action API Functions --- >>>
+
+
 // ========================
 // Results Data Functions
 // ========================
+// ... (existing results functions remain unchanged) ...
 export const getResultsList = async (): Promise<ResultRun[]> => {
   try {
     const response = await apiClient.get<ResultRun[]>("/api/get_results");
@@ -180,29 +223,22 @@ export const downloadResultFile = async (runDirName: string, filePath: string): 
     }
 };
 
-// --- MultiQC Path API FUNCTION ---
 export const getMultiQCReportPath = async (runDirName: string): Promise<string | null> => {
-  console.log(`[API getMultiQCReportPath DEBUG] Function called with runDirName: '${runDirName}'`);
   if (!runDirName) {
-    console.warn("[API getMultiQCReportPath DEBUG] runDirName is empty, returning null.");
     return null;
   }
   try {
-    console.log(`[API getMultiQCReportPath DEBUG] Attempting apiClient.get for /api/results/${encodeURIComponent(runDirName)}/multiqc_path`);
     const response = await apiClient.get<string | null>(`/api/results/${encodeURIComponent(runDirName)}/multiqc_path`);
-    console.log(`[API getMultiQCReportPath DEBUG] for ${runDirName} - Response Status: ${response.status}, Data:`, response.data);
-    return response.data; // This will be the path string or null
+    return response.data;
   } catch (error) {
     const axiosError = error as any;
     if (axiosError.isAxiosError && axiosError.response && axiosError.response.status === 404) {
-      console.log(`[API getMultiQCReportPath DEBUG] MultiQC report path not found for run ${runDirName} (API returned 404).`);
       return null;
     }
-    console.error(`[API getMultiQCReportPath DEBUG] Error fetching MultiQC path for run ${runDirName}:`, error);
+    console.error(`Error fetching MultiQC path for run ${runDirName}:`, error);
     throw error;
   }
 };
-// --- END MultiQC Path API FUNCTION ---
 
 // ========================
 // Pipeline Staging Function
@@ -210,7 +246,6 @@ export const getMultiQCReportPath = async (runDirName: string): Promise<string |
 export const stagePipelineJob = async (values: PipelineInput): Promise<{ message: string; staged_job_id: string }> => {
   const apiPayload: PipelineInput = values;
   try {
-    // console.log("Staging Job with API Payload:", apiPayload); // Already have this
     const response = await apiClient.post('/api/run_pipeline', apiPayload);
     return response.data;
   } catch (error) {
@@ -241,6 +276,7 @@ export const getDataFiles = async (type?: string, extensions?: string[]): Promis
 // ========================
 // Profile Management Functions
 // ========================
+// ... (existing profile functions remain unchanged) ...
 export const listProfileNames = async (): Promise<string[]> => {
     try {
         const response = await apiClient.get<string[]>("/api/profiles");
@@ -255,7 +291,7 @@ export const getProfileData = async (profileName: string): Promise<ProfileData> 
     if (!profileName) throw new Error("Profile name is required.");
     try {
         const response = await apiClient.get<ProfileData>(`/api/profiles/${encodeURIComponent(profileName)}`);
-        return response.data || {};
+        return response.data || {}; // Ensure it returns an object even if data is null/undefined
     } catch (error) {
          console.error(`Failed to fetch profile data for ${profileName}:`, error);
         throw error;
