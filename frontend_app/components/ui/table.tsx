@@ -1,10 +1,10 @@
 // File: frontend_app/components/ui/table.tsx
-"use client"; // Assuming this was intended, keep if so. Remove if not a client component.
+"use client";
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-// Main table component - CORRECTED
+// Main table component
 function Table({ className, children, ...props }: React.ComponentProps<"table">) {
   return (
     <div
@@ -14,16 +14,14 @@ function Table({ className, children, ...props }: React.ComponentProps<"table">)
       <table
         data-slot="table"
         className={cn("w-full caption-bottom text-sm", className)}
-        {...props} // Spread props here
-      >{/* Ensure no space before children */}
-        {children}
-      {/* Ensure no space after children before closing tag */}</table>
+        {...props}
+      >{children}</table>
     </div>
   )
 }
 Table.displayName = "Table"
 
-// TableRow component - CORRECTED
+// TableRow component
 function TableRow({ className, children, ...props }: React.ComponentProps<"tr">) {
   return (
     <tr
@@ -32,10 +30,10 @@ function TableRow({ className, children, ...props }: React.ComponentProps<"tr">)
         "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors",
         className
       )}
-      {...props} // Spread props here
-    >{/* Ensure no space before children */}
+      {...props}
+    >
       {children}
-    {/* Ensure no space after children before closing tag */}</tr>
+    </tr>
   );
 }
 TableRow.displayName = "TableRow"
