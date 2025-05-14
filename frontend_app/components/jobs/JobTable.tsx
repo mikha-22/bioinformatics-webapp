@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Job } from "@/lib/types";
+import { Job } from "@/lib/types"; // Job type now includes updated JobMeta
 import { formatDistanceToNow } from 'date-fns';
 import { formatDuration } from "@/lib/utils";
 import JobActions from "./JobActions";
@@ -32,11 +32,11 @@ function mapToUiStatus(internalStatus: string | null | undefined): string {
     switch (status) {
         case 'staged': return 'Staged';
         case 'queued': return 'Queued';
-        case 'started': return 'Running';
+        case 'started': return 'Running'; // Map 'started' to 'Running' for UI
         case 'running': return 'Running';
         case 'finished': return 'Finished';
         case 'failed': return 'Failed';
-        case 'canceled': return 'Stopped';
+        case 'canceled': return 'Stopped'; // User-friendly term
         case 'stopped': return 'Stopped';
         default: return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown';
     }
@@ -67,6 +67,7 @@ function formatTimestamp(timestamp: number | null | undefined): React.ReactEleme
     return "Invalid Date";
   }
 }
+
 
 export default function JobTable({
   jobs,
@@ -101,8 +102,9 @@ export default function JobTable({
     const meta = job.meta;
     const currentTaskFromMeta = meta?.current_task;
     const configuredStep = meta?.sarek_params?.step;
+
     let text = "N/A";
-    let percentage: number | null = null;
+    let percentage: number | null = null; // Initialize as null
     let taskCounts: string | undefined = undefined;
 
     if (typeof meta?.completed_task_count === 'number' && typeof meta?.submitted_task_count === 'number' && meta.submitted_task_count > 0) {
@@ -113,6 +115,10 @@ export default function JobTable({
         text = currentTaskFromMeta ? `Running: ${currentTaskFromMeta}` : (configuredStep ? `Starting: ${configuredStep}` : "Processing...");
         if (typeof meta?.overall_progress === 'number') {
             percentage = Math.max(0, Math.min(100, meta.overall_progress));
+        } else if (typeof meta?.completed_task_count === 'number' && typeof meta?.submitted_task_count === 'number' && meta.submitted_task_count > 0) {
+            percentage = Math.max(0, Math.min(100, (meta.completed_task_count / meta.submitted_task_count) * 100));
+        } else {
+            percentage = 0; // Default to 0% if no progress data yet for running/started jobs
         }
     } else if (status === 'finished') {
         text = `Completed`;
@@ -122,17 +128,21 @@ export default function JobTable({
         if (typeof meta?.overall_progress === 'number') {
             percentage = Math.max(0, Math.min(100, meta.overall_progress));
         }
+        // For failed jobs, if overall_progress is null, percentage remains null (no bar or 0% bar based on rendering logic)
     } else if (status === 'queued') {
-        text = "Queued"; percentage = 0;
+        text = "Queued";
+        percentage = 0;
     } else if (status === 'staged') {
-        text = "Staged"; percentage = 0;
+        text = "Staged";
+        percentage = 0;
     } else if (status === 'stopped' || status === 'canceled') {
         text = `Stopped: ${currentTaskFromMeta || 'User action'}`;
         if (typeof meta?.overall_progress === 'number') {
             percentage = Math.max(0, Math.min(100, meta.overall_progress));
         }
+        // For stopped jobs, if overall_progress is null, percentage remains null
     } else {
-        text = mapToUiStatus(job.status);
+        text = mapToUiStatus(job.status); // Fallback for any other unknown status
     }
     return { text, percentage, taskCounts };
   };
@@ -146,7 +156,7 @@ export default function JobTable({
       <Table>
         <TableCaption className="mt-4">A list of your pipeline jobs. Select jobs to perform batch actions.</TableCaption>
         <TableHeader>
-          <TableRow>{/* Ensure no whitespace or comments directly inside TableRow or between TableHead elements */}
+          <TableRow>
             <TableHead className="w-[60px] px-2 sm:px-4">
               <Checkbox
                 checked={allSelectableInViewSelected}
@@ -173,10 +183,11 @@ export default function JobTable({
             const { text: progressText, percentage: progressPercentage, taskCounts } = getProgressDisplayInfo(job);
             const isSelected = selectedJobIds.includes(job.job_id);
             const selectable = isJobSelectable ? isJobSelectable(job) : true;
+
             const displayProgressText = taskCounts ? `${progressText} ${taskCounts}` : progressText;
 
             return (
-              <TableRow key={job.job_id} data-state={isSelected ? "selected" : undefined}>{/* Ensure no whitespace or comments directly inside TableRow or between TableCell elements */}
+              <TableRow key={job.job_id} data-state={isSelected ? "selected" : undefined}>
                 <TableCell className="px-2 sm:px-4">
                   <Checkbox checked={isSelected} onCheckedChange={(checked) => onSelectJob(job.job_id, checked === true)} aria-label={`Select job ${job.job_id}`} disabled={!selectable} />
                 </TableCell>
@@ -188,17 +199,14 @@ export default function JobTable({
                 <TableCell className="max-w-xs truncate" title={job.description ?? "No description"}>{job.description || <span className="italic text-muted-foreground">No description</span>}</TableCell>
                 <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
                   <div className="flex flex-col space-y-1 w-full">
-                    {/* Conditionally render TooltipProvider only if displayProgressText is non-empty */}
                     {displayProgressText && displayProgressText.trim().length > 0 ? (
                       <TooltipProvider delayDuration={150}>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            {/* Ensure this span is always a valid React element child */}
                             <span className="truncate text-xs block" style={{maxWidth: "200px"}} title={displayProgressText}>
                               {displayProgressText}
                             </span>
                           </TooltipTrigger>
-                          {/* Only render TooltipContent if text is actually long enough to be truncated or warrants a tooltip */}
                           {displayProgressText.length > 35 && (
                             <TooltipContent side="top" align="start" className="max-w-xs break-words">
                               <p>{displayProgressText}</p>
@@ -209,15 +217,16 @@ export default function JobTable({
                     ) : (
                       <span className="truncate text-xs block" style={{maxWidth: "200px"}}>{progressText || "N/A"}</span>
                     )}
-                    {(progressPercentage !== null && (internalStatus === 'running' || internalStatus === 'started' || internalStatus === 'finished' || internalStatus === 'failed' || internalStatus === 'stopped' || internalStatus === 'canceled' || internalStatus === 'queued' || internalStatus === 'staged')) && (
+                    {/* Render Progress bar if percentage is a number (0-100) */}
+                    {typeof progressPercentage === 'number' && (
                       <Progress
                         value={progressPercentage}
                         className="h-2 w-full"
                         indicatorClassName={
                             internalStatus === 'failed' ? "bg-destructive" :
                             (internalStatus === 'finished' || progressPercentage === 100) ? "bg-green-500" :
-                            (internalStatus === 'queued' || internalStatus === 'staged') ? "bg-muted-foreground/30" :
-                            "bg-primary"
+                            (internalStatus === 'queued' || internalStatus === 'staged') ? "bg-muted-foreground/30" : // Muted for 0% non-active
+                            "bg-primary" // Active running
                         } />
                     )}
                   </div>
