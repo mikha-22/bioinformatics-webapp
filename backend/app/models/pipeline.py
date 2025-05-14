@@ -18,7 +18,7 @@ class SampleInfo(BaseModel):
 class PipelineInput(BaseModel):
     """ Main input model """
     run_name: str = Field(..., description="User-defined name for the pipeline run. Spaces will be converted to underscores.")
-    run_description: Optional[str] = Field(None, description="Optional user-defined description for the pipeline run.") # User's overall description
+    run_description: Optional[str] = Field(None, description="Optional user-defined description for the pipeline run.")
     input_type: str = Field(..., description="Type of input data ('fastq', 'bam_cram', 'vcf')")
     samples: List[SampleInfo] = Field(..., description="List of sample information, structure depends on input_type")
 
@@ -40,7 +40,6 @@ class PipelineInput(BaseModel):
     skip_qc: Optional[bool] = Field(False, description="Skip QC steps")
     skip_annotation: Optional[bool] = Field(False, description="Skip annotation steps")
     skip_baserecalibrator: Optional[bool] = Field(False, description="Skip base quality score recalibration")
-    # description: Optional[str] = Field(None, ...) // <<< REMOVED Sarek's internal config description
 
 class JobResourceInfo(BaseModel):
     peak_memory_mb: Optional[float] = None
@@ -49,15 +48,14 @@ class JobResourceInfo(BaseModel):
 
 class JobMeta(BaseModel):
     run_name: Optional[str] = Field(None, description="User-defined name for the pipeline run.")
-    # The user's overall run_description is stored in RQ Job.description / JobStatusDetails.description
     input_type: Optional[str] = None
     input_params: Optional[Dict[str, Optional[str]]] = Field(default_factory=dict)
-    sarek_params: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Sarek-specific parameters. If Sarek uses an internal description, it would be part of this dict.")
+    sarek_params: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Sarek-specific parameters.")
     sample_info: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     staged_job_id_origin: Optional[str] = None
     error_message: Optional[str] = None
     stderr_snippet: Optional[str] = None
-    progress: Optional[int] = None
+    # progress: Optional[int] = None # This was a generic progress, replaced by more specific ones
     current_task: Optional[str] = None
     results_path: Optional[str] = None
     warning_message: Optional[str] = None
@@ -65,11 +63,19 @@ class JobMeta(BaseModel):
     is_rerun_execution: Optional[bool] = None
     original_job_id: Optional[str] = None
 
+    # <<< --- ADDED Fields for Detailed Progress --- >>>
+    overall_progress: Optional[float] = Field(None, description="Overall pipeline progress percentage based on Nextflow tasks (0-100)")
+    submitted_task_count: Optional[int] = Field(None, description="Total unique tasks submitted/identified by Nextflow in the trace")
+    completed_task_count: Optional[int] = Field(None, description="Total unique tasks marked as COMPLETED by Nextflow in the trace")
+    # current_task_progress: Optional[float] = Field(None, description="Progress percentage of the current_task, if available from console parsing (future)") # Optional for future
+    # <<< --- END ADDED Fields --- >>>
+
+
 class JobStatusDetails(BaseModel):
     job_id: str = Field(..., description="The unique ID of the RQ job or Staged ID")
     run_name: Optional[str] = Field(None, description="User-defined name for the pipeline run.")
     status: str = Field(..., description="Current status of the job")
-    description: Optional[str] = Field(None, description="User-defined run description for the pipeline run.") # This is the one
+    description: Optional[str] = Field(None, description="User-defined run description for the pipeline run.")
     staged_at: Optional[float] = Field(None, description="Unix timestamp when the job was staged")
     enqueued_at: Optional[float] = Field(None, description="Unix timestamp when the job was enqueued")
     started_at: Optional[float] = Field(None, description="Unix timestamp when the job started execution")
@@ -96,7 +102,6 @@ class ProfileData(BaseModel):
     skip_qc: Optional[bool] = Field(False, description="Skip QC steps")
     skip_annotation: Optional[bool] = Field(False, description="Skip annotation steps")
     skip_baserecalibrator: Optional[bool] = Field(False, description="Skip base quality score recalibration")
-    # description: Optional[str] = Field(None, ...) // <<< REMOVED Sarek's internal config description
 
 class SaveProfileRequest(BaseModel):
     name: str = Field(..., description="The name to save the profile under.")

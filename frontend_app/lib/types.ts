@@ -6,12 +6,9 @@ export interface JobResourceInfo {
   duration_seconds?: number | null;
 }
 
-// SarekParams as understood by our application for storing in JobMeta.
-// If Sarek pipeline itself has an internal description parameter it uses,
-// it would be part of this generic dictionary if passed.
 export interface SarekParams {
   genome?: string;
-  tools?: string; // Comma-separated string when stored in backend meta
+  tools?: string;
   step?: string;
   profile?: string;
   aligner?: string;
@@ -21,10 +18,7 @@ export interface SarekParams {
   skip_qc?: boolean;
   skip_annotation?: boolean;
   skip_baserecalibrator?: boolean;
-  // No explicit 'description' field here for Sarek's internal config,
-  // as it's not a standard top-level Sarek CLI param we manage.
-  // If Sarek uses one internally via other means, it would be part of this Any dict.
-  [key: string]: any; // Allows for other Sarek params not explicitly listed
+  [key: string]: any;
 }
 
 export interface InputFilenames {
@@ -48,10 +42,8 @@ export interface SampleInfo {
 }
 
 export interface JobMeta {
-  run_name?: string | null; // User-defined run name
-  // description field here is for the user's overall run_description,
-  // which is also on JobStatusDetails.description and RQ Job.description
-  description?: string | null;
+  run_name?: string | null;
+  description?: string | null; // User's overall run description
   input_type?: string;
   input_params?: InputFilenames;
   sarek_params?: SarekParams;
@@ -59,49 +51,56 @@ export interface JobMeta {
   staged_job_id_origin?: string;
   error_message?: string;
   stderr_snippet?: string;
-  progress?: number;
-  current_task?: string;
+  // progress?: number; // Old generic progress
+  current_task?: string | null; // Keep this, can be from Nextflow process name or final status
   results_path?: string;
   warning_message?: string;
   input_csv_path_used?: string;
-  is_rerun_execution?: boolean;
-  original_job_id?: string;
+  is_rerun_execution?: boolean | null;
+  original_job_id?: string | null;
+
+  // <<< --- ADDED Fields for Detailed Progress --- >>>
+  overall_progress?: number | null;       // Percentage (0-100)
+  submitted_task_count?: number | null;   // Total tasks Nextflow knows about
+  completed_task_count?: number | null;   // Tasks marked COMPLETED in trace
+  // current_task_progress?: number | null; // Optional for future if parsing console for current task %
+  // <<< --- END ADDED Fields --- >>>
 }
 
 export interface JobResultSuccess {
     status: "success";
     results_path?: string;
     message?: string;
-    resources: JobMeta;
+    resources: JobMeta; // Assuming resources in result might be the full JobMeta
 }
 
 export interface Job {
   job_id: string;
   run_name?: string | null;
   status: "staged" | "queued" | "started" | "running" | "finished" | "failed" | "stopped" | "canceled" | string;
-  description: string | null; // This holds the user's run_description
+  description: string | null;
   enqueued_at: number | null;
   started_at: number | null;
   ended_at: number | null;
   staged_at?: number | null;
-  result: JobResultSuccess | null | any;
+  result: JobResultSuccess | null | any; // result can be complex
   error: string | null;
-  meta: JobMeta;
+  meta: JobMeta; // This will now include the new progress fields
   resources: JobResourceInfo | null;
 }
 
-export interface JobStatusDetails {
+export interface JobStatusDetails { // This is often what's directly used in UI components
     job_id: string;
     run_name?: string | null;
     status: string;
-    description?: string | null; // This is the user's run_description
+    description?: string | null;
     staged_at?: number | null;
     enqueued_at?: number | null;
     started_at?: number | null;
     ended_at?: number | null;
     result?: any | null;
     error?: string | null;
-    meta: JobMeta;
+    meta: JobMeta; // This will now include the new progress fields
     resources?: JobResourceInfo | null;
 }
 
@@ -131,10 +130,9 @@ export interface DataFile {
     type: 'file';
 }
 
-// Type for the API input payload to the backend
 export interface PipelineInput {
   run_name: string;
-  run_description?: string; // User's overall run description
+  run_description?: string;
   input_type: 'fastq' | 'bam_cram' | 'vcf';
   samples: SampleInfo[];
   genome: string;
@@ -152,15 +150,13 @@ export interface PipelineInput {
   skip_qc?: boolean;
   skip_annotation?: boolean;
   skip_baserecalibrator?: boolean;
-  // The Sarek-specific internal config description field is removed
 }
 
-// Type for parameters displayed in the Results page dialog
 export interface RunParameters {
   run_name?: string | null;
-  run_description?: string | null; // User's overall run description
+  run_description?: string | null;
   input_filenames?: InputFilenames | null;
-  sarek_params?: SarekParams | null; // This SarekParams might contain Sarek's own internal description if it was part of the run's meta
+  sarek_params?: SarekParams | null;
   sample_info?: SampleInfo[] | null;
   input_type?: string | null;
   staged_job_id_origin?: string | null;
@@ -169,7 +165,6 @@ export interface RunParameters {
   input_csv_path_used?: string | null;
 }
 
-// Type for data saved/loaded as a configuration profile
 export interface ProfileData {
     genome: string;
     step: string;
@@ -186,5 +181,17 @@ export interface ProfileData {
     skip_qc?: boolean | null;
     skip_annotation?: boolean | null;
     skip_baserecalibrator?: boolean | null;
-    // The Sarek-specific internal config description field is removed
+}
+
+// Batch Action Response Types (already added in a previous step, ensure they are here)
+export interface BatchActionDetail {
+  job_id: string;
+  status: string;
+  message?: string;
+}
+
+export interface BatchActionResponse {
+  succeeded_count: number;
+  failed_count: number;
+  details: BatchActionDetail[];
 }
