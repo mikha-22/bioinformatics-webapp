@@ -9,8 +9,8 @@ from pathlib import Path
 import tempfile
 import csv
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel # Ensure BaseModel is imported
-from fastapi import APIRouter, Depends, HTTPException, Body # Added Body
+from pydantic import BaseModel, Field # <<< --- CORRECTED IMPORT --- >>>
+from fastapi import APIRouter, Depends, HTTPException, Body
 from fastapi.responses import JSONResponse
 
 from rq import Queue
@@ -37,7 +37,7 @@ router = APIRouter(
     tags=["Jobs Management"]
 )
 
-# <<< --- ADDED Pydantic Models for Batch Actions --- >>>
+# Pydantic Models for Batch Actions
 class BatchJobActionRequest(BaseModel):
     job_ids: List[str] = Field(..., description="A list of job IDs to perform the action on.")
 
@@ -50,7 +50,6 @@ class BatchActionResponse(BaseModel):
     succeeded_count: int
     failed_count: int
     details: List[BatchActionDetail]
-# <<< --- END ADDED Pydantic Models --- >>>
 
 
 @router.post("/run_pipeline", status_code=200, summary="Stage Pipeline Job")
@@ -369,11 +368,11 @@ async def get_job_status_endpoint(
         logger.exception(f"Unexpected error for job {job_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error.")
 
-# <<< --- MODIFIED: Single Job Stop Endpoint --- >>>
+
 @router.post("/stop_job/{job_id}", status_code=200, summary="Cancel Running/Queued RQ Job")
-async def stop_single_job( # Renamed to avoid conflict if we make a helper
+async def stop_job( # Renamed back to stop_job for consistency with frontend call
     job_id: str,
-    redis_conn: redis.Redis = Depends(get_redis_connection), # Keep sync redis for direct command
+    redis_conn: redis.Redis = Depends(get_redis_connection),
     queue: Queue = Depends(get_pipeline_queue)
 ):
     if job_id.startswith("staged_"):
@@ -383,26 +382,22 @@ async def stop_single_job( # Renamed to avoid conflict if we make a helper
     action_status = "unknown_state"
     try:
         job = Job.fetch(job_id, connection=queue.connection)
-        status = job.get_status(refresh=True) # Refresh status before checking
+        current_job_status = job.get_status(refresh=True)
         if job.is_finished or job.is_failed or job.is_stopped or job.is_canceled:
-            message = f"Job {job_id} already in terminal state: {status}."
+            message = f"Job {job_id} already in terminal state: {current_job_status}."
             action_status = "already_terminal"
-        elif status == JobStatus.QUEUED:
+        elif current_job_status == JobStatus.QUEUED:
             job.cancel()
             message = f"Queued job {job_id} canceled."
             action_status = "canceled"
-        elif status == JobStatus.STARTED or status == JobStatus.RUNNING :
-            # Use the redis_conn passed by Depends for send_stop_job_command
-            # Ensure it's not decode_responses=True for this command if it matters
-            # For RQ commands, it's often better to use the queue's connection directly if possible,
-            # or a connection configured identically.
-            # The `redis_conn` from Depends should be fine if it's the same server.
-            send_stop_job_command(redis_conn, job.id) # Use the injected redis_conn
+        elif current_job_status == JobStatus.STARTED or current_job_status == JobStatus.RUNNING :
+            send_stop_job_command(redis_conn, job.id)
             message = f"Stop signal sent to job {job_id}."
             action_status = "stop_signal_sent"
-        else: # e.g. deferred, scheduled - not typically stoppable this way by user
-            message = f"Job {job_id} has status '{status}', cannot directly stop/cancel via this action."
+        else:
+            message = f"Job {job_id} has status '{current_job_status}', cannot directly stop/cancel via this action."
             action_status = "not_stoppable"
+        # Return action_status for frontend to potentially use
         return JSONResponse(content={"message": message, "job_id": job_id, "action_status": action_status})
     except NoSuchJobError:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
@@ -410,9 +405,9 @@ async def stop_single_job( # Renamed to avoid conflict if we make a helper
         logger.exception(f"Error stopping/canceling job {job_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error stopping/canceling job: {str(e)}")
 
-# <<< --- MODIFIED: Single Job Remove Endpoint --- >>>
+
 @router.delete("/remove_job/{job_id}", status_code=200, summary="Remove Job Data")
-async def remove_single_job( # Renamed to avoid conflict if we make a helper
+async def remove_job( # Renamed back to remove_job for consistency
     job_id: str,
     redis_conn: redis.Redis = Depends(get_redis_connection),
     queue: Queue = Depends(get_pipeline_queue)
@@ -422,7 +417,7 @@ async def remove_single_job( # Renamed to avoid conflict if we make a helper
     job_removed_flag = False
     action_status = "unknown"
     message = f"Processing removal for job {job_id}."
-    log_history_key = f"{LOG_HISTORY_PREFIX}{job_id}" # For RQ jobs
+    log_history_key = f"{LOG_HISTORY_PREFIX}{job_id}"
 
     if job_id.startswith("staged_"):
         details_bytes = redis_conn.hget(STAGED_JOBS_KEY, job_id)
@@ -437,25 +432,17 @@ async def remove_single_job( # Renamed to avoid conflict if we make a helper
             action_status = "removed"
             message = f"Staged job {job_id} removed."
             logger.info(message)
-        elif not details_bytes: # Was not found in the first place
+        elif not details_bytes:
             action_status = "not_found"
             message = f"Staged job '{job_id}' not found for removal."
             logger.warning(message)
-            # Consider it "removed" in the sense that it's not there
-            # Frontend might expect a 200 if it's gone, or a 404 if it was never there.
-            # For batch, we'll report not_found. For single, a 404 is better if it never existed.
-            # Let's assume for single endpoint, if hdel is 0 AND it wasn't found initially, it's a 404.
-            # This logic is tricky. For now, if hdel is 0 and details_bytes was None, it's a 404.
-            if not details_bytes: raise HTTPException(status_code=404, detail=message)
-            job_removed_flag = False # It existed but hdel failed
-            action_status = "error"
-            message = f"Failed to remove staged job {job_id} (hdel returned 0)."
-            logger.error(message)
-        else: # Existed, but hdel failed
+            raise HTTPException(status_code=404, detail=message) # Explicit 404 if not found
+        else:
             job_removed_flag = False
             action_status = "error"
             message = f"Failed to remove staged job {job_id} (hdel returned 0)."
             logger.error(message)
+            raise HTTPException(status_code=500, detail=message) # Error if hdel failed
 
     else: # RQ Job
         try:
@@ -464,23 +451,17 @@ async def remove_single_job( # Renamed to avoid conflict if we make a helper
             if job.meta:
                 csv_path_to_remove = job.meta.get("input_csv_path_used") or job.meta.get("input_csv_path")
             
-            # Attempt to remove from registries first (best effort)
-            registries_to_try = [
-                FinishedJobRegistry(queue=queue), FailedJobRegistry(queue=queue),
-                CanceledJobRegistry(queue=queue), StartedJobRegistry(queue=queue),
-                DeferredJobRegistry(queue=queue), ScheduledJobRegistry(queue=queue)
-            ]
+            registries_to_try = [ FinishedJobRegistry(queue=queue), FailedJobRegistry(queue=queue), CanceledJobRegistry(queue=queue), StartedJobRegistry(queue=queue), DeferredJobRegistry(queue=queue), ScheduledJobRegistry(queue=queue) ]
             for registry in registries_to_try:
-                try: registry.remove(job, delete_job=False) # delete_job=False as we delete explicitly later
-                except InvalidJobOperation: pass # Job might not be in this state
+                try: registry.remove(job, delete_job=False)
+                except InvalidJobOperation: pass
                 except Exception as e_reg: logger.warning(f"Minor error removing {job_id} from {registry.__class__.__name__}: {e_reg}")
-
-            job.delete() # This deletes the job hash from Redis
+            
+            job.delete()
             job_removed_flag = True
             action_status = "removed"
             message = f"RQ Job {job_id} and its data deleted."
             logger.info(message)
-            # Clean up log history for RQ jobs
             if redis_conn.delete(log_history_key) > 0:
                 logger.info(f"Cleaned up log history for RQ job {job_id}: {log_history_key}")
 
@@ -488,42 +469,35 @@ async def remove_single_job( # Renamed to avoid conflict if we make a helper
             action_status = "not_found"
             message = f"RQ Job '{job_id}' not found for removal."
             logger.warning(message)
-            # If the job hash doesn't exist, it's effectively removed.
-            if not redis_conn.exists(f"rq:job:{job_id}"):
-                job_removed_flag = True # Consider it successfully "removed" if it's not in Redis
-                # Also try to clean up log history if it exists
-                if redis_conn.delete(log_history_key) > 0:
-                    logger.info(f"Cleaned up orphaned log history for non-existent RQ job {job_id}: {log_history_key}")
-            else: # Should not happen if NoSuchJobError was raised
-                 job_removed_flag = False
-                 action_status = "error"
-                 message = f"RQ Job '{job_id}' not found by fetch, but hash exists. Inconsistent state."
+            if not redis_conn.exists(f"rq:job:{job_id}"): # Check if hash is also gone
+                job_removed_flag = True # If truly gone, consider it a success for removal
+                if redis_conn.delete(log_history_key) > 0: logger.info(f"Cleaned up orphaned log history for {job_id}")
+                # For a single delete, if not found, it should be a 404
+                raise HTTPException(status_code=404, detail=message)
+            else: # Hash exists but fetch failed - inconsistent
+                 job_removed_flag = False; action_status = "error"; message = f"RQ Job '{job_id}' inconsistent state."
                  logger.error(message)
-
-
+                 raise HTTPException(status_code=500, detail=message)
         except Exception as e:
             logger.exception(f"Error removing RQ job {job_id}: {e}")
             job_removed_flag = False
             action_status = "error"
             message = f"Error removing RQ job {job_id}: {str(e)}"
+            raise HTTPException(status_code=500, detail=message)
 
     if job_removed_flag and csv_path_to_remove:
         try:
             csv_p = Path(csv_path_to_remove)
-            # Only remove if it's a CSV in the temp directory
             if csv_p.is_file() and csv_p.suffix == '.csv' and str(csv_p.parent).startswith(tempfile.gettempdir()):
                 os.remove(csv_p)
                 logger.info(f"Cleaned up temp CSV: {csv_p} for job {job_id}")
         except Exception as e:
             logger.warning(f"Error cleaning up CSV {csv_path_to_remove} for job {job_id}: {e}")
 
-    if job_removed_flag:
-        return JSONResponse(content={"message": message, "removed_id": job_id, "action_status": action_status})
-    else:
-        # If not removed and was not_found initially (for RQ jobs specifically)
-        if action_status == "not_found" and not job_id.startswith("staged_"):
-             raise HTTPException(status_code=404, detail=message)
-        raise HTTPException(status_code=500, detail=message)
+    # This part is reached only if job_removed_flag was true from the staged job logic
+    # or if an RQ job was successfully deleted.
+    # If an exception was raised above (like 404 or 500), this won't be reached.
+    return JSONResponse(content={"message": message, "removed_id": job_id, "action_status": action_status})
 
 
 @router.post("/rerun_job/{job_id}", status_code=200, summary="Re-stage Failed/Finished Job")
@@ -567,13 +541,13 @@ async def rerun_job(
             def _resolve_path_for_rerun(relative_path_str: Optional[str], is_required: bool, allowed_extensions: Optional[List[str]] = None) -> Optional[str]:
                 if not relative_path_str:
                     if is_required: validation_errors_rerun.append(f"Sample {i+1}: Missing required path string for a field."); return None
-                    return ""
+                    return "" # Return empty string for optional non-provided paths
                 try:
-                    base_dir = Path(DATA_DIR) # Ensure DATA_DIR is used
+                    base_dir = Path(DATA_DIR)
                     abs_path = get_safe_path(base_dir, relative_path_str)
                     if not abs_path.is_file(): validation_errors_rerun.append(f"Sample {i+1}: File '{relative_path_str}' (abs: {abs_path}) not found."); return None
                     if allowed_extensions and not any(abs_path.name.lower().endswith(ext.lower()) for ext in allowed_extensions): validation_errors_rerun.append(f"Sample {i+1}: File '{relative_path_str}' has invalid extension. Allowed: {', '.join(allowed_extensions)}"); return None
-                    return str(abs_path) # Return absolute path for the new CSV
+                    return str(abs_path)
                 except HTTPException as e_http: validation_errors_rerun.append(f"Sample {i+1}: Path error for '{relative_path_str}': {e_http.detail}"); return None
                 except Exception as e_gen: validation_errors_rerun.append(f"Sample {i+1}: General error for '{relative_path_str}': {str(e_gen)}"); return None
 
@@ -607,10 +581,10 @@ async def rerun_job(
             "input_csv_path": new_temp_csv_file_path, "outdir_base_path": str(RESULTS_DIR),
             "genome": sarek_p_orig.get("genome"), "tools": sarek_p_orig.get("tools"), "step": sarek_p_orig.get("step"),
             "profile": sarek_p_orig.get("profile"), "aligner": sarek_p_orig.get("aligner"),
-            "intervals_path": _resolve_path_for_rerun(input_p_orig.get("intervals_file"), False) if input_p_orig.get("intervals_file") else None,
-            "dbsnp_path": _resolve_path_for_rerun(input_p_orig.get("dbsnp"), False) if input_p_orig.get("dbsnp") else None,
-            "known_indels_path": _resolve_path_for_rerun(input_p_orig.get("known_indels"), False) if input_p_orig.get("known_indels") else None,
-            "pon_path": _resolve_path_for_rerun(input_p_orig.get("pon"), False) if input_p_orig.get("pon") else None,
+            "intervals_path": _resolve_path_for_rerun(input_p_orig.get("intervals_file"), False, ['.bed', '.list', '.interval_list']) if input_p_orig.get("intervals_file") else None,
+            "dbsnp_path": _resolve_path_for_rerun(input_p_orig.get("dbsnp"), False, ['.vcf', '.vcf.gz']) if input_p_orig.get("dbsnp") else None,
+            "known_indels_path": _resolve_path_for_rerun(input_p_orig.get("known_indels"), False, ['.vcf', '.vcf.gz']) if input_p_orig.get("known_indels") else None,
+            "pon_path": _resolve_path_for_rerun(input_p_orig.get("pon"), False, ['.vcf', '.vcf.gz']) if input_p_orig.get("pon") else None,
             "joint_germline": sarek_p_orig.get("joint_germline", False), "wes": sarek_p_orig.get("wes", False),
             "trim_fastq": sarek_p_orig.get("trim_fastq", False), "skip_qc": sarek_p_orig.get("skip_qc", False),
             "skip_annotation": sarek_p_orig.get("skip_annotation", False), "skip_baserecalibrator": sarek_p_orig.get("skip_baserecalibrator", False),
@@ -636,11 +610,11 @@ async def rerun_job(
         raise HTTPException(status_code=500, detail=f"Error re-staging job: {str(e)}")
 
 
-# <<< --- NEW Batch Stop Endpoint --- >>>
+# Batch Action Endpoints
 @router.post("/jobs/batch_stop", response_model=BatchActionResponse, summary="Stop/Cancel Multiple RQ Jobs")
 async def batch_stop_jobs(
     request_body: BatchJobActionRequest = Body(...),
-    redis_conn: redis.Redis = Depends(get_redis_connection), # Sync redis for direct command
+    redis_conn: redis.Redis = Depends(get_redis_connection),
     queue: Queue = Depends(get_pipeline_queue)
 ):
     job_ids = request_body.job_ids
@@ -665,9 +639,8 @@ async def batch_stop_jobs(
             current_job_status = job.get_status(refresh=True)
 
             if job.is_finished or job.is_failed or job.is_stopped or job.is_canceled:
-                message = f"Job already in terminal state: {current_job_status}."
+                message = f"Job {job_id} already in terminal state: {current_job_status}."
                 action_status = "already_terminal"
-                # For batch, we might consider this a "success" in terms of not needing action
                 succeeded_count +=1 
             elif current_job_status == JobStatus.QUEUED:
                 job.cancel()
@@ -696,7 +669,6 @@ async def batch_stop_jobs(
     return BatchActionResponse(succeeded_count=succeeded_count, failed_count=failed_count, details=results)
 
 
-# <<< --- NEW Batch Remove Endpoint --- >>>
 @router.post("/jobs/batch_remove", response_model=BatchActionResponse, summary="Remove Multiple Jobs")
 async def batch_remove_jobs(
     request_body: BatchJobActionRequest = Body(...),
@@ -726,18 +698,18 @@ async def batch_remove_jobs(
                     try:
                         details_batch = json.loads(details_bytes_batch.decode('utf-8'))
                         csv_path_to_remove_batch = details_batch.get("input_csv_path")
-                    except Exception: pass # Ignore parsing error for CSV path
+                    except Exception: pass
                 
                 if redis_conn.hdel(STAGED_JOBS_KEY, job_id) == 1:
                     job_removed_this_iteration = True
                     action_status = "removed"
                     message = f"Staged job {job_id} removed."
                     succeeded_count += 1
-                elif not details_bytes_batch: # Not found initially
+                elif not details_bytes_batch:
                     action_status = "not_found"
                     message = f"Staged job {job_id} not found."
-                    failed_count +=1 # Or count as success if goal is "it's gone"? For now, fail if not found.
-                else: # Existed, but hdel failed
+                    failed_count +=1
+                else:
                     action_status = "error"
                     message = f"Failed to remove staged job {job_id} (hdel returned 0)."
                     failed_count += 1
@@ -751,7 +723,7 @@ async def batch_remove_jobs(
                     for registry in registries_to_try:
                         try: registry.remove(job, delete_job=False)
                         except InvalidJobOperation: pass
-                        except Exception: pass # Best effort
+                        except Exception: pass
                     
                     job.delete()
                     job_removed_this_iteration = True
@@ -764,9 +736,8 @@ async def batch_remove_jobs(
                 except NoSuchJobError:
                     action_status = "not_found"
                     message = f"RQ Job {job_id} not found."
-                    # If job hash doesn't exist, it's effectively gone.
                     if not redis_conn.exists(f"rq:job:{job_id}"):
-                        succeeded_count += 1 # Count as success if it's truly gone
+                        succeeded_count += 1
                         if redis_conn.delete(log_history_key_batch) > 0:
                              logger.info(f"Cleaned up orphaned log history for non-existent RQ job {job_id} in batch: {log_history_key_batch}")
                     else:
