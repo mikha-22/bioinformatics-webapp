@@ -1,5 +1,5 @@
 // File: frontend_app/components/ui/table.tsx
-"use client";
+"use client"
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
@@ -15,7 +15,7 @@ function Table({ className, children, ...props }: React.ComponentProps<"table">)
         data-slot="table"
         className={cn("w-full caption-bottom text-sm", className)}
         {...props}
-      >{children}</table>
+      >{children}</table> {/* Explicit children, no whitespace */}
     </div>
   )
 }
@@ -31,14 +31,12 @@ function TableRow({ className, children, ...props }: React.ComponentProps<"tr">)
         className
       )}
       {...props}
-    >
-      {children}
-    </tr>
+    >{children}</tr>
   );
 }
 TableRow.displayName = "TableRow"
 
-// TableHeader component
+// --- Other components ---
 function TableHeader({ className, children, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
@@ -50,7 +48,6 @@ function TableHeader({ className, children, ...props }: React.ComponentProps<"th
 }
 TableHeader.displayName = "TableHeader"
 
-// TableBody component
 function TableBody({ className, children, ...props }: React.ComponentProps<"tbody">) {
   return (
     <tbody
@@ -62,7 +59,6 @@ function TableBody({ className, children, ...props }: React.ComponentProps<"tbod
 }
 TableBody.displayName = "TableBody"
 
-// TableFooter component
 function TableFooter({ className, children, ...props }: React.ComponentProps<"tfoot">) {
   return (
     <tfoot
@@ -77,7 +73,6 @@ function TableFooter({ className, children, ...props }: React.ComponentProps<"tf
 }
 TableFooter.displayName = "TableFooter"
 
-// TableHead component
 function TableHead({ className, children, ...props }: React.ComponentProps<"th">) {
   return (
     <th
@@ -92,7 +87,6 @@ function TableHead({ className, children, ...props }: React.ComponentProps<"th">
 }
 TableHead.displayName = "TableHead"
 
-// TableCell component
 function TableCell({ className, children, ...props }: React.ComponentProps<"td">) {
   return (
     <td
@@ -107,7 +101,6 @@ function TableCell({ className, children, ...props }: React.ComponentProps<"td">
 }
 TableCell.displayName = "TableCell"
 
-// TableCaption component
 function TableCaption({
   className, children,
   ...props

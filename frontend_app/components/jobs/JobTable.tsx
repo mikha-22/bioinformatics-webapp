@@ -7,21 +7,22 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table"; // Using the reverted, known-good table.tsx
 import { Badge } from "@/components/ui/badge";
-import { Job } from "@/lib/types"; // Ensure Job type includes meta.current_task and meta.sarek_params.step
+import { Job } from "@/lib/types";
 import { formatDistanceToNow } from 'date-fns';
 import { formatDuration } from "@/lib/utils";
 import JobActions from "./JobActions";
 import React from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import LiveDuration from "./LiveDuration"; // Assuming this component exists and works
+import LiveDuration from "./LiveDuration";
 
 interface JobTableProps {
   jobs: Job[];
 }
 
-// Helper Functions (mapToUiStatus, getStatusVariant, formatTimestamp) remain the same
+// --- Helper Functions (mapToUiStatus, getStatusVariant, formatTimestamp) ---
+// (These are assumed to be correct and are not the source of the hydration error)
 function mapToUiStatus(internalStatus: string | null | undefined): string {
     const status = internalStatus?.toLowerCase();
     switch (status) {
@@ -65,7 +66,7 @@ function formatTimestamp(timestamp: number | null | undefined): React.ReactEleme
     return "Invalid Date";
   }
 }
-
+// --- End Helper Functions ---
 
 export default function JobTable({ jobs }: JobTableProps) {
 
@@ -95,51 +96,42 @@ export default function JobTable({ jobs }: JobTableProps) {
     return `${prefix}_${mainIdPart}`;
   };
 
-  // --- NEW: Helper to display current task/progress ---
   const getCurrentTaskDisplay = (job: Job): string => {
     const status = job.status?.toLowerCase();
-    const currentTaskFromMeta = job.meta?.current_task; // This should now be populated by the backend
+    const currentTaskFromMeta = job.meta?.current_task;
     const configuredStep = job.meta?.sarek_params?.step;
 
     if (status === 'running' || status === 'started') {
       if (currentTaskFromMeta) {
-        // No need to split here if backend already stores the simple name
         return `Running: ${currentTaskFromMeta}`;
       }
-      // Fallback if current_task isn't populated yet for a running job
       return configuredStep ? `Starting: ${configuredStep}` : "Processing...";
     }
     if (status === 'finished') {
-      // For finished jobs, 'current_task' in meta might be set to "Completed" by backend
       return currentTaskFromMeta || (configuredStep ? `Completed: ${configuredStep}` : "Finished");
     }
     if (status === 'failed') {
-      // For failed jobs, 'current_task' in meta might be "Failed: [LastKnownTask]"
       return currentTaskFromMeta || (configuredStep ? `Failed at: ${configuredStep}` : "Failed");
     }
     if (status === 'queued') return "Queued";
     if (status === 'staged') return "Staged";
     if (status === 'stopped' || status === 'canceled') {
-        return currentTaskFromMeta || "Stopped"; // Backend might set current_task to "Stopped: [LastTask]"
+        return currentTaskFromMeta || "Stopped";
     }
-    return "N/A"; // Default or unknown states
+    return "N/A";
   };
-  // --- END NEW Helper ---
 
   return (
     <div className="border rounded-lg overflow-hidden overflow-x-auto">
       <Table>
         <TableCaption className="mt-4">A list of your pipeline jobs.</TableCaption>
         <TableHeader>
+          {/* Ensure no whitespace directly inside TableRow if it's the only child of TableHeader */}
           <TableRow>
             <TableHead className="w-[120px] hidden lg:table-cell">Job ID</TableHead>
             <TableHead className="min-w-[150px] max-w-[250px]">Run Name</TableHead>
             <TableHead>Description</TableHead>
-            {/* --- NEW: Current Task/Progress Column --- */}
-            <TableHead className="w-[180px] hidden md:table-cell">Progress</TableHead> {/* Increased width slightly */}
-            {/* --- REMOVED Step and Genome Columns --- */}
-            {/* <TableHead className="w-[100px] hidden xl:table-cell">Step</TableHead> */}
-            {/* <TableHead className="w-[100px] hidden xl:table-cell">Genome</TableHead> */}
+            <TableHead className="w-[180px] hidden md:table-cell">Progress</TableHead>
             <TableHead className="w-[120px] hidden md:table-cell">Duration</TableHead>
             <TableHead className="w-[150px] hidden sm:table-cell">Last Updated</TableHead>
             <TableHead className="w-[100px]">Status</TableHead>
@@ -152,12 +144,11 @@ export default function JobTable({ jobs }: JobTableProps) {
             const isActiveJob = internalStatus === 'running' || internalStatus === 'started';
             const currentTaskText = getCurrentTaskDisplay(job);
 
+            // CRITICAL: Ensure no whitespace or comments are rendered directly between <TableRow> and <TableCell>
+            // or between <TableCell> elements.
             return (
               <TableRow key={job.job_id} data-state={job.status === 'finished' ? 'completed' : job.status === 'failed' ? 'error' : undefined}>
-                <TableCell className="font-mono text-xs hidden lg:table-cell" title={job.job_id}>
-                  {formatDisplayJobId(job.job_id)}
-                </TableCell>
-
+                <TableCell className="font-mono text-xs hidden lg:table-cell" title={job.job_id}>{formatDisplayJobId(job.job_id)}</TableCell>
                 <TableCell className="font-medium min-w-[150px] max-w-[250px] truncate" title={job.run_name ?? "N/A"}>
                   <TooltipProvider delayDuration={300}>
                       <Tooltip>
@@ -175,26 +166,8 @@ export default function JobTable({ jobs }: JobTableProps) {
                       {formatDisplayJobId(job.job_id)}
                   </div>
                 </TableCell>
-
-                <TableCell className="max-w-xs truncate" title={job.description ?? "No description"}>
-                  {job.description || <span className="italic text-muted-foreground">No description</span>}
-                </TableCell>
-
-                {/* --- NEW: Current Task/Progress Cell --- */}
-                <TableCell className="text-sm text-muted-foreground hidden md:table-cell truncate" title={currentTaskText}>
-                  {currentTaskText}
-                </TableCell>
-
-                {/* --- REMOVED Step and Genome Cells --- */}
-                {/*
-                <TableCell className="text-sm text-muted-foreground hidden xl:table-cell">
-                  {job.meta?.sarek_params?.step || 'N/A'}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground hidden xl:table-cell">
-                  {job.meta?.sarek_params?.genome || 'N/A'}
-                </TableCell>
-                */}
-
+                <TableCell className="max-w-xs truncate" title={job.description ?? "No description"}>{job.description || <span className="italic text-muted-foreground">No description</span>}</TableCell>
+                <TableCell className="text-sm text-muted-foreground hidden md:table-cell truncate" title={currentTaskText}>{currentTaskText}</TableCell>
                 <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
                   {isActiveJob && job.started_at ? (
                     <LiveDuration startedAt={job.started_at} status={job.status} />
@@ -202,17 +175,13 @@ export default function JobTable({ jobs }: JobTableProps) {
                     formatDuration(job.resources?.duration_seconds)
                   )}
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground hidden sm:table-cell">
-                  {formatTimestamp(job.ended_at || job.started_at || job.enqueued_at || job.staged_at)}
-                </TableCell>
+                <TableCell className="text-sm text-muted-foreground hidden sm:table-cell">{formatTimestamp(job.ended_at || job.started_at || job.enqueued_at || job.staged_at)}</TableCell>
                 <TableCell>
                   <Badge variant={getStatusVariant(job.status)} className="text-xs px-1.5 py-0.5">
                     {mapToUiStatus(job.status)}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right p-1">
-                  <JobActions job={job} />
-                </TableCell>
+                <TableCell className="text-right p-1"><JobActions job={job} /></TableCell>
               </TableRow>
             );
           })}
