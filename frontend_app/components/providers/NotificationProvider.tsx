@@ -1,22 +1,22 @@
 // frontend_app/components/providers/NotificationProvider.tsx
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react'; // <<< ADD useMemo here
 import useWebSocket, { ReadyState } from 'react-use-websocket';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation'; // For navigating on notification click
+import { useRouter } from 'next/navigation';
 
 interface NotificationPayload {
   event_type: "job_completed" | "job_failed";
   job_id: string;
   run_name: string;
   message: string;
-  status_variant: "success" | "error"; // For toast styling
+  status_variant: "success" | "error";
 }
 
 interface NotificationContextType {
   notificationsEnabled: boolean;
-  permissionStatus: NotificationPermission | "loading"; // Add 'loading' state
+  permissionStatus: NotificationPermission | "loading";
   requestPermission: () => void;
   toggleNotifications: () => void;
   isSupported: boolean;
@@ -37,41 +37,41 @@ interface NotificationProviderProps {
 }
 
 const NOTIFICATION_PREFERENCE_KEY = 'bioapp_notifications_enabled';
-const NOTIFICATION_PERMISSION_KEY = 'bioapp_notification_permission'; // To remember if we asked
+const NOTIFICATION_PERMISSION_KEY = 'bioapp_notification_permission';
 
 export function NotificationProvider({ children }: NotificationProviderProps) {
   const [isSupported, setIsSupported] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const storedPreference = localStorage.getItem(NOTIFICATION_PREFERENCE_KEY);
-      return storedPreference ? JSON.parse(storedPreference) : true; // Default to true
+      return storedPreference ? JSON.parse(storedPreference) : true;
     }
     return true;
   });
   const [permissionStatus, setPermissionStatus] = useState<NotificationPermission | "loading">("loading");
   const router = useRouter();
 
-  // Check for Notification API support and initial permission status
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       setIsSupported(true);
       setPermissionStatus(Notification.permission);
     } else {
       setIsSupported(false);
-      setPermissionStatus('denied'); // Effectively denied if not supported
+      setPermissionStatus('denied');
     }
   }, []);
 
+  // <<< --- MOVED websocketUrl CALCULATION INSIDE THE COMPONENT --- >>>
   const websocketUrl = useMemo(() => {
     if (typeof window === 'undefined') return null;
     const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || window.location.origin;
     const wsProtocol = apiUrl.startsWith('https://') ? 'wss://' : 'ws://';
     const domainAndPath = apiUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
     return `${wsProtocol}${domainAndPath}/api/ws/app_notifications`;
-  }, []);
+  }, []); // Empty dependency array means it's calculated once on mount
 
   const { lastMessage, readyState } = useWebSocket(websocketUrl, {
-    share: true, // Allow multiple components to share this connection if needed later
+    share: true,
     shouldReconnect: (closeEvent) => true,
     reconnectInterval: 5000,
     reconnectAttempts: 10,
@@ -80,37 +80,34 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     onClose: (event) => console.log(`[NotificationProvider] WebSocket for notifications closed. Code: ${event.code}`),
     onError: (event) => console.error('[NotificationProvider] WebSocket notification error:', event),
     filter: (message: MessageEvent<any>): boolean => typeof message.data === 'string',
-  }, !!websocketUrl); // Only connect if URL is valid
+  }, !!websocketUrl);
 
-  // Handle incoming notification messages
   useEffect(() => {
     if (lastMessage?.data) {
       try {
         const data = JSON.parse(lastMessage.data as string) as NotificationPayload;
         console.log('[NotificationProvider] Received notification payload:', data);
 
-        // Always show in-app toast
         toast[data.status_variant === 'success' ? 'success' : 'error'](data.message, {
           description: `Job: ${data.run_name} (ID: ...${data.job_id.slice(-6)})`,
-          duration: 10000, // Longer duration for job notifications
+          duration: 10000,
           action: {
             label: "View Job",
-            onClick: () => router.push(`/jobs`), // Consider highlighting specific job later
+            onClick: () => router.push(`/jobs`),
           },
         });
 
-        // Show browser notification if enabled, permission granted, and tab is not visible
         if (notificationsEnabled && permissionStatus === 'granted' && document.visibilityState === 'hidden') {
           const notification = new Notification(`Sarek Job: ${data.run_name}`, {
             body: data.message,
             icon: data.status_variant === 'success' ? '/icons/success_icon_64.png' : '/icons/failure_icon_64.png',
-            tag: `job-notification-${data.job_id}`, // Helps replace/group notifications
-            renotify: true, // If a notification with the same tag is shown, it will re-alert the user
+            tag: `job-notification-${data.job_id}`,
+            renotify: true,
           });
 
           notification.onclick = () => {
             window.focus();
-            router.push(`/jobs`); // Navigate to jobs page
+            router.push(`/jobs`);
             notification.close();
           };
         }
@@ -130,9 +127,9 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     try {
       const permission = await Notification.requestPermission();
       setPermissionStatus(permission);
-      localStorage.setItem(NOTIFICATION_PERMISSION_KEY, permission); // Remember choice
+      localStorage.setItem(NOTIFICATION_PERMISSION_KEY, permission);
       if (permission === 'granted') {
-        setNotificationsEnabled(true); // Enable by default if permission granted
+        setNotificationsEnabled(true);
         localStorage.setItem(NOTIFICATION_PREFERENCE_KEY, JSON.stringify(true));
         toast.success("Browser notifications enabled!");
       } else if (permission === 'denied') {
@@ -158,7 +155,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       return;
     }
     if (permissionStatus === 'default') {
-      requestPermission(); // Request permission first if not yet granted/denied
+      requestPermission();
       return;
     }
     const newValue = !notificationsEnabled;
