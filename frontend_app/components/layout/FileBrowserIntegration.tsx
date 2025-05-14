@@ -2,8 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-// Import both icons
-import { FolderClosed, FolderOpen } from "lucide-react";
+import { FolderClosed, FolderOpen } from "lucide-react"; // Keep both icons
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,10 +19,8 @@ export default function FileBrowserIntegration() {
   const { isOpen, currentPath, closeFileBrowser, openFileBrowser } = useFileBrowser();
 
   useEffect(() => {
-    // Fetch URL from env var only on the client-side
     const url = process.env.NEXT_PUBLIC_FILEBROWSER_URL;
     if (url) {
-      // Basic validation/cleanup (remove trailing slash)
       setFileBrowserUrl(url.replace(/\/$/, ""));
     } else {
       console.warn("NEXT_PUBLIC_FILEBROWSER_URL is not set.");
@@ -31,78 +28,69 @@ export default function FileBrowserIntegration() {
   }, []);
 
   const handleToggle = () => {
-    // Increment key to force reload when opening
     setIframeKey(prev => prev + 1);
-    
     if (isOpen) {
       closeFileBrowser();
     } else {
-      // Open with root path when clicking the floating button
-      openFileBrowser('/filebrowser/files');
+      openFileBrowser('/filebrowser/files'); // Default path when opening via floating button
     }
   };
 
-  // Construct the iframe URL based on the current path
   const getIframeUrl = () => {
     if (!fileBrowserUrl) return null;
-    
-    // If we have a currentPath, it's already in the format /filebrowser/files/results/...
-    // We just need to append it to the base URL
     if (currentPath) {
-      // Remove any leading slash from currentPath to avoid double slashes
       const cleanPath = currentPath.startsWith('/') ? currentPath.slice(1) : currentPath;
-      return `${fileBrowserUrl}/${cleanPath}`;
+      // Ensure the path starts with the filebrowser base URL if it's not already included
+      // This logic assumes currentPath might be like '/results/run_xyz' or '/filebrowser/files/results/run_xyz'
+      if (cleanPath.startsWith('filebrowser/files')) {
+        return `${fileBrowserUrl}/${cleanPath}`;
+      }
+      // If currentPath is just a relative path like 'results/run_xyz', prepend the default filebrowser files path
+      return `${fileBrowserUrl}/filebrowser/files/${cleanPath}`;
     }
-    
-    return fileBrowserUrl;
+    return `${fileBrowserUrl}/filebrowser/files`; // Default to root of files if no specific path
   };
 
-  // Use Dialog component for overlay and content management
+
   return (
     <>
       {/* Floating Button */}
       <Button
-        variant="secondary" // Keep the base variant for initial styling
+        variant="secondary"
         size="icon"
         className={cn(
             "fixed bottom-5 left-5 z-40 h-14 w-14 rounded-full shadow-lg",
-            // Add group utility for targeting child icons on hover
             "group",
-            // Ensure cursor is pointer unless disabled
             "cursor-pointer",
-            // Add border and set its color using the theme variable
             "border border-border",
-            // Override the default hover background change for secondary variant
-            // Apply the non-hover secondary background color even on hover
-            "hover:bg-secondary"
+            "hover:bg-secondary", // Keep original hover background
+            // <<< --- ADDED HOVER ANIMATION --- >>>
+            "transition-all duration-150 ease-in-out hover:scale-105"
+            // <<< --- END ADDED HOVER ANIMATION --- >>>
         )}
         onClick={handleToggle}
         aria-label="Toggle File Browser"
-        disabled={!fileBrowserUrl} // Disable if URL is not set
+        disabled={!fileBrowserUrl}
       >
-        {/* Default Icon: Visible normally, hidden on group hover */}
         <FolderClosed className={cn(
-            "h-8 w-8", // Increased icon size
-            "block group-hover:hidden transition-opacity duration-150" // Show by default, hide on hover
+            "h-8 w-8",
+            "block group-hover:hidden transition-opacity duration-150"
             )}
         />
-        {/* Hover Icon: Hidden normally, visible on group hover */}
         <FolderOpen className={cn(
-            "h-8 w-8", // Increased icon size
-            "hidden group-hover:block transition-opacity duration-150" // Hide by default, show on hover
+            "h-8 w-8",
+            "hidden group-hover:block transition-opacity duration-150"
             )}
         />
       </Button>
 
       {/* Dialog for Modal */}
-      <Dialog open={isOpen} onOpenChange={closeFileBrowser}>
+      <Dialog open={isOpen} onOpenChange={(open) => { if (!open) closeFileBrowser(); }}>
         <DialogContent
           className={cn(
-            "p-0 gap-0 sm:max-w-[90vw] h-[85vh] flex flex-col", // Adjust size as needed
-            // Remove default padding and make flex column
+            "p-0 gap-0 sm:max-w-[90vw] h-[85vh] flex flex-col",
           )}
           onInteractOutside={(e) => {
-            // Prevent closing when clicking inside the iframe itself
             if ((e.target as HTMLElement)?.closest('iframe')) {
               e.preventDefault();
             }
@@ -110,16 +98,14 @@ export default function FileBrowserIntegration() {
         >
           <DialogHeader className="p-4 border-b">
             <DialogTitle>File Browser</DialogTitle>
-             {/* DialogClose is automatically handled by Dialog component's X */}
           </DialogHeader>
-          <div className="flex-grow overflow-hidden p-1"> {/* Container for iframe */}
+          <div className="flex-grow overflow-hidden p-1">
             {fileBrowserUrl && (
               <iframe
-                key={iframeKey} // Use key to force reload
-                src={getIframeUrl() || fileBrowserUrl}
+                key={iframeKey}
+                src={getIframeUrl() || `${fileBrowserUrl}/filebrowser/files`} // Fallback src
                 title="File Browser"
                 className="w-full h-full border-0"
-                // sandbox="allow-scripts allow-same-origin allow-forms allow-popups" // Consider security implications
               />
             )}
           </div>
