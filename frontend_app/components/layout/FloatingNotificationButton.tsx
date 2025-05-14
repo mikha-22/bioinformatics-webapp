@@ -2,7 +2,7 @@
 "use client";
 
 import React from 'react';
-import { Bell, BellRing, BellOff, AlertTriangle, Loader2 } from 'lucide-react'; // Added Loader2
+import { Bell, BellRing, BellOff, Loader2 } from 'lucide-react'; // Changed AlertTriangle to Loader2 for loading
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useNotificationManager } from '@/components/providers/NotificationProvider';
@@ -22,19 +22,19 @@ export default function FloatingNotificationButton() {
   }
 
   const getIconAndTooltip = () => {
-    if (permissionStatus === 'loading') { // Handle loading state first
+    if (permissionStatus === 'loading') {
         return {
-            icon: <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />,
+            icon: <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />, // Icon size adjusted for smaller button
             tooltip: "Checking notification status...",
-            action: () => {}, // No action while loading
+            action: () => {},
             variant: "secondary" as const,
             disabled: true,
         };
     }
     if (permissionStatus === 'denied') {
       return {
-        icon: <BellOff className="h-6 w-6 text-destructive" />,
-        tooltip: "Notifications blocked. Click for info.", // Updated tooltip
+        icon: <BellOff className="h-5 w-5 text-destructive" />, // Icon size adjusted
+        tooltip: "Notifications blocked. Click for info.",
         action: toggleNotifications,
         variant: "destructive_outline" as const,
         disabled: false,
@@ -42,29 +42,24 @@ export default function FloatingNotificationButton() {
     }
     if (permissionStatus === 'default') {
       return {
-        icon: <Bell className="h-6 w-6 text-muted-foreground" />,
+        icon: <Bell className="h-5 w-5 text-muted-foreground" />, // Icon size adjusted
         tooltip: "Click to enable browser notifications",
         action: requestPermission,
         variant: "secondary" as const,
         disabled: false,
       };
     }
-    // Permission is 'granted' from here
     if (notificationsEnabled) {
       return {
-        // Use BellRing with a prominent color for the enabled state
-        icon: <BellRing className="h-6 w-6 text-green-600 dark:text-green-500" />, // <<< CHANGED: More prominent color
+        icon: <BellRing className="h-5 w-5 text-green-600 dark:text-green-500" />, // Icon size adjusted
         tooltip: "Browser notifications ON. Click to disable.",
         action: toggleNotifications,
-        variant: "secondary" as const, // Keep secondary, icon color will make it stand out
-        // Or, if you want the button itself to change more:
-        // variant: "default" as const, // This would make it use primary background
+        variant: "secondary" as const,
         disabled: false,
       };
     }
-    // Permission granted, but notifications are manually disabled by user
     return {
-      icon: <BellOff className="h-6 w-6 text-muted-foreground" />,
+      icon: <BellOff className="h-5 w-5 text-muted-foreground" />, // Icon size adjusted
       tooltip: "Browser notifications OFF. Click to enable.",
       action: toggleNotifications,
       variant: "secondary" as const,
@@ -82,13 +77,22 @@ export default function FloatingNotificationButton() {
             variant={variant === "destructive_outline" ? "outline" : variant}
             size="icon"
             className={cn(
-              "fixed bottom-5 z-40 h-14 w-14 rounded-full shadow-lg",
+              "fixed bottom-5 z-40 rounded-full shadow-lg",
+              // <<< --- MODIFIED SIZE --- >>>
+              "h-12 w-12", // Smaller than h-14 w-14
               "border",
               "cursor-pointer transition-all duration-150 ease-in-out",
-              "hover:scale-105",
-              "left-[calc(theme(spacing.5)_+_theme(spacing.14)_+_theme(spacing.3))] sm:left-[calc(theme(spacing.5)_+_theme(spacing.14)_+_theme(spacing.4))]",
-              variant === "destructive_outline" && "border-destructive/50 hover:bg-destructive/10 text-destructive hover:text-destructive", // Ensure text color is also destructive
-              disabled && "opacity-70 cursor-not-allowed hover:scale-100" // Style for disabled/loading
+              // Position it next to the FileBrowser button (assuming FileBrowser is left-5, w-14)
+              // left-5 (1.25rem) + w-14 (3.5rem) + gap (e.g., 0.75rem for sm:1rem)
+              "left-[calc(1.25rem_+_3.5rem_+_0.75rem)] sm:left-[calc(1.25rem_+_3.5rem_+_1rem)]",
+
+
+              // <<< --- MODIFIED HOVER & DISABLED STYLING --- >>>
+              disabled
+                ? "opacity-70 cursor-not-allowed" // Apply opacity only when truly disabled (loading)
+                : "hover:scale-105", // Apply hover scale only when not disabled
+
+              variant === "destructive_outline" && "border-destructive/50 hover:bg-destructive/10 text-destructive hover:text-destructive"
             )}
             onClick={action}
             aria-label={tooltip}
