@@ -27,9 +27,9 @@ export default function FloatingNotificationButton() {
             icon: <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />,
             tooltip: "Checking notification status...",
             action: () => {},
-            variant: "secondary" as const, // Keep as secondary for base style
+            variant: "secondary" as const,
             disabled: true,
-            hoverClass: "", // No special hover when disabled
+            hoverClass: "", // No hover effect when disabled
         };
     }
     if (permissionStatus === 'denied') {
@@ -49,7 +49,7 @@ export default function FloatingNotificationButton() {
         action: requestPermission,
         variant: "secondary" as const,
         disabled: false,
-        hoverClass: "hover:bg-secondary/90 dark:hover:bg-secondary/70", // Subtle hover for secondary
+        hoverClass: "hover:bg-secondary", // Explicitly set hover to be same as base secondary
       };
     }
     if (notificationsEnabled) { // Permission granted and notifications enabled
@@ -57,11 +57,9 @@ export default function FloatingNotificationButton() {
         icon: <BellRing className="h-5 w-5 text-green-600 dark:text-green-500" />,
         tooltip: "Browser notifications ON. Click to disable.",
         action: toggleNotifications,
-        variant: "secondary" as const, // Base style
+        variant: "secondary" as const,
         disabled: false,
-        // Explicitly define hover background to be same as non-hover or a very subtle change
-        // This ensures no default opacity/darkening from the base button variant's hover
-        hoverClass: "hover:bg-secondary/90 dark:hover:bg-secondary/70", // Or simply "hover:bg-secondary" if you want no change
+        hoverClass: "hover:bg-secondary", // Explicitly set hover to be same as base secondary
       };
     }
     // Permission granted, but notifications are manually disabled by user
@@ -71,7 +69,7 @@ export default function FloatingNotificationButton() {
       action: toggleNotifications,
       variant: "secondary" as const,
       disabled: false,
-      hoverClass: "hover:bg-secondary/90 dark:hover:bg-secondary/70", // Subtle hover for secondary
+      hoverClass: "hover:bg-secondary", // Explicitly set hover to be same as base secondary
     };
   };
 
@@ -88,15 +86,17 @@ export default function FloatingNotificationButton() {
               "fixed bottom-5 z-40 rounded-full shadow-lg",
               "h-12 w-12",
               "border",
-              "transition-all duration-150 ease-in-out",
+              // <<< --- MODIFIED TRANSITION & OPACITY --- >>>
+              "transition-transform duration-150 ease-in-out", // Only transition transform (scale)
+              "opacity-100 hover:opacity-100", // Force opacity to 100 always
+              // Positioning
               "left-[calc(1.25rem_+_3.5rem_+_0.75rem)] sm:left-[calc(1.25rem_+_3.5rem_+_1rem)]",
 
               disabled
                 ? "cursor-not-allowed"
-                : ["cursor-pointer hover:scale-105", hoverClass], // Apply hoverClass when not disabled
+                : ["cursor-pointer hover:scale-105", hoverClass],
 
-              variant === "destructive_outline" && "border-destructive/50 text-destructive hover:text-destructive"
-              // No general hover:bg-X here, it's handled by hoverClass or variant's default
+              variant === "destructive_outline" && "border-destructive/50 text-destructive" // Removed hover:bg-destructive/10 from here, hoverClass will handle if needed
             )}
             onClick={action}
             aria-label={tooltip}
