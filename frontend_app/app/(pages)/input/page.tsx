@@ -51,14 +51,15 @@ import VcfSampleInputGroup from "@/components/forms/VcfSampleInputGroup";
 import FileSelector from "@/components/forms/FileSelector";
 import ProfileLoader from "@/components/forms/ProfileLoader";
 import SaveProfileDialog from "@/components/forms/SaveProfileDialog";
-import FormWarningDisplay from "@/components/forms/FormWarningDisplay"; // <<< --- ADDED IMPORT
+import FormWarningDisplay from "@/components/forms/FormWarningDisplay";
+import HelpTooltipIcon from "@/components/forms/HelpTooltipIcon"; // <<< --- ADDED IMPORT ---
 import * as api from "@/lib/api";
 import { PipelineInput, SampleInfo as ApiSampleInfo, ProfileData } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Control } from "react-hook-form";
 
 
-// --- Zod Schemas & Constants (Same as your last correct version) ---
+// --- Zod Schemas & Constants (Assume these are correct and complete from previous steps) ---
 const noSpacesRegex = /^[^\s]+$/;
 const laneRegex = /^L\d{3}$/;
 const commonRunInfoSchema = { run_name: z.string().min(1, "Run Name is required.").max(100, "Run Name must be 1-100 characters.").regex(/^[a-zA-Z0-9_ -]+$/, "Run Name can contain letters, numbers, spaces, underscores, and hyphens."), run_description: z.string().max(250, "Run Description must be at most 250 characters.").optional(), };
@@ -90,11 +91,8 @@ export default function InputPage() {
   const [selectedInputType, setSelectedInputType] = useState<InputType>('fastq');
   const formRef = useRef<HTMLFormElement>(null);
   const [advancedAccordionValue, setAdvancedAccordionValue] = useState<string | undefined>(undefined);
-
-  // <<< --- ADDED STATE FOR WARNINGS --- >>>
   const [bqsrFilesWarning, setBqsrFilesWarning] = useState<string | null>(null);
   const [somaticTumorWarning, setSomaticTumorWarning] = useState<string | null>(null);
-  // <<< --- END ADDED STATE --- >>>
 
   const form = useForm<PipelineFormValues>({
     resolver: zodResolver(pipelineInputSchema),
@@ -109,8 +107,6 @@ export default function InputPage() {
     },
   });
 
-  // useEffect(() => { /* console.log("Initial form values:", form.getValues()); */ }, [form]); // Keep for debugging if needed
-
   const watchedInputType = form.watch('input_type');
   const watchedStep = form.watch('step');
   const watchedSkipBqsr = form.watch('skip_baserecalibrator');
@@ -120,72 +116,32 @@ export default function InputPage() {
   const watchedSamples = form.watch('samples');
 
   useEffect(() => {
-    // Logic for resetting form on input_type change
     if (watchedInputType !== selectedInputType) {
       setSelectedInputType(watchedInputType);
       let defaultSample: Partial<ApiSampleInfo> = {};
-      if (watchedInputType === 'fastq') {
-        defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, lane: "L001", fastq_1: "", fastq_2: "" };
-      } else if (watchedInputType === 'bam_cram') {
-        defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, bam_cram: "", index: "" };
-      } else if (watchedInputType === 'vcf') {
-        defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, vcf: "", index: "" };
-      }
+      if (watchedInputType === 'fastq') { defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, lane: "L001", fastq_1: "", fastq_2: "" }; }
+      else if (watchedInputType === 'bam_cram') { defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, bam_cram: "", index: "" }; }
+      else if (watchedInputType === 'vcf') { defaultSample = { patient: "", sample: "", sex: undefined, status: undefined, vcf: "", index: "" }; }
       const currentValues = form.getValues();
       const newDefaultValues: Partial<PipelineFormValues> = {
-        run_name: "", run_description: "",
-        genome: currentValues.genome || "GATK.GRCh38",
-        profile: currentValues.profile || "docker",
-        wes: currentValues.wes || false,
-        skip_qc: currentValues.skip_qc || false,
-        intervals_file: currentValues.intervals_file || "",
-        dbsnp: currentValues.dbsnp || "",
-        known_indels: currentValues.known_indels || "",
-        pon: currentValues.pon || "",
-        input_type: watchedInputType,
-        samples: [defaultSample as ApiSampleInfo],
-        step: STEPS_FOR_INPUT_TYPE[watchedInputType][0],
-        aligner: watchedInputType === 'fastq' ? (currentValues.aligner || 'bwa-mem') : '',
-        trim_fastq: watchedInputType === 'fastq' ? (currentValues.trim_fastq || false) : false,
-        tools: watchedInputType === 'vcf' ? [] : (currentValues.tools || []),
-        skip_annotation: watchedInputType === 'vcf' ? false : (currentValues.skip_annotation || false),
-        skip_baserecalibrator: watchedInputType === 'vcf' ? false : (currentValues.skip_baserecalibrator || false),
-        joint_germline: watchedInputType === 'vcf' ? false : (currentValues.joint_germline || false),
+        run_name: "", run_description: "", genome: currentValues.genome || "GATK.GRCh38", profile: currentValues.profile || "docker", wes: currentValues.wes || false, skip_qc: currentValues.skip_qc || false, intervals_file: currentValues.intervals_file || "", dbsnp: currentValues.dbsnp || "", known_indels: currentValues.known_indels || "", pon: currentValues.pon || "", input_type: watchedInputType, samples: [defaultSample as ApiSampleInfo], step: STEPS_FOR_INPUT_TYPE[watchedInputType][0], aligner: watchedInputType === 'fastq' ? (currentValues.aligner || 'bwa-mem') : '', trim_fastq: watchedInputType === 'fastq' ? (currentValues.trim_fastq || false) : false, tools: watchedInputType === 'vcf' ? [] : (currentValues.tools || []), skip_annotation: watchedInputType === 'vcf' ? false : (currentValues.skip_annotation || false), skip_baserecalibrator: watchedInputType === 'vcf' ? false : (currentValues.skip_baserecalibrator || false), joint_germline: watchedInputType === 'vcf' ? false : (currentValues.joint_germline || false),
       };
       form.reset(newDefaultValues as PipelineFormValues);
-      setCurrentProfileName(null);
-      setAdvancedAccordionValue(undefined);
+      setCurrentProfileName(null); setAdvancedAccordionValue(undefined);
     }
 
-    // --- BQSR & Required Files Warning ---
     const isBqsrRelevant = watchedInputType !== 'vcf' && watchedStep !== 'variant_calling' && watchedStep !== 'annotation';
-    const isBqsrEnabled = !watchedSkipBqsr; // BQSR is enabled if skip_baserecalibrator is false
+    const isBqsrEnabled = !watchedSkipBqsr;
     const missingBqsrReferenceFiles = (!watchedDbsnp || watchedDbsnp.trim() === "") && (!watchedKnownIndels || watchedKnownIndels.trim() === "");
+    if (isBqsrRelevant && isBqsrEnabled && missingBqsrReferenceFiles) { setBqsrFilesWarning("Base Recalibration (BQSR) is enabled but requires either a dbSNP or Known Indels file to be specified."); }
+    else { setBqsrFilesWarning(null); }
 
-    if (isBqsrRelevant && isBqsrEnabled && missingBqsrReferenceFiles) {
-      setBqsrFilesWarning("Base Recalibration (BQSR) is enabled but requires either a dbSNP or Known Indels file to be specified.");
-    } else {
-      setBqsrFilesWarning(null);
-    }
-
-    // --- Somatic Tool & Missing Tumor Sample Warning (Overall Check) ---
     const relevantForSomaticCheck = watchedInputType !== 'vcf' && watchedStep !== 'annotation';
     const isAnySomaticToolSelected = watchedTools?.some(tool => SOMATIC_TOOLS.includes(tool)) ?? false;
     const hasAnyTumorSample = watchedSamples?.some(sample => sample.status === 1) ?? false;
-
-    if (relevantForSomaticCheck && isAnySomaticToolSelected && !hasAnyTumorSample) {
-      const selectedSomaticTools = watchedTools?.filter(t => SOMATIC_TOOLS.includes(t)).join(', ');
-      setSomaticTumorWarning(`Somatic tool(s) (${selectedSomaticTools || 'None selected yet'}) are selected, but no samples are marked as Tumor (Status=1). This is required for somatic analysis.`);
-    } else {
-      setSomaticTumorWarning(null);
-    }
-
-  }, [
-    watchedInputType, watchedStep, watchedSkipBqsr, watchedDbsnp,
-    watchedKnownIndels, watchedTools, watchedSamples,
-    form, selectedInputType // ensure form and selectedInputType are dependencies for reset logic
-  ]);
-
+    if (relevantForSomaticCheck && isAnySomaticToolSelected && !hasAnyTumorSample) { const selectedSomaticTools = watchedTools?.filter(t => SOMATIC_TOOLS.includes(t)).join(', '); setSomaticTumorWarning(`Somatic tool(s) (${selectedSomaticTools || 'None selected yet'}) are selected, but no samples are marked as Tumor (Status=1). This is required for somatic analysis.`); }
+    else { setSomaticTumorWarning(null); }
+  }, [watchedInputType, watchedStep, watchedSkipBqsr, watchedDbsnp, watchedKnownIndels, watchedTools, watchedSamples, form, selectedInputType]);
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "samples", });
   const availableSteps = useMemo(() => STEPS_FOR_INPUT_TYPE[selectedInputType] || [], [selectedInputType]);
@@ -257,57 +213,76 @@ export default function InputPage() {
           <Card>
             <CardHeader> <CardTitle className="text-xl">Core Pipeline Setup</CardTitle> <CardDescription>Essential parameters for the Sarek pipeline run.</CardDescription> </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
-                <FormField control={form.control} name="genome" render={({ field }) => ( <FormItem> <FormLabel>Reference Genome Build <span className="text-destructive">*</span></FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select genome build" /> </SelectTrigger> </FormControl> <SelectContent> {SAREK_GENOMES.map(g => ( <SelectItem key={g.value} value={g.value}> {g.label} </SelectItem> ))} </SelectContent> </Select> <FormDescription className="italic"> Select the genome assembly key. </FormDescription> <FormMessage /> </FormItem> )} />
-                <FormField control={form.control} name="step" render={({ field }) => ( <FormItem id="step-form-item"> <FormLabel>Starting Step <span className="text-destructive">*</span></FormLabel> <Select onValueChange={field.onChange} value={field.value} disabled={availableSteps.length <= 1} > <FormControl> <SelectTrigger id="step"> <SelectValue placeholder="Select starting step" /> </SelectTrigger> </FormControl> <SelectContent> {availableSteps.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)} </SelectContent> </Select> <FormDescription className="italic">Pipeline execution starting point.</FormDescription> <FormMessage /> </FormItem> )} />
-                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 md:col-span-2 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-wes" className="flex flex-row items-center space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-center"> <Checkbox id="flag-wes" checked={form.watch('wes')} onCheckedChange={() => toggleCheckboxValue('wes')} /> </FormControl> <div className="space-y-1 leading-none"> <span>Whole Exome Sequencing (WES)</span> <FormDescription className="italic mt-1"> Check if data is WES/targeted. Providing an Intervals file is recommended. </FormDescription> </div> </FormLabel> <FormField control={form.control} name="wes" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem>
-                <FormField control={form.control} name="intervals_file" render={({ field }) => ( <FormItem className="md:col-span-2"> <FormLabel> Intervals File <span className="text-muted-foreground text-xs"> (Optional for WES/Targeted)</span> </FormLabel> <FormControl> <FileSelector fileTypeLabel="Intervals" fileType="intervals" extensions={[".bed", ".list", ".interval_list"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select intervals file..." allowNone required={false} /> </FormControl> <FormDescription className="italic"> Target regions. </FormDescription> <FormMessage /> </FormItem> )} />
+                <FormField control={form.control} name="genome" render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center">
+                      <FormLabel>Reference Genome Build <span className="text-destructive">*</span></FormLabel>
+                      <HelpTooltipIcon tooltipKey="genome" />
+                    </div>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select genome build" /> </SelectTrigger> </FormControl> <SelectContent> {SAREK_GENOMES.map(g => ( <SelectItem key={g.value} value={g.value}> {g.label} </SelectItem> ))} </SelectContent> </Select> <FormDescription className="italic"> Select the genome assembly key. </FormDescription> <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="step" render={({ field }) => (
+                  <FormItem id="step-form-item">
+                    <div className="flex items-center">
+                      <FormLabel>Starting Step <span className="text-destructive">*</span></FormLabel>
+                      <HelpTooltipIcon tooltipKey="step" />
+                    </div>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={availableSteps.length <= 1} > <FormControl> <SelectTrigger id="step"> <SelectValue placeholder="Select starting step" /> </SelectTrigger> </FormControl> <SelectContent> {availableSteps.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)} </SelectContent> </Select> <FormDescription className="italic">Pipeline execution starting point.</FormDescription> <FormMessage />
+                  </FormItem>
+                )} />
+                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 md:col-span-2 hover:bg-accent/50 transition-colors select-none">
+                  <FormLabel htmlFor="flag-wes" className="flex flex-row items-center space-x-3 space-y-0 font-normal cursor-pointer w-full h-full">
+                    <FormControl className="flex h-6 items-center"> <Checkbox id="flag-wes" checked={form.watch('wes')} onCheckedChange={() => toggleCheckboxValue('wes')} /> </FormControl>
+                    <div className="space-y-1 leading-none"> <span>Whole Exome Sequencing (WES)</span> <FormDescription className="italic mt-1"> Check if data is WES/targeted. Providing an Intervals file is recommended. </FormDescription> </div>
+                  </FormLabel>
+                  <HelpTooltipIcon tooltipKey="wes" />
+                  <FormField control={form.control} name="wes" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} />
+                </FormItem>
+                <FormField control={form.control} name="intervals_file" render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <div className="flex items-center">
+                      <FormLabel> Intervals File <span className="text-muted-foreground text-xs"> (Optional for WES/Targeted)</span> </FormLabel>
+                      <HelpTooltipIcon tooltipKey="intervals_file" />
+                    </div>
+                    <FormControl> <FileSelector fileTypeLabel="Intervals" fileType="intervals" extensions={[".bed", ".list", ".interval_list"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select intervals file..." allowNone required={false} /> </FormControl> <FormDescription className="italic"> Target regions. </FormDescription> <FormMessage />
+                  </FormItem>
+                )} />
 
-                {/* --- BQSR Section with Warning --- */}
                 {showSkipBaserecalibrator && (
                   <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 md:col-span-2 hover:bg-accent/50 transition-colors select-none">
                     <FormLabel htmlFor="flag-skip_baserecalibrator" className="flex flex-row items-center space-x-3 space-y-0 font-normal cursor-pointer w-full h-full">
-                      <FormControl className="flex h-6 items-center">
-                        <Checkbox id="flag-skip_baserecalibrator" checked={form.watch('skip_baserecalibrator')} onCheckedChange={() => toggleCheckboxValue('skip_baserecalibrator')} />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <span>Skip Base Recalibration (BQSR)</span>
-                        <FormDescription className="italic mt-1">
-                          (If unchecked, dbSNP or Known Indels file is required below).
-                        </FormDescription>
-                      </div>
+                      <FormControl className="flex h-6 items-center"> <Checkbox id="flag-skip_baserecalibrator" checked={form.watch('skip_baserecalibrator')} onCheckedChange={() => toggleCheckboxValue('skip_baserecalibrator')} /> </FormControl>
+                      <div className="space-y-1 leading-none"> <span>Skip Base Recalibration (BQSR)</span> <FormDescription className="italic mt-1"> (If unchecked, dbSNP or Known Indels file is required below). </FormDescription> </div>
                     </FormLabel>
+                    <HelpTooltipIcon tooltipKey="skip_baserecalibrator" />
                     <FormField control={form.control} name="skip_baserecalibrator" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} />
                   </FormItem>
                 )}
-                {bqsrFilesWarning && showSkipBaserecalibrator && !form.watch('skip_baserecalibrator') && (
-                    <div className="md:col-span-2 -mt-2 mb-2"> {/* Adjust margin as needed */}
-                        <FormWarningDisplay message={bqsrFilesWarning} title="BQSR Configuration Notice" />
-                    </div>
-                )}
+                {bqsrFilesWarning && showSkipBaserecalibrator && !form.watch('skip_baserecalibrator') && ( <div className="md:col-span-2 -mt-2 mb-2"> <FormWarningDisplay message={bqsrFilesWarning} title="BQSR Configuration Notice" /> </div> )}
                 {showSkipBaserecalibrator && !form.watch('skip_baserecalibrator') && (
                   <>
                     <FormField control={form.control} name="dbsnp" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>dbSNP (VCF/VCF.GZ) <span className={cn(!watchedSkipBqsr && "text-destructive")}>*</span></FormLabel>
-                        <FormControl>
-                          <FileSelector fileTypeLabel="dbSNP" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select dbSNP file..." allowNone />
-                        </FormControl>
-                        <FormMessage />
+                        <div className="flex items-center">
+                          <FormLabel>dbSNP (VCF/VCF.GZ) <span className={cn(!watchedSkipBqsr && "text-destructive")}>*</span></FormLabel>
+                          <HelpTooltipIcon tooltipKey="dbsnp" />
+                        </div>
+                        <FormControl> <FileSelector fileTypeLabel="dbSNP" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select dbSNP file..." allowNone /> </FormControl> <FormMessage />
                       </FormItem>
                     )} />
                     <FormField control={form.control} name="known_indels" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Known Indels (VCF/VCF.GZ) <span className={cn(!watchedSkipBqsr && "text-destructive")}>*</span></FormLabel>
-                        <FormControl>
-                          <FileSelector fileTypeLabel="Known Indels" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select known indels file..." allowNone />
-                        </FormControl>
-                        <FormMessage />
+                        <div className="flex items-center">
+                          <FormLabel>Known Indels (VCF/VCF.GZ) <span className={cn(!watchedSkipBqsr && "text-destructive")}>*</span></FormLabel>
+                          <HelpTooltipIcon tooltipKey="known_indels" />
+                        </div>
+                        <FormControl> <FileSelector fileTypeLabel="Known Indels" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select known indels file..." allowNone /> </FormControl> <FormMessage />
                       </FormItem>
                     )} />
                     <FormDescription className="md:col-span-2 text-xs italic -mt-4">At least one (dbSNP or Known Indels) is required for BQSR.</FormDescription>
                   </>
                 )}
-                {/* --- End BQSR Section --- */}
             </CardContent>
           </Card>
 
@@ -321,33 +296,50 @@ export default function InputPage() {
                   <div className="px-6 pt-4 pb-6 space-y-6 border-t">
                     {showTools && (
                       <div>
-                        <div className="mb-4">
+                        <div className="mb-4 flex items-center">
                           <FormLabel className="text-base font-medium">Variant Calling Tools</FormLabel>
-                          <FormDescription className="text-sm text-muted-foreground">Select tools to run (not applicable when starting at annotation).</FormDescription>
+                          <HelpTooltipIcon tooltipKey="tools" />
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                          {SAREK_TOOLS.map((tool) => { const uniqueId = `tool-${tool}`; const currentTools: string[] = form.watch("tools") || []; const isChecked = currentTools.includes(tool); return ( <FormItem key={uniqueId} className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor={uniqueId} className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id={uniqueId} checked={isChecked} onCheckedChange={() => toggleCheckboxValue('tools', tool)} /> </FormControl> <span className="pt-px">{tool}</span> </FormLabel> </FormItem> ); })}
-                        </div>
+                        <FormDescription className="text-sm text-muted-foreground mb-2">Select tools to run (not applicable when starting at annotation).</FormDescription>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2"> {SAREK_TOOLS.map((tool) => { const uniqueId = `tool-${tool}`; const currentTools: string[] = form.watch("tools") || []; const isChecked = currentTools.includes(tool); return ( <FormItem key={uniqueId} className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor={uniqueId} className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id={uniqueId} checked={isChecked} onCheckedChange={() => toggleCheckboxValue('tools', tool)} /> </FormControl> <span className="pt-px">{tool}</span> </FormLabel> </FormItem> ); })} </div>
                         <FormField control={form.control} name="tools" render={() => <FormMessage className="pt-2" />} />
-                        {/* --- Somatic/Tumor Warning --- */}
-                        {somaticTumorWarning && (
-                            <div className="mt-3">
-                                <FormWarningDisplay message={somaticTumorWarning} title="Somatic Analysis Check" />
-                            </div>
-                        )}
-                        {/* --- End Somatic/Tumor Warning --- */}
+                        {somaticTumorWarning && ( <div className="mt-3"> <FormWarningDisplay message={somaticTumorWarning} title="Somatic Analysis Check" /> </div> )}
                       </div>
                     )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
-                      <FormField control={form.control} name="profile" render={({ field }) => ( <FormItem> <FormLabel>Execution Profile</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select execution profile" /> </SelectTrigger> </FormControl> <SelectContent> {SAREK_PROFILES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)} </SelectContent> </Select> <FormDescription className="italic"> Container or environment system. </FormDescription> <FormMessage /> </FormItem> )} />
-                      {showAligner && ( <FormField control={form.control} name="aligner" render={({ field }) => ( <FormItem> <FormLabel>Aligner</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value || ""}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select aligner" /> </SelectTrigger> </FormControl> <SelectContent> {SAREK_ALIGNERS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)} </SelectContent> </Select> <FormDescription className="italic"> Alignment algorithm (only for FASTQ input). </FormDescription> <FormMessage /> </FormItem> )} /> )}
-                      <FormField control={form.control} name="pon" render={({ field }) => ( <FormItem className="md:col-span-2"> <FormLabel>Panel of Normals (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel> <FormControl> <FileSelector fileTypeLabel="Panel of Normals" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select Panel of Normals file..." allowNone /> </FormControl> <FormDescription className="italic"> Recommended for Mutect2 somatic variant calling. </FormDescription> <FormMessage /> </FormItem> )} />
+                      <FormField control={form.control} name="profile" render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center">
+                            <FormLabel>Execution Profile</FormLabel>
+                            <HelpTooltipIcon tooltipKey="profile" />
+                          </div>
+                          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select execution profile" /> </SelectTrigger> </FormControl> <SelectContent> {SAREK_PROFILES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)} </SelectContent> </Select> <FormDescription className="italic"> Container or environment system. </FormDescription> <FormMessage />
+                        </FormItem>
+                      )} />
+                      {showAligner && ( <FormField control={form.control} name="aligner" render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center">
+                            <FormLabel>Aligner</FormLabel>
+                            <HelpTooltipIcon tooltipKey="aligner" />
+                          </div>
+                          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value || ""}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select aligner" /> </SelectTrigger> </FormControl> <SelectContent> {SAREK_ALIGNERS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)} </SelectContent> </Select> <FormDescription className="italic"> Alignment algorithm (only for FASTQ input). </FormDescription> <FormMessage />
+                        </FormItem>
+                      )} /> )}
+                      <FormField control={form.control} name="pon" render={({ field }) => (
+                        <FormItem className="md:col-span-2">
+                          <div className="flex items-center">
+                            <FormLabel>Panel of Normals (VCF/VCF.GZ) <span className="text-muted-foreground text-xs">(Optional)</span></FormLabel>
+                            <HelpTooltipIcon tooltipKey="pon" />
+                          </div>
+                          <FormControl> <FileSelector fileTypeLabel="Panel of Normals" fileType="vcf" extensions={[".vcf", ".vcf.gz", ".vcf.bgz"]} value={field.value || undefined} onChange={field.onChange} placeholder="Select Panel of Normals file..." allowNone /> </FormControl> <FormDescription className="italic"> Recommended for Mutect2 somatic variant calling. </FormDescription> <FormMessage />
+                        </FormItem>
+                      )} />
                     </div>
                     <div className="space-y-4">
-                      {showTrimFastq && ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-adv-trim_fastq" className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id="flag-adv-trim_fastq" checked={form.watch('trim_fastq')} onCheckedChange={() => toggleCheckboxValue('trim_fastq')} /> </FormControl> <div className="space-y-1 leading-none pt-px"> <span>Trim FASTQ</span> <FormDescription className="italic mt-1"> Enable adapter trimming (only for FASTQ input). </FormDescription> </div> </FormLabel> <FormField control={form.control} name="trim_fastq" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem> )}
-                      {showJointGermline && ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-adv-joint_germline" className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id="flag-adv-joint_germline" checked={form.watch('joint_germline')} onCheckedChange={() => toggleCheckboxValue('joint_germline')} /> </FormControl> <div className="space-y-1 leading-none pt-px"> <span>Joint Germline Calling</span> <FormDescription className="italic mt-1"> Enable joint calling (not applicable if starting at annotation). </FormDescription> </div> </FormLabel> <FormField control={form.control} name="joint_germline" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem> )}
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-adv-skip_qc" className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id="flag-adv-skip_qc" checked={form.watch('skip_qc')} onCheckedChange={() => toggleCheckboxValue('skip_qc')} /> </FormControl> <div className="space-y-1 leading-none pt-px"> <span>Skip QC</span> <FormDescription className="italic mt-1"> Skip quality control steps (FastQC, Samtools stats, etc.). </FormDescription> </div> </FormLabel> <FormField control={form.control} name="skip_qc" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem>
-                      {showSkipAnnotation && ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-adv-skip_annotation" className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id="flag-adv-skip_annotation" checked={form.watch('skip_annotation')} onCheckedChange={() => toggleCheckboxValue('skip_annotation')} /> </FormControl> <div className="space-y-1 leading-none pt-px"> <span>Skip Annotation</span> <FormDescription className="italic mt-1"> Skip variant annotation steps (not applicable if starting at annotation). </FormDescription> </div> </FormLabel> <FormField control={form.control} name="skip_annotation" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem> )}
+                      {showTrimFastq && ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-adv-trim_fastq" className="flex flex-row items-center space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id="flag-adv-trim_fastq" checked={form.watch('trim_fastq')} onCheckedChange={() => toggleCheckboxValue('trim_fastq')} /> </FormControl> <div className="space-y-1 leading-none pt-px"> <span>Trim FASTQ</span> <FormDescription className="italic mt-1"> Enable adapter trimming (only for FASTQ input). </FormDescription> </div> </FormLabel> <HelpTooltipIcon tooltipKey="trim_fastq" /> <FormField control={form.control} name="trim_fastq" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem> )}
+                      {showJointGermline && ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-adv-joint_germline" className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id="flag-adv-joint_germline" checked={form.watch('joint_germline')} onCheckedChange={() => toggleCheckboxValue('joint_germline')} /> </FormControl> <div className="space-y-1 leading-none pt-px"> <span>Joint Germline Calling</span> <FormDescription className="italic mt-1"> Enable joint calling (not applicable if starting at annotation). </FormDescription> </div> </FormLabel> <HelpTooltipIcon tooltipKey="joint_germline" /> <FormField control={form.control} name="joint_germline" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem> )}
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-adv-skip_qc" className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id="flag-adv-skip_qc" checked={form.watch('skip_qc')} onCheckedChange={() => toggleCheckboxValue('skip_qc')} /> </FormControl> <div className="space-y-1 leading-none pt-px"> <span>Skip QC</span> <FormDescription className="italic mt-1"> Skip quality control steps (FastQC, Samtools stats, etc.). </FormDescription> </div> </FormLabel> <HelpTooltipIcon tooltipKey="skip_qc" /> <FormField control={form.control} name="skip_qc" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem>
+                      {showSkipAnnotation && ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors select-none"> <FormLabel htmlFor="flag-adv-skip_annotation" className="flex flex-row items-start space-x-3 space-y-0 font-normal cursor-pointer w-full h-full"> <FormControl className="flex h-6 items-start"> <Checkbox id="flag-adv-skip_annotation" checked={form.watch('skip_annotation')} onCheckedChange={() => toggleCheckboxValue('skip_annotation')} /> </FormControl> <div className="space-y-1 leading-none pt-px"> <span>Skip Annotation</span> <FormDescription className="italic mt-1"> Skip variant annotation steps (not applicable if starting at annotation). </FormDescription> </div> </FormLabel> <HelpTooltipIcon tooltipKey="skip_annotation" /> <FormField control={form.control} name="skip_annotation" render={() => <FormMessage className="pt-1 pl-[calc(1rem+0.75rem)]" />} /> </FormItem> )}
                     </div>
                   </div>
                 </AccordionContent>
@@ -359,37 +351,14 @@ export default function InputPage() {
             <TooltipProvider delayDuration={100}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    type="submit"
-                    disabled={isStagingDisabled}
-                    className={cn(
-                      "border border-primary hover:underline",
-                      isStagingDisabled
-                        ? "bg-primary/50 text-primary-foreground/70 opacity-50 cursor-not-allowed"
-                        : "bg-primary text-primary-foreground hover:bg-primary/90"
-                    )}
-                    aria-disabled={isStagingDisabled}
-                  >
-                    {(stageMutation.isPending || saveProfileMutation.isPending)
-                        ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        : <Play className="mr-2 h-4 w-4" />
-                    }
-                    Stage Pipeline Run
+                  <Button type="submit" disabled={isStagingDisabled} className={cn("border border-primary hover:underline", isStagingDisabled ? "bg-primary/50 text-primary-foreground/70 opacity-50 cursor-not-allowed" : "bg-primary text-primary-foreground hover:bg-primary/90" )} aria-disabled={isStagingDisabled} >
+                    {(stageMutation.isPending || saveProfileMutation.isPending) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" /> } Stage Pipeline Run
                   </Button>
                 </TooltipTrigger>
-                {isStagingDisabled && disabledButtonTooltipMessage && (
-                  <TooltipContent side="top" align="center">
-                    <p className="text-sm flex items-center gap-1">
-                        <Info className="h-4 w-4"/>
-                        {disabledButtonTooltipMessage}
-                    </p>
-                  </TooltipContent>
-                )}
+                {isStagingDisabled && disabledButtonTooltipMessage && ( <TooltipContent side="top" align="center"> <p className="text-sm flex items-center gap-1"> <Info className="h-4 w-4"/> {disabledButtonTooltipMessage} </p> </TooltipContent> )}
               </Tooltip>
             </TooltipProvider>
-            <Button type="button" variant="outline" onClick={() => setIsSaveProfileOpen(true)} disabled={stageMutation.isPending || saveProfileMutation.isPending} className="cursor-pointer" >
-              <Save className="mr-2 h-4 w-4" /> Save Profile
-            </Button>
+            <Button type="button" variant="outline" onClick={() => setIsSaveProfileOpen(true)} disabled={stageMutation.isPending || saveProfileMutation.isPending} className="cursor-pointer" > <Save className="mr-2 h-4 w-4" /> Save Profile </Button>
           </div>
         </form>
       </Form>
