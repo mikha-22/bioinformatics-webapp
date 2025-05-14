@@ -89,7 +89,23 @@ if [ -z "$outdir_base" ]; then log "ERROR: Missing required argument: outdir_bas
 if [ -z "$genome" ]; then log "ERROR: Missing required argument: genome (Argument #4)" >&2; exit 1; fi
 
 log "Run Name (Input): $run_name_input"
-# ... (logging for other arguments remains the same) ...
+log "Input CSV: $input_csv"
+log "Output Base Dir: $outdir_base"
+log "Genome: $genome"
+[ -n "$tools" ] && [ "$tools" != " " ] && log "Tools: $tools"
+[ -n "$step" ] && [ "$step" != " " ] && log "Step: $step"
+[ -n "$profile" ] && [ "$profile" != " " ] && log "Profile: $profile"
+[ -n "$aligner" ] && [ "$aligner" != " " ] && log "Aligner: $aligner"
+[ -n "$intervals" ] && [ "$intervals" != " " ] && log "Intervals: $intervals"
+[ -n "$dbsnp" ] && [ "$dbsnp" != " " ] && log "dbSNP: $dbsnp"
+[ -n "$known_indels" ] && [ "$known_indels" != " " ] && log "Known Indels: $known_indels"
+[ -n "$pon" ] && [ "$pon" != " " ] && log "PoN: $pon"
+log "Joint Germline: $joint_germline_flag"
+log "WES: $wes_flag"
+log "Trim FASTQ: $trim_fastq_flag"
+log "Skip QC: $skip_qc_flag"
+log "Skip Annotation: $skip_annotation_flag"
+log "Skip Base Recalibrator: $skip_baserecalibrator_flag"
 log "Is Rerun: $is_rerun"
 log "Job ID Suffix Arg: $job_id_suffix_arg"
 
@@ -146,7 +162,7 @@ log "Run-specific Nextflow work directory will be: ${RUN_SPECIFIC_WORK_DIR}"
 log "Run-specific Nextflow log file will be: ${RUN_SPECIFIC_LOG_FILE}"
 mkdir -p "$RUN_SPECIFIC_WORK_DIR" || { log "ERROR: Failed to create run-specific work dir: $RUN_SPECIFIC_WORK_DIR" >&2; exit 1; }
 
-NXF_EXECUTABLE="/usr/local/bin/nextflow"
+NXF_EXECUTABLE="/usr/local/bin/nextflow" # Assuming Nextflow is in PATH or adjust as needed
 
 log "Building Nextflow command..."
 cmd="$NXF_EXECUTABLE run nf-core/sarek -r 3.5.1"
@@ -156,11 +172,9 @@ cmd+=" --genome \"${genome}\""
 cmd+=" -c \"${NEXTFLOW_CONFIG_FILE}\""
 cmd+=" -name \"${RUN_SPECIFIC_IDENTIFIER}\""
 
-# <<< --- ADDED -with-trace OPTION --- >>>
-# The trace file will be generated inside the Sarek results directory for this specific run.
+# <<< --- MODIFIED: Using -with-trace and specifying filename within results_dir --- >>>
 cmd+=" -with-trace \"${results_dir}/execution_trace.txt\""
-# <<< --- END ADDED OPTION --- >>>
-
+# <<< --- END MODIFICATION --- >>>
 
 export NXF_WORK="${RUN_SPECIFIC_WORK_DIR}"
 export NXF_LOG_FILE="${RUN_SPECIFIC_LOG_FILE}"
@@ -184,7 +198,6 @@ if [ "$skip_qc_flag" = "true" ]; then cmd+=" --skip_qc"; fi
 if [ "$skip_annotation_flag" = "true" ]; then cmd+=" --skip_annotation"; fi
 if [ "$is_rerun" = "true" ]; then cmd+=" -resume"; fi
 
-# ... (Sanity Checks remain the same) ...
 log "--- Worker Environment & Sanity Checks ---"
 log "User: $(whoami) (UID: $(id -u))"
 log "Current Directory (of script execution): $(pwd)"
@@ -205,7 +218,6 @@ if [ -f "$input_csv" ] && [ -r "$input_csv" ]; then log "Input CSV found and rea
 log "Checking Nextflow Config File..."
 if [ -f "$NEXTFLOW_CONFIG_FILE" ] && [ -r "$NEXTFLOW_CONFIG_FILE" ]; then log "Config file found and readable: $NEXTFLOW_CONFIG_FILE"; else log "ERROR: Config file not found or not readable: $NEXTFLOW_CONFIG_FILE" >&2; ls -l "$NEXTFLOW_CONFIG_FILE"; exit 1; fi
 log "--- End Sanity Checks ---"
-
 
 log "Executing Nextflow Command:"
 log "$cmd"

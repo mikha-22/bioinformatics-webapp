@@ -8,7 +8,7 @@ export interface JobResourceInfo {
 
 export interface SarekParams {
   genome?: string;
-  tools?: string;
+  tools?: string; // Comma-separated string when stored in backend meta
   step?: string;
   profile?: string;
   aligner?: string;
@@ -51,27 +51,25 @@ export interface JobMeta {
   staged_job_id_origin?: string;
   error_message?: string;
   stderr_snippet?: string;
-  // progress?: number; // Old generic progress
-  current_task?: string | null; // Keep this, can be from Nextflow process name or final status
+  current_task?: string | null;
   results_path?: string;
   warning_message?: string;
   input_csv_path_used?: string;
   is_rerun_execution?: boolean | null;
   original_job_id?: string | null;
 
-  // <<< --- ADDED Fields for Detailed Progress --- >>>
-  overall_progress?: number | null;       // Percentage (0-100)
-  submitted_task_count?: number | null;   // Total tasks Nextflow knows about
-  completed_task_count?: number | null;   // Tasks marked COMPLETED in trace
-  // current_task_progress?: number | null; // Optional for future if parsing console for current task %
-  // <<< --- END ADDED Fields --- >>>
+  // <<< --- MODIFIED/ADDED Fields for Detailed Progress --- >>>
+  overall_progress?: number | null;       // Percentage (0-100), can be from NF log or trace
+  submitted_task_count?: number | null;   // Total tasks Nextflow knows about (from NF log or trace)
+  completed_task_count?: number | null;   // Tasks marked COMPLETED (primarily from trace)
+  // <<< --- END MODIFIED/ADDED Fields --- >>>
 }
 
 export interface JobResultSuccess {
     status: "success";
     results_path?: string;
     message?: string;
-    resources: JobMeta; // Assuming resources in result might be the full JobMeta
+    resources: JobMeta;
 }
 
 export interface Job {
@@ -83,13 +81,13 @@ export interface Job {
   started_at: number | null;
   ended_at: number | null;
   staged_at?: number | null;
-  result: JobResultSuccess | null | any; // result can be complex
+  result: JobResultSuccess | null | any;
   error: string | null;
   meta: JobMeta; // This will now include the new progress fields
   resources: JobResourceInfo | null;
 }
 
-export interface JobStatusDetails { // This is often what's directly used in UI components
+export interface JobStatusDetails {
     job_id: string;
     run_name?: string | null;
     status: string;
@@ -156,7 +154,7 @@ export interface RunParameters {
   run_name?: string | null;
   run_description?: string | null;
   input_filenames?: InputFilenames | null;
-  sarek_params?: SarekParams | null;
+  sarek_params?: Sarek_params | null;
   sample_info?: SampleInfo[] | null;
   input_type?: string | null;
   staged_job_id_origin?: string | null;
@@ -183,7 +181,6 @@ export interface ProfileData {
     skip_baserecalibrator?: boolean | null;
 }
 
-// Batch Action Response Types (already added in a previous step, ensure they are here)
 export interface BatchActionDetail {
   job_id: string;
   status: string;

@@ -17,7 +17,7 @@ import JobActions from "./JobActions";
 import React from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import LiveDuration from "./LiveDuration";
-import { Progress } from "@/components/ui/progress"; // <<< --- ADDED IMPORT for Progress Bar ---
+import { Progress } from "@/components/ui/progress"; // Already imported from previous attempt
 
 interface JobTableProps {
   jobs: Job[];
@@ -27,17 +27,16 @@ interface JobTableProps {
   isJobSelectable?: (job: Job) => boolean;
 }
 
-// Helper Functions (mapToUiStatus, getStatusVariant, formatTimestamp) remain the same
 function mapToUiStatus(internalStatus: string | null | undefined): string {
     const status = internalStatus?.toLowerCase();
     switch (status) {
         case 'staged': return 'Staged';
         case 'queued': return 'Queued';
-        case 'started': return 'Running';
+        case 'started': return 'Running'; // Map 'started' to 'Running' for UI
         case 'running': return 'Running';
         case 'finished': return 'Finished';
         case 'failed': return 'Failed';
-        case 'canceled': return 'Stopped';
+        case 'canceled': return 'Stopped'; // User-friendly term
         case 'stopped': return 'Stopped';
         default: return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown';
     }
@@ -46,11 +45,11 @@ function mapToUiStatus(internalStatus: string | null | undefined): string {
 function getStatusVariant(internalStatus: string | null | undefined): "default" | "destructive" | "secondary" | "outline" {
     const status = internalStatus?.toLowerCase();
     switch (status) {
-        case 'finished': return 'default';
+        case 'finished': return 'default'; // Consider a success-like variant if 'default' isn't green
         case 'failed': return 'destructive';
-        case 'started': case 'running': return 'default';
-        case 'queued': case 'staged': return 'secondary';
-        case 'stopped': case 'canceled': return 'outline';
+        case 'started': case 'running': return 'default'; // Primary/active color
+        case 'queued': case 'staged': return 'secondary'; // Neutral/gray
+        case 'stopped': case 'canceled': return 'outline'; // Muted
         default: return 'secondary';
     }
 }
@@ -59,7 +58,7 @@ function formatTimestamp(timestamp: number | null | undefined): React.ReactEleme
   if (!timestamp) return "N/A";
   try {
     const date = new Date(timestamp * 1000);
-    if (isNaN(date.getTime())) return "Invalid Date";
+    if (isNaN(date.getTime())) return "Invalid Date"; // Check for invalid date object
     const relative = formatDistanceToNow(date, { addSuffix: true });
     const absolute = date.toLocaleString();
     return <span title={absolute}>{relative}</span>;
@@ -98,58 +97,52 @@ export default function JobTable({
     return mainIdPart.length > 6 ? `${prefix}_...${mainIdPart.slice(-6)}` : `${prefix}_${mainIdPart}`;
   };
 
-  // <<< --- MODIFIED getCurrentTaskDisplay to include progress --- >>>
-  const getProgressDisplayInfo = (job: Job): { text: string; percentage: number | null } => {
+  const getProgressDisplayInfo = (job: Job): { text: string; percentage: number | null; taskCounts?: string } => {
     const status = job.status?.toLowerCase();
     const meta = job.meta;
-    const currentTaskFromMeta = meta?.current_task;
-    const configuredStep = meta?.sarek_params?.step;
+    const currentTaskFromMeta = meta?.current_task; // This is the simplified task name from trace/NF log
 
     let text = "N/A";
     let percentage: number | null = null;
+    let taskCounts: string | undefined = undefined;
+
+    // Construct task counts string if data is available
+    if (typeof meta?.completed_task_count === 'number' && typeof meta?.submitted_task_count === 'number' && meta.submitted_task_count > 0) {
+        taskCounts = `[${meta.completed_task_count}/${meta.submitted_task_count}]`;
+    }
 
     if (status === 'running' || status === 'started') {
-      text = currentTaskFromMeta ? `Running: ${currentTaskFromMeta}` : (configuredStep ? `Starting: ${configuredStep}` : "Processing...");
-      if (typeof meta?.overall_progress === 'number') {
-        percentage = Math.max(0, Math.min(100, meta.overall_progress)); // Clamp between 0-100
-        text = `${currentTaskFromMeta || 'Processing...'} (${percentage.toFixed(0)}%)`;
-        if (typeof meta.completed_task_count === 'number' && typeof meta.submitted_task_count === 'number' && meta.submitted_task_count > 0) {
-          text += ` [${meta.completed_task_count}/${meta.submitted_task_count}]`;
+        text = currentTaskFromMeta ? `Running: ${currentTaskFromMeta}` : "Processing...";
+        if (typeof meta?.overall_progress === 'number') {
+            percentage = Math.max(0, Math.min(100, meta.overall_progress));
+            // Text already includes current task, percentage will be shown by progress bar or appended if no bar
         }
-      } else if (typeof meta?.completed_task_count === 'number' && typeof meta?.submitted_task_count === 'number' && meta.submitted_task_count > 0) {
-        percentage = Math.max(0, Math.min(100, (meta.completed_task_count / meta.submitted_task_count) * 100));
-        text = `${currentTaskFromMeta || 'Processing...'} (${percentage.toFixed(0)}%) [${meta.completed_task_count}/${meta.submitted_task_count}]`;
-      }
     } else if (status === 'finished') {
-      text = `Completed`;
-      percentage = 100;
-      if (typeof meta?.completed_task_count === 'number' && typeof meta?.submitted_task_count === 'number') {
-        text += ` (${meta.completed_task_count}/${meta.submitted_task_count} tasks)`;
-      } else {
-         text += ` (All tasks)`;
-      }
+        text = `Completed`;
+        percentage = 100;
+        // Task counts will be appended if available
     } else if (status === 'failed') {
-      text = `Failed: ${currentTaskFromMeta || (configuredStep ? `at ${configuredStep}` : 'Unknown step')}`;
-      percentage = meta?.overall_progress !== null && meta?.overall_progress !== undefined ? meta.overall_progress : null; // Show progress if available, even on fail
-      if (percentage !== null) text += ` (${percentage.toFixed(0)}%)`;
-      if (typeof meta?.completed_task_count === 'number' && typeof meta?.submitted_task_count === 'number') {
-        text += ` [${meta.completed_task_count}/${meta.submitted_task_count}]`;
-      }
+        text = `Failed: ${currentTaskFromMeta || 'Unknown step'}`;
+        if (typeof meta?.overall_progress === 'number') {
+            percentage = Math.max(0, Math.min(100, meta.overall_progress));
+        }
+        // Task counts will be appended if available
     } else if (status === 'queued') {
-      text = "Queued";
-      percentage = 0;
+        text = "Queued";
+        percentage = 0; // Show 0% for queued
     } else if (status === 'staged') {
-      text = "Staged";
-      percentage = 0;
+        text = "Staged";
+        percentage = 0; // Show 0% for staged
     } else if (status === 'stopped' || status === 'canceled') {
-      text = `Stopped: ${currentTaskFromMeta || 'User action'}`;
-      percentage = meta?.overall_progress !== null && meta?.overall_progress !== undefined ? meta.overall_progress : null;
-      if (percentage !== null) text += ` (${percentage.toFixed(0)}%)`;
+        text = `Stopped: ${currentTaskFromMeta || 'User action'}`;
+        if (typeof meta?.overall_progress === 'number') {
+            percentage = Math.max(0, Math.min(100, meta.overall_progress));
+        }
+    } else {
+        text = mapToUiStatus(job.status); // Fallback to general status mapping
     }
-    return { text, percentage };
+    return { text, percentage, taskCounts };
   };
-  // <<< --- END MODIFIED getCurrentTaskDisplay --- >>>
-
 
   const selectableJobsInView = validJobs.filter(job => isJobSelectable ? isJobSelectable(job) : true);
   const allSelectableInViewSelected = selectableJobsInView.length > 0 && selectableJobsInView.every(job => selectedJobIds.includes(job.job_id));
@@ -173,7 +166,7 @@ export default function JobTable({
             <TableHead className="w-[120px] hidden lg:table-cell">Job ID</TableHead>
             <TableHead className="min-w-[150px] max-w-[250px]">Run Name</TableHead>
             <TableHead>Description</TableHead>
-            <TableHead className="w-[220px] hidden md:table-cell">Progress</TableHead> {/* Increased width for progress bar */}
+            <TableHead className="w-[250px] hidden md:table-cell">Progress</TableHead> {/* Adjusted width */}
             <TableHead className="w-[120px] hidden md:table-cell">Duration</TableHead>
             <TableHead className="w-[150px] hidden sm:table-cell">Last Updated</TableHead>
             <TableHead className="w-[100px]">Status</TableHead>
@@ -184,9 +177,11 @@ export default function JobTable({
           {validJobs.map((job) => {
             const internalStatus = job.status?.toLowerCase();
             const isActiveJob = internalStatus === 'running' || internalStatus === 'started';
-            const { text: progressText, percentage: progressPercentage } = getProgressDisplayInfo(job); // Get progress info
+            const { text: progressText, percentage: progressPercentage, taskCounts } = getProgressDisplayInfo(job);
             const isSelected = selectedJobIds.includes(job.job_id);
             const selectable = isJobSelectable ? isJobSelectable(job) : true;
+
+            const displayProgressText = taskCounts ? `${progressText} ${taskCounts}` : progressText;
 
             return (
               <TableRow key={job.job_id} data-state={isSelected ? "selected" : undefined} >
@@ -200,20 +195,36 @@ export default function JobTable({
                 </TableCell>
                 <TableCell className="max-w-xs truncate" title={job.description ?? "No description"}>{job.description || <span className="italic text-muted-foreground">No description</span>}</TableCell>
                 
-                {/* --- MODIFIED Progress Cell --- */}
                 <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
-                  <div className="flex flex-col space-y-1">
-                    <span className="truncate text-xs" title={progressText}>{progressText}</span>
-                    {(progressPercentage !== null && (internalStatus === 'running' || internalStatus === 'started' || internalStatus === 'finished' || internalStatus === 'failed' || internalStatus === 'stopped' || internalStatus === 'canceled')) && (
-                      <Progress value={progressPercentage} className="h-1.5" indicatorClassName={
-                        internalStatus === 'failed' ? "bg-destructive" :
-                        (internalStatus === 'finished' || progressPercentage === 100) ? "bg-green-500" :
-                        "bg-primary"
-                      } />
+                  <div className="flex flex-col space-y-1 w-full"> {/* Ensure full width for truncation */}
+                    <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="truncate text-xs block" style={{maxWidth: "200px"}}> {/* Constrain width for truncation */}
+                                    {displayProgressText}
+                                </span>
+                            </TooltipTrigger>
+                            {/* Show full text in tooltip if it was truncated */}
+                            {displayProgressText.length > 35 && ( // Adjust character limit as needed
+                                <TooltipContent side="top" align="start">
+                                    <p>{displayProgressText}</p>
+                                </TooltipContent>
+                            )}
+                        </Tooltip>
+                    </TooltipProvider>
+                    {(progressPercentage !== null && (internalStatus === 'running' || internalStatus === 'started' || internalStatus === 'finished' || internalStatus === 'failed' || internalStatus === 'stopped' || internalStatus === 'canceled' || internalStatus === 'queued' || internalStatus === 'staged')) && (
+                      <Progress
+                        value={progressPercentage}
+                        className="h-2 w-full" // Ensure progress bar takes available width
+                        indicatorClassName={
+                            internalStatus === 'failed' ? "bg-destructive" :
+                            (internalStatus === 'finished' || progressPercentage === 100) ? "bg-green-500" :
+                            (internalStatus === 'queued' || internalStatus === 'staged') ? "bg-muted-foreground/30" : // Lighter for queued/staged
+                            "bg-primary"
+                        } />
                     )}
                   </div>
                 </TableCell>
-                {/* --- END MODIFIED Progress Cell --- */}
 
                 <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
                   {isActiveJob && job.started_at ? ( <LiveDuration startedAt={job.started_at} status={job.status} /> ) : ( formatDuration(job.resources?.duration_seconds) )}

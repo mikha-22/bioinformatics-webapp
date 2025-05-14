@@ -55,8 +55,7 @@ class JobMeta(BaseModel):
     staged_job_id_origin: Optional[str] = None
     error_message: Optional[str] = None
     stderr_snippet: Optional[str] = None
-    # progress: Optional[int] = None # This was a generic progress, replaced by more specific ones
-    current_task: Optional[str] = None
+    current_task: Optional[str] = None # Kept for current high-level task name
     results_path: Optional[str] = None
     warning_message: Optional[str] = None
     input_csv_path_used: Optional[str] = None
@@ -67,7 +66,6 @@ class JobMeta(BaseModel):
     overall_progress: Optional[float] = Field(None, description="Overall pipeline progress percentage based on Nextflow tasks (0-100)")
     submitted_task_count: Optional[int] = Field(None, description="Total unique tasks submitted/identified by Nextflow in the trace")
     completed_task_count: Optional[int] = Field(None, description="Total unique tasks marked as COMPLETED by Nextflow in the trace")
-    # current_task_progress: Optional[float] = Field(None, description="Progress percentage of the current_task, if available from console parsing (future)") # Optional for future
     # <<< --- END ADDED Fields --- >>>
 
 
