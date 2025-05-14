@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation"; // Not strictly needed for this specific change, but keep if used elsewhere
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -15,6 +15,7 @@ import {
     FolderGit2,
     Loader2,
     Terminal,
+    History, // <<< --- ADDED History icon for rerun info ---
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -42,24 +43,28 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-import { Job, SampleInfo, JobMeta, InputFilenames, SarekParams, RunParameters } from "@/lib/types"; // Job type now uses job_id
+import { Job, SampleInfo, JobMeta } from "@/lib/types"; // Removed unused InputFilenames, SarekParams, RunParameters for this file
 import * as api from "@/lib/api";
 import { formatDuration } from "@/lib/utils";
 import { formatDistanceToNow } from 'date-fns';
 import JobLogViewer from "./JobLogViewer";
 
+// Helper functions (getStatusVariant, formatTimestamp, formatTimestampRelative, formatParamKey, formatParamValue)
+// Assuming these are correctly defined as in your previous versions or a shared utility
 function getStatusVariant(internalStatus: string | null | undefined): "default" | "destructive" | "secondary" | "outline" { const status = internalStatus?.toLowerCase(); switch (status) { case 'finished': return 'default'; case 'failed': return 'destructive'; case 'started': case 'running': return 'default'; case 'queued': case 'staged': return 'secondary'; case 'stopped': case 'canceled': return 'outline'; default: return 'secondary'; } }
 function formatTimestamp(timestamp: number | null | undefined): string { if (!timestamp) return "N/A"; try { const date = new Date(timestamp * 1000); if (isNaN(date.getTime())) return "Invalid Date"; return date.toLocaleString(); } catch (e) { return "Invalid Date"; } }
 function formatTimestampRelative(timestamp: number | null | undefined): string { if (!timestamp) return "N/A"; try { if (timestamp <= 0) return "N/A"; const date = new Date(timestamp * 1000); if (isNaN(date.getTime())) return "Invalid Date"; return formatDistanceToNow(date, { addSuffix: true }); } catch (e) { console.error("Error formatting relative timestamp:", timestamp, e); return "Invalid Date"; } }
 const formatParamKey = (key: string): string => key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 const formatParamValue = (value: any): string => { if (value === true) return 'Yes'; if (value === false) return 'No'; if (value === null || value === undefined) return 'N/A'; if (typeof value === 'string' && value.trim() === '') return 'N/A'; if (Array.isArray(value)) { return value.length > 0 ? value.join(', ') : 'N/A'; } if (typeof value === 'object') { return JSON.stringify(value); } return String(value); }
 
+
 interface JobActionsProps {
-  job: Job | undefined; // job.job_id is the identifier
+  job: Job | undefined;
 }
 
 export default function JobActions({ job }: JobActionsProps) {
     const queryClient = useQueryClient();
+    // const router = useRouter(); // Keep if used for navigation on notification click etc.
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [isStopConfirmOpen, setIsStopConfirmOpen] = useState(false);
     const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false);
@@ -115,7 +120,7 @@ export default function JobActions({ job }: JobActionsProps) {
     const canRemove = internalStatus === 'staged' || internalStatus === 'finished' || internalStatus === 'failed' || internalStatus === 'stopped' || internalStatus === 'canceled';
     const canViewLogs = internalStatus !== 'staged';
 
-    const meta = job.meta as JobMeta | null | undefined;
+    const meta = job.meta as JobMeta | null | undefined; // Type assertion for clarity
     const inputParams = meta?.input_params;
     const sarekParams = meta?.sarek_params;
     const hasParameters = !!(inputParams && Object.keys(inputParams).length > 0) || !!(sarekParams && Object.keys(sarekParams).length > 0);
@@ -123,6 +128,7 @@ export default function JobActions({ job }: JobActionsProps) {
     return (
         <>
             <div className="flex items-center justify-between gap-1 w-full">
+                {/* ... (existing buttons for logs, start, stop, rerun) ... */}
                 <div className="flex items-center gap-1">
                     <Button
                         variant="ghost" size="icon" onClick={handleViewLogs} disabled={!canViewLogs}
@@ -191,7 +197,7 @@ export default function JobActions({ job }: JobActionsProps) {
             <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
                 <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>Job Details: {job.job_id}</DialogTitle> {/* Use job.job_id */}
+                        <DialogTitle>Job Details: {job.job_id}</DialogTitle>
                         <DialogDescription>{job.description || "No description provided."}</DialogDescription>
                     </DialogHeader>
                     <div className="mt-4 max-h-[65vh] overflow-y-auto space-y-4 pr-2">
@@ -204,6 +210,25 @@ export default function JobActions({ job }: JobActionsProps) {
                             <div className="font-medium text-muted-foreground">Ended:</div> <div>{formatTimestamp(job.ended_at)} ({formatTimestampRelative(job.ended_at)})</div>
                             <div className="font-medium text-muted-foreground">Duration:</div> <div>{formatDuration(job.resources?.duration_seconds)}</div>
                         </div>
+
+                        {/* <<< --- ADDED Rerun Information Section --- >>> */}
+                        {meta?.is_rerun_execution && meta?.original_job_id && (
+                          <div className="mt-3 pt-3 border-t">
+                            <h4 className="font-semibold mb-1.5 text-sm text-muted-foreground flex items-center">
+                                <History className="h-4 w-4 mr-2" />
+                                Rerun Information
+                            </h4>
+                            <div className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm pl-4 items-center">
+                              <div className="font-medium text-muted-foreground/80">Original Job ID:</div>
+                              <div className="font-mono text-xs bg-muted/70 px-1.5 py-0.5 rounded-sm break-all" title={meta.original_job_id}>
+                                {meta.original_job_id}
+                                {/* Consider making this a link later if feasible to jump to original job details */}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {/* <<< --- END ADDED Rerun Information Section --- >>> */}
+
                         {job.resources && (job.resources.peak_memory_mb || job.resources.average_cpu_percent) && ( <div> <h4 className="font-semibold mb-1">Resources Used:</h4> <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm pl-4"> <div className="font-medium text-muted-foreground">Peak Memory:</div> <div>{job.resources.peak_memory_mb ? `${job.resources.peak_memory_mb.toFixed(1)} MB` : 'N/A'}</div> <div className="font-medium text-muted-foreground">Average CPU:</div> <div>{job.resources.average_cpu_percent ? `${job.resources.average_cpu_percent.toFixed(1)} %` : 'N/A'}</div> </div> </div> )}
                         {hasParameters && ( <div> <h4 className="font-semibold mb-1">Parameters:</h4> <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm pl-4"> {inputParams && Object.entries(inputParams).map(([key, value]) => ( <React.Fragment key={`input-${key}`}> <div className="font-medium text-muted-foreground truncate" title={key}>{formatParamKey(key)}:</div> <div className="font-mono text-xs break-words" title={String(value ?? '')}>{formatParamValue(value)}</div> </React.Fragment> ))} {sarekParams && Object.entries(sarekParams).map(([key, value]) => ( <React.Fragment key={`sarek-${key}`}> <div className="font-medium text-muted-foreground truncate" title={key}>{formatParamKey(key)}:</div> <div className="font-mono text-xs break-words" title={String(value ?? '')}>{formatParamValue(value)}</div> </React.Fragment> ))} </div> </div> )}
                          {meta?.sample_info && meta.sample_info.length > 0 && ( <div> <h4 className="font-semibold mb-1">Samples Processed:</h4> <ul className="text-sm pl-4 space-y-1 list-disc list-inside"> {meta.sample_info.map((sample: SampleInfo, index: number) => ( <li key={index}> {sample.patient} / {sample.sample} (Sex: {sample.sex}, Status: {sample.status === 1 ? 'Tumor' : 'Normal'}) {sample.fastq_1 && <span className="block text-xs text-muted-foreground pl-4 truncate" title={`${sample.fastq_1}, ${sample.fastq_2}`}>FASTQs: {sample.fastq_1}, {sample.fastq_2}</span>} {sample.bam_cram && <span className="block text-xs text-muted-foreground pl-4 truncate" title={`${sample.bam_cram}`}>BAM/CRAM: {sample.bam_cram}</span>} {sample.vcf && <span className="block text-xs text-muted-foreground pl-4 truncate" title={`${sample.vcf}`}>VCF: {sample.vcf}</span>} </li> ))} </ul> </div> )}
@@ -213,15 +238,18 @@ export default function JobActions({ job }: JobActionsProps) {
                     <DialogFooter className="mt-4"> <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose> </DialogFooter>
                 </DialogContent>
              </Dialog>
+
+            {/* ... (AlertDialogs for stop, remove, rerun confirmations) ... */}
             <AlertDialog open={isStopConfirmOpen} onOpenChange={setIsStopConfirmOpen}> <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Stop/Cancel Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to stop job <span className="font-mono font-semibold">{job.job_id}</span>? If it's running, a stop signal will be sent. If it's queued, it will be canceled. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={stopMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleStop} disabled={stopMutation.isPending} className="bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-700"> {stopMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Stop/Cancel Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent> </AlertDialog>
             <AlertDialog open={isRemoveConfirmOpen} onOpenChange={setIsRemoveConfirmOpen}> <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Remove Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to remove job <span className="font-mono font-semibold">{job.job_id}</span>? This will remove its entry from the list. Results files (if any) will not be deleted. This action cannot be undone. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={removeMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleRemove} disabled={removeMutation.isPending} className={buttonVariants({ variant: "destructive" })}> {removeMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Remove Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent> </AlertDialog>
             <AlertDialog open={isRerunConfirmOpen} onOpenChange={setIsRerunConfirmOpen}> <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Re-stage Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to re-stage job <span className="font-mono font-semibold">{job.job_id}</span>? This will create a new 'staged' job entry using the same parameters. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={rerunMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleRerun} disabled={rerunMutation.isPending}> {rerunMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Re-stage Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent> </AlertDialog>
+
             {job && job.job_id && (
                   <JobLogViewer
-                      jobId={logViewerJobId} // This is already job.job_id from handleViewLogs
+                      jobId={logViewerJobId}
                       isOpen={isLogViewerOpen}
                       onOpenChange={setIsLogViewerOpen}
-                      jobDescription={job.description} // This is the run_description
+                      jobDescription={job.description}
                   />
               )}
         </>
