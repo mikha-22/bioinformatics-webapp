@@ -2,7 +2,7 @@
 "use client";
 
 import React from 'react';
-import { Bell, BellRing, BellOff, AlertTriangle } from 'lucide-react';
+import { Bell, BellRing, BellOff, AlertTriangle, Loader2 } from 'lucide-react'; // Added Loader2
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useNotificationManager } from '@/components/providers/NotificationProvider';
@@ -18,16 +18,26 @@ export default function FloatingNotificationButton() {
   } = useNotificationManager();
 
   if (!isSupported) {
-    return null; // Don't render the button if notifications aren't supported
+    return null;
   }
 
   const getIconAndTooltip = () => {
+    if (permissionStatus === 'loading') { // Handle loading state first
+        return {
+            icon: <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />,
+            tooltip: "Checking notification status...",
+            action: () => {}, // No action while loading
+            variant: "secondary" as const,
+            disabled: true,
+        };
+    }
     if (permissionStatus === 'denied') {
       return {
         icon: <BellOff className="h-6 w-6 text-destructive" />,
-        tooltip: "Notifications blocked by browser. Click to see how to enable.",
-        action: toggleNotifications, // Will show info toast
-        variant: "destructive_outline" as const, // Custom variant for styling
+        tooltip: "Notifications blocked. Click for info.", // Updated tooltip
+        action: toggleNotifications,
+        variant: "destructive_outline" as const,
+        disabled: false,
       };
     }
     if (permissionStatus === 'default') {
@@ -36,49 +46,55 @@ export default function FloatingNotificationButton() {
         tooltip: "Click to enable browser notifications",
         action: requestPermission,
         variant: "secondary" as const,
+        disabled: false,
       };
     }
+    // Permission is 'granted' from here
     if (notificationsEnabled) {
       return {
-        icon: <BellRing className="h-6 w-6 text-primary" />,
-        tooltip: "Browser notifications enabled. Click to disable.",
+        // Use BellRing with a prominent color for the enabled state
+        icon: <BellRing className="h-6 w-6 text-green-600 dark:text-green-500" />, // <<< CHANGED: More prominent color
+        tooltip: "Browser notifications ON. Click to disable.",
         action: toggleNotifications,
-        variant: "secondary" as const, // Or "default" if you prefer a more prominent look
+        variant: "secondary" as const, // Keep secondary, icon color will make it stand out
+        // Or, if you want the button itself to change more:
+        // variant: "default" as const, // This would make it use primary background
+        disabled: false,
       };
     }
     // Permission granted, but notifications are manually disabled by user
     return {
       icon: <BellOff className="h-6 w-6 text-muted-foreground" />,
-      tooltip: "Browser notifications disabled. Click to enable.",
+      tooltip: "Browser notifications OFF. Click to enable.",
       action: toggleNotifications,
       variant: "secondary" as const,
+      disabled: false,
     };
   };
 
-  const { icon, tooltip, action, variant } = getIconAndTooltip();
+  const { icon, tooltip, action, variant, disabled } = getIconAndTooltip();
 
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
-            variant={variant === "destructive_outline" ? "outline" : variant} // Map custom variant
+            variant={variant === "destructive_outline" ? "outline" : variant}
             size="icon"
             className={cn(
               "fixed bottom-5 z-40 h-14 w-14 rounded-full shadow-lg",
-              "border", // Ensure border is always present
+              "border",
               "cursor-pointer transition-all duration-150 ease-in-out",
-              "hover:scale-105", // Simple hover effect
-              // Position it next to the FileBrowser button (assuming FileBrowser is left-5)
-              "left-[calc(theme(spacing.5)_+_theme(spacing.14)_+_theme(spacing.3))] sm:left-[calc(theme(spacing.5)_+_theme(spacing.14)_+_theme(spacing.4))]", // left-5 + width-of-fb-button + gap
-              variant === "destructive_outline" && "border-destructive/50 hover:bg-destructive/10",
-              permissionStatus === 'loading' && "opacity-50 cursor-wait" // Loading state
+              "hover:scale-105",
+              "left-[calc(theme(spacing.5)_+_theme(spacing.14)_+_theme(spacing.3))] sm:left-[calc(theme(spacing.5)_+_theme(spacing.14)_+_theme(spacing.4))]",
+              variant === "destructive_outline" && "border-destructive/50 hover:bg-destructive/10 text-destructive hover:text-destructive", // Ensure text color is also destructive
+              disabled && "opacity-70 cursor-not-allowed hover:scale-100" // Style for disabled/loading
             )}
             onClick={action}
             aria-label={tooltip}
-            disabled={permissionStatus === 'loading'}
+            disabled={disabled}
           >
-            {permissionStatus === 'loading' ? <AlertTriangle className="h-6 w-6 animate-pulse text-yellow-500" /> : icon}
+            {icon}
           </Button>
         </TooltipTrigger>
         <TooltipContent side="top" align="center">
