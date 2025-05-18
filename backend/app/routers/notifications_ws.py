@@ -25,31 +25,35 @@ class NotificationConnectionManager:
         self.is_redis_listener_running = False
 
     async def connect_redis(self):
-        if self.redis_client and self.redis_client.closed == False:
+        # If a client instance already exists, try to ping it to check liveness
+        if self.redis_client: # Check if client object exists
             try:
                 await self.redis_client.ping()
                 logger.info("NotificationManager: Reusing existing Redis connection.")
                 return True
             except (aioredis.exceptions.ConnectionError, aioredis.exceptions.TimeoutError) as e:
-                logger.warning(f"NotificationManager: Existing Redis connection check failed: {e}. Reconnecting.")
-                await self._close_redis_client()
-            except Exception as e:
+                logger.warning(f"NotificationManager: Existing Redis connection check (ping) failed: {e}. Reconnecting.")
+                await self._close_redis_client() # Close the problematic client
+                # Fall through to create a new connection below
+            except Exception as e: # Catch other potential errors with the existing client
                 logger.error(f"NotificationManager: Unexpected error with existing Redis connection: {e}. Reconnecting.")
-                await self._close_redis_client()
-
+                await self._close_redis_client() # Close the problematic client
+                # Fall through to create a new connection below
+        
+        # If self.redis_client is None, or if ping failed and it was closed:
         logger.info("NotificationManager: Establishing new Redis connection for Pub/Sub.")
         try:
             self.redis_client = aioredis.Redis(
                 host=str(REDIS_HOST), port=int(REDIS_PORT), db=int(REDIS_DB),
                 decode_responses=True,
-                health_check_interval=30
+                health_check_interval=30 # Good practice for async clients
             )
-            await self.redis_client.ping()
+            await self.redis_client.ping() # Verify the new connection
             logger.info("NotificationManager: Successfully connected to Redis for Pub/Sub.")
             return True
         except Exception as e:
             logger.error(f"NotificationManager: FATAL - Could not connect to Redis for Pub/Sub: {e}", exc_info=True)
-            self.redis_client = None
+            self.redis_client = None # Ensure client is None on failure
             return False
 
     async def _close_redis_client(self):
@@ -65,9 +69,21 @@ class NotificationConnectionManager:
     async def start_redis_listener(self):
         if self.is_redis_listener_running and self.pubsub_task and not self.pubsub_task.done():
             logger.info("NotificationManager: Redis listener task already running.")
-            return
+            # Ensure connection is still valid if listener is supposedly running
+            if self.redis_client:
+                try:
+                    await self.redis_client.ping() # Check if existing connection is good
+                except (aioredis.exceptions.ConnectionError, aioredis.exceptions.TimeoutError, AttributeError): # AttributeError if redis_client became None unexpectedly
+                    logger.warning("NotificationManager: Listener was running but Redis connection is dead or client is None. Restarting listener.")
+                    await self.stop_redis_listener() # Clean up old state
+                else:
+                    return # Listener is running and connection is good
+            else: # redis_client is None but listener thought to be running
+                logger.warning("NotificationManager: Listener was marked running but Redis client is None. Restarting listener.")
+                await self.stop_redis_listener()
 
-        if not await self.connect_redis() or not self.redis_client:
+
+        if not await self.connect_redis() or not self.redis_client: # connect_redis now handles ping
             logger.error("NotificationManager: Cannot start Redis listener, Redis connection failed.")
             return
 
@@ -120,6 +136,10 @@ class NotificationConnectionManager:
                     await self.start_redis_listener()
                     if self.is_redis_listener_running:
                         logger.info("NotificationManager: Re-established Redis listener after connection error.")
+                        # Resubscribe if a new listener was started and this one is exiting
+                        # This instance of the listener will terminate, the new one will take over.
+                        # So, we just need to ensure the new one subscribes.
+                        # The `start_redis_listener` calls `_redis_message_listener` which handles subscription.
                         return # Exit this instance, new one is running
                     else:
                         logger.error("NotificationManager: Failed to re-establish Redis listener. Stopping.")
@@ -128,11 +148,11 @@ class NotificationConnectionManager:
                     logger.error(f"NotificationManager: Unexpected error in Redis listener: {e}", exc_info=True)
                     await asyncio.sleep(1)
         finally:
-            if pubsub and pubsub.subscribed: # Check if pubsub was initialized and subscribed
+            if pubsub and pubsub.subscribed: 
                 try:
                     await pubsub.unsubscribe(APP_NOTIFICATIONS_CHANNEL)
                     logger.info(f"NotificationManager: Unsubscribed from Redis channel: {APP_NOTIFICATIONS_CHANNEL}")
-                except Exception as e: # <<< --- CORRECTED SYNTAX ---
+                except Exception as e: 
                     logger.error(f"NotificationManager: Error unsubscribing: {e}")
             logger.info("NotificationManager: Redis message listener loop ended.")
             self.is_redis_listener_running = False
@@ -157,7 +177,7 @@ class NotificationConnectionManager:
         disconnected_clients: Set[WebSocket] = set()
 
         for connection in self.active_connections:
-            if connection.client_state == status.WS_STATE_CONNECTED: # Use WS_STATE_CONNECTED from starlette
+            if connection.client_state == status.WS_STATE_CONNECTED: 
                 send_tasks.append(connection.send_text(message_json_str))
             else:
                 logger.warning(f"NotificationManager: Client {connection.client} found disconnected during broadcast prep.")
@@ -165,10 +185,8 @@ class NotificationConnectionManager:
 
         if send_tasks:
             results = await asyncio.gather(*send_tasks, return_exceptions=True)
-            # Basic error logging for failed sends
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
-                    # This is a simplified error handling. For specific client, more complex tracking is needed.
                     logger.error(f"NotificationManager: Error broadcasting message to a client: {result}")
         
         for client in disconnected_clients:
@@ -185,17 +203,20 @@ manager = NotificationConnectionManager()
 @router.on_event("startup")
 async def startup_event():
     logger.info("Notification WebSocket router startup: Manager initialized.")
+    # Optionally, you could try to start the listener here if you expect connections immediately
+    # or if you want the listener to always be ready.
+    # await manager.start_redis_listener()
 
 @router.on_event("shutdown")
 async def shutdown_event():
     logger.info("Notification WebSocket router shutdown: Stopping Redis listener and closing connections.")
     await manager.stop_redis_listener()
-    for websocket in list(manager.active_connections):
+    for websocket in list(manager.active_connections): # Iterate over a copy
         try:
-            await websocket.close(code=status.WS_1001_GOING_AWAY)
-        except Exception as e: # <<< --- CORRECTED SYNTAX & ADDED LOGGING ---
+            if websocket.client_state == status.WS_STATE_CONNECTED:
+                await websocket.close(code=status.WS_1001_GOING_AWAY)
+        except Exception as e: 
             logger.warning(f"Error closing websocket {websocket.client} during shutdown: {e}")
-            pass
     manager.active_connections.clear()
     logger.info("Notification WebSocket router shutdown complete.")
 
@@ -204,10 +225,14 @@ async def websocket_notification_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
+            # Keep the connection alive and handle client messages if any
+            # For this specific notification endpoint, we primarily broadcast from server to client.
+            # If client sends "ping", we can respond with "pong".
             data = await websocket.receive_text()
             logger.debug(f"Notification WebSocket received from {websocket.client}: {data}")
             if data.lower() == "ping":
                 await websocket.send_text("pong")
+            # Other client messages can be handled here if needed
     except WebSocketDisconnect:
         logger.info(f"Notification WebSocket client disconnected: {websocket.client}")
     except Exception as e:
