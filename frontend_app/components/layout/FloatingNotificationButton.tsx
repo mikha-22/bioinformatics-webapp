@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Bell, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'; // Bell for default/info, AlertTriangle for warning/started
+import { Bell, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useNotificationManager } from '@/components/providers/NotificationProvider';
@@ -55,9 +55,8 @@ export default function FloatingNotificationButton() {
   const getAppearance = () => {
     let iconElement: React.ReactNode = <Bell className="h-6 w-6" />;
     let tooltipText = "Show Notifications";
-    // Default to secondary (neutral) background and its corresponding icon/text color
     let buttonClasses = "bg-secondary hover:bg-secondary/80 text-secondary-foreground";
-    let iconColorOverride = ""; // By default, icon inherits color from buttonClasses
+    let iconColorOverride = ""; 
 
     if (!isClient) {
       return { iconElement, tooltipText, buttonClasses, iconColorOverride };
@@ -65,13 +64,11 @@ export default function FloatingNotificationButton() {
 
     if (unreadNotificationCount > 0) {
       tooltipText = `${unreadNotificationCount} new notification(s). Click to view.`;
-      buttonClasses = "bg-primary hover:bg-primary/90 text-primary-foreground"; // Primary color for unread
-      iconElement = <Bell className="h-6 w-6" />; // Icon is Bell, color from buttonClasses
+      buttonClasses = "bg-primary hover:bg-primary/90 text-primary-foreground";
+      iconElement = <Bell className="h-6 w-6" />;
     } else {
-      // No unread notifications: button background is always neutral (secondary).
-      // Icon and tooltip can reflect the latest *read* event type.
       buttonClasses = "bg-secondary hover:bg-secondary/80 text-secondary-foreground";
-      iconColorOverride = "text-secondary-foreground"; // Ensure icon matches neutral button text
+      iconColorOverride = "text-secondary-foreground"; 
 
       if (latestSignificantEventType) {
         tooltipText = "Latest (read): ";
@@ -79,22 +76,22 @@ export default function FloatingNotificationButton() {
           case 'success':
             iconElement = <CheckCircle2 className="h-6 w-6" />;
             tooltipText += "Job Succeeded.";
-            iconColorOverride = "text-green-500 dark:text-green-400"; // Icon shows status
+            iconColorOverride = "text-green-500 dark:text-green-400";
             break;
           case 'error':
             iconElement = <XCircle className="h-6 w-6" />;
             tooltipText += "Job Failed.";
-            iconColorOverride = "text-red-500 dark:text-red-400"; // Icon shows status
+            iconColorOverride = "text-red-500 dark:text-red-400";
             break;
           case 'warning':
             iconElement = <AlertTriangle className="h-6 w-6" />;
             tooltipText += "Warning.";
-            iconColorOverride = "text-yellow-500 dark:text-yellow-400"; // Icon shows status
+            iconColorOverride = "text-yellow-500 dark:text-yellow-400";
             break;
           case 'info':
-            iconElement = <Bell className="h-6 w-6" />; // Or Info icon
+            iconElement = <Bell className="h-6 w-6" />;
             tooltipText += "Information/Job Started.";
-            iconColorOverride = "text-blue-500 dark:text-blue-400"; // Icon shows status
+            iconColorOverride = "text-blue-500 dark:text-blue-400";
             break;
           default:
             iconElement = <Bell className="h-6 w-6" />;
@@ -102,7 +99,6 @@ export default function FloatingNotificationButton() {
             break;
         }
       } else {
-        // No unread, and no latest significant event (e.g., log cleared)
         iconElement = <Bell className="h-6 w-6" />;
         tooltipText = "No new notifications";
       }
@@ -121,8 +117,7 @@ export default function FloatingNotificationButton() {
             className={cn(
               "fixed bottom-5 z-40 rounded-full shadow-lg",
               "h-12 w-12",
-              "border",
-              unreadNotificationCount > 0 ? "border-transparent" : "border-border", // Border only for default state
+              "border border-border", // <<< ALWAYS APPLY DEFAULT BORDER
               "transition-all duration-150 ease-in-out",
               "hover:scale-105",
               "left-[calc(1.25rem_+_3.5rem_+_0.75rem)] sm:left-[calc(1.25rem_+_3.5rem_+_1rem)]",
