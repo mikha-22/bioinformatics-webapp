@@ -41,6 +41,9 @@ export default function NotificationPanel() {
     clearNotificationsLog,
   } = useNotificationManager();
 
+  // Add this log:
+  console.log('[NotificationPanel DEBUG] Rendering. Log length:', notificationsLog.length, 'Items:', JSON.stringify(notificationsLog));
+
   return (
     <Dialog open={isPanelOpen} onOpenChange={(open) => { if (!open) closeNotificationPanel(); }}>
       <DialogContent className="sm:max-w-lg md:max-w-xl h-[70vh] flex flex-col p-0 gap-0">
