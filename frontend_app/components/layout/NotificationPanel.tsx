@@ -15,7 +15,8 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNotificationManager, NotificationLogItem } from '@/components/providers/NotificationProvider';
 import { AlertTriangle, CheckCircle2, Info, MessageSquareText, Trash2, XCircle } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+// Remove formatDistanceToNow if no longer used anywhere else in this file
+// import { formatDistanceToNow } from 'date-fns'; 
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -33,6 +34,25 @@ const getIconForType = (type: NotificationLogItem['type']) => {
   }
 };
 
+// Function to format timestamp as absolute date and time
+const formatAbsoluteTimestamp = (timestamp: number): string => {
+  if (!timestamp) return "N/A";
+  try {
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return "Invalid Date";
+    // Example format: "5/25/2025, 11:30:15 AM"
+    // You can customize this using toLocaleDateString, toLocaleTimeString, or Intl.DateTimeFormat
+    return date.toLocaleString(undefined, { 
+      year: 'numeric', month: 'numeric', day: 'numeric', 
+      hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true 
+    });
+  } catch (e) {
+    console.error("Error formatting absolute timestamp:", timestamp, e);
+    return "Invalid Date";
+  }
+};
+
+
 export default function NotificationPanel() {
   const {
     isPanelOpen,
@@ -41,8 +61,7 @@ export default function NotificationPanel() {
     clearNotificationsLog,
   } = useNotificationManager();
 
-  // Add this log:
-  console.log('[NotificationPanel DEBUG] Rendering. Log length:', notificationsLog.length, 'Items:', JSON.stringify(notificationsLog));
+  // console.log('[NotificationPanel DEBUG] Rendering. Log length:', notificationsLog.length, 'Items:', JSON.stringify(notificationsLog));
 
   return (
     <Dialog open={isPanelOpen} onOpenChange={(open) => { if (!open) closeNotificationPanel(); }}>
@@ -83,7 +102,8 @@ export default function NotificationPanel() {
                     )}
                     <div className="flex justify-between items-center mt-1.5">
                       <p className="text-xs opacity-70">
-                        {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+                        {/* CHANGED: Use formatAbsoluteTimestamp instead of formatDistanceToNow */}
+                        {formatAbsoluteTimestamp(item.timestamp)}
                       </p>
                       {item.job_id && (
                         <Button variant="link" size="xs" className="p-0 h-auto text-xs opacity-90 hover:opacity-100" asChild>
