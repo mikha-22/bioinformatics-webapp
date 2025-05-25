@@ -60,6 +60,7 @@ interface NotificationProviderProps {
 
 const NOTIFICATION_PREFERENCE_KEY = 'bioapp_notifications_enabled';
 const NOTIFICATION_PERMISSION_KEY = 'bioapp_notification_permission';
+const NOTIFICATION_LOG_STORAGE_KEY = 'bioapp_notifications_log_v1'; // Added _v1 for potential future schema changes
 const MAX_LOG_ITEMS = 50;
 
 export function NotificationProvider({ children }: NotificationProviderProps) {
@@ -74,10 +75,43 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   const [permissionStatus, setPermissionStatus] = useState<NotificationPermission | "loading">("loading");
   const router = useRouter();
 
+  // Initialize notificationsLog from localStorage
+  const [notificationsLog, setNotificationsLog] = useState<NotificationLogItem[]>(() => {
+    if (typeof window !== 'undefined') {
+      const storedLog = localStorage.getItem(NOTIFICATION_LOG_STORAGE_KEY);
+      try {
+        if (storedLog) {
+            const parsedLog = JSON.parse(storedLog);
+            // Basic validation: ensure it's an array
+            return Array.isArray(parsedLog) ? parsedLog.slice(0, MAX_LOG_ITEMS) : [];
+        }
+        return [];
+      } catch (e) {
+        console.error("Error parsing stored notifications log:", e);
+        localStorage.removeItem(NOTIFICATION_LOG_STORAGE_KEY); // Clear corrupted data
+        return [];
+      }
+    }
+    return [];
+  });
+
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [notificationsLog, setNotificationsLog] = useState<NotificationLogItem[]>([]);
-  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
-  const [latestSignificantEventType, setLatestSignificantEventType] = useState<NotificationLogItem['type'] | null>(null);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0); // Reset on load for simplicity
+  const [latestSignificantEventType, setLatestSignificantEventType] = useState<NotificationLogItem['type'] | null>(
+    () => notificationsLog[0]?.type || null
+  );
+
+  // Persist notificationsLog to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(NOTIFICATION_LOG_STORAGE_KEY, JSON.stringify(notificationsLog.slice(0, MAX_LOG_ITEMS)));
+      } catch (e) {
+        console.error("Error saving notifications log to localStorage:", e);
+      }
+    }
+  }, [notificationsLog]);
+
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -113,7 +147,24 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     if (lastMessage?.data) {
       try {
         const data = JSON.parse(lastMessage.data as string) as NotificationPayload;
-        console.log('[NotificationProvider DEBUG] Received WebSocket data:', data); // Log received data
+        console.log('[NotificationProvider DEBUG] Received WebSocket data:', data);
+
+        // Check for potential duplicates before processing
+        const lastLogEntry = notificationsLog[0]; // Check against the most recent entry
+        if (
+          lastLogEntry &&
+          lastLogEntry.job_id === data.job_id &&
+          lastLogEntry.message === data.message &&
+          lastLogEntry.type === data.status_variant && // Also check type to differentiate if message is same but status changes
+          (Date.now() - lastLogEntry.timestamp < 3000) // Consider it a duplicate if very recent (e.g., within 3 seconds)
+        ) {
+          console.warn('[NotificationProvider DEBUG] Likely duplicate message received shortly after previous, skipping log add:', data);
+          // Optionally, still update latestSignificantEventType if it's different and more severe
+          if (data.status_variant === 'error' || (data.status_variant === 'warning' && latestSignificantEventType !== 'error')) {
+            setLatestSignificantEventType(data.status_variant);
+          }
+          return; // Skip adding to log and showing toast for this likely duplicate
+        }
 
         toast[data.status_variant](data.message, {
           description: `Job: ${data.run_name} (ID: ...${data.job_id.slice(-6)})`,
@@ -134,7 +185,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
           timestamp: Date.now(),
         };
         
-        console.log('[NotificationProvider DEBUG] New log item created:', newLogItem); // Log the item to be added
+        console.log('[NotificationProvider DEBUG] New log item created:', newLogItem);
 
         setNotificationsLog(prevLog => {
           const updatedLog = [newLogItem, ...prevLog.slice(0, MAX_LOG_ITEMS - 1)];
@@ -151,7 +202,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
         console.error('[NotificationProvider DEBUG] Error processing notification message:', error);
       }
     }
-  }, [lastMessage, router, isPanelOpen]);
+  }, [lastMessage, router, isPanelOpen, notificationsLog, latestSignificantEventType]); // Added notificationsLog and latestSignificantEventType to dependencies
 
   const requestPermission = useCallback(async () => {
     if (!isSupported || permissionStatus === 'denied') {
@@ -166,14 +217,24 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       const permission = await Notification.requestPermission();
       setPermissionStatus(permission);
       localStorage.setItem(NOTIFICATION_PERMISSION_KEY, permission);
+      if (permission === 'granted') {
+        setNotificationsEnabled(true);
+        localStorage.setItem(NOTIFICATION_PREFERENCE_KEY, JSON.stringify(true));
+        toast.success("Browser notification permission granted!");
+      } else if (permission === 'denied') {
+        setNotificationsEnabled(false);
+        localStorage.setItem(NOTIFICATION_PREFERENCE_KEY, JSON.stringify(false));
+        toast.info("Browser notifications denied.");
+      }
     } catch (error) {
       console.error('[NotificationProvider] Error requesting notification permission:', error);
+      toast.error("Could not request notification permission.");
     }
   }, [isSupported, permissionStatus]);
 
   const toggleNotifications = useCallback(() => {
     openNotificationPanel();
-  }, [/* openNotificationPanel will be a dependency if not memoized/stable itself */]);
+  }, [/* openNotificationPanel dependency will be added if it's not stable */]);
 
   const openNotificationPanel = useCallback(() => {
     setIsPanelOpen(true);
@@ -188,8 +249,18 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     setNotificationsLog([]);
     setUnreadNotificationCount(0);
     setLatestSignificantEventType(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(NOTIFICATION_LOG_STORAGE_KEY);
+    }
     toast.success("Notifications cleared.");
   }, []);
+
+  useEffect(() => { // Update latestSignificantEventType from persisted log on initial load if empty
+    if (!latestSignificantEventType && notificationsLog.length > 0) {
+      setLatestSignificantEventType(notificationsLog[0].type);
+    }
+  }, [notificationsLog, latestSignificantEventType]); // Run when log is loaded
+
 
   const contextValue: NotificationContextType = {
     notificationsEnabled,
