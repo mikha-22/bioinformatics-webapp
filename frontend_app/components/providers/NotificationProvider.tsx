@@ -7,12 +7,60 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 
-interface NotificationPayload { /* ... */ }
-export interface NotificationLogItem { /* ... */ }
-interface NotificationContextType { /* ... */ }
+// Expanded NotificationPayload to include more event types
+interface NotificationPayload {
+  event_type: "job_completed" | "job_failed" | "job_started" | "job_processing_update";
+  job_id: string;
+  run_name: string;
+  message: string;
+  status_variant: "success" | "error" | "info" | "warning";
+  progress?: number;
+  current_task?: string;
+}
+
+// Structure for items in our notification log
+export interface NotificationLogItem {
+  id: string;
+  type: "success" | "error" | "info" | "warning";
+  message: string;
+  description?: string;
+  job_id?: string;
+  run_name?: string;
+  timestamp: number;
+}
+
+interface NotificationContextType {
+  notificationsEnabled: boolean;
+  permissionStatus: NotificationPermission | "loading";
+  requestPermission: () => void;
+  toggleNotifications: () => void;
+  isSupported: boolean;
+  isPanelOpen: boolean;
+  openNotificationPanel: () => void;
+  closeNotificationPanel: () => void;
+  notificationsLog: NotificationLogItem[];
+  clearNotificationsLog: () => void;
+  unreadNotificationCount: number;
+  latestSignificantEventType: "success" | "error" | "info" | "warning" | null;
+}
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
-export function useNotificationManager() { /* ... */ }
+
+export function useNotificationManager() {
+  const context = useContext(NotificationContext);
+  console.log('[useNotificationManager DEBUG] Context value:', context); // <-- DEBUG LOG ADDED HERE
+  if (!context) {
+    console.error('[useNotificationManager ERROR] Context is undefined. Ensure the component is wrapped by NotificationProvider.');
+    // This error below is what you'd typically see if the throw new Error was directly causing the halt.
+    // The destructuring error happens if this hook returns undefined and the calling component tries to destructure it.
+    throw new Error('useNotificationManager must be used within a NotificationProvider - CONTEXT IS UNDEFINED AT HOOK LEVEL');
+  }
+  return context;
+}
+
+interface NotificationProviderProps {
+  children: ReactNode;
+}
 
 const NOTIFICATION_PREFERENCE_KEY = 'bioapp_notifications_enabled';
 const NOTIFICATION_PERMISSION_KEY = 'bioapp_notification_permission';
@@ -20,24 +68,21 @@ const NOTIFICATION_LOG_STORAGE_KEY = 'bioapp_notifications_log_v1';
 const MAX_LOG_ITEMS = 50;
 
 export function NotificationProvider({ children }: NotificationProviderProps) {
-  const [isMounted, setIsMounted] = useState(false); // <-- New state for hydration safety
+  const [isMounted, setIsMounted] = useState(false);
 
   const [isSupported, setIsSupported] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true); // Default before mount
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
   const [permissionStatus, setPermissionStatus] = useState<NotificationPermission | "loading">("loading");
   const router = useRouter();
 
-  // Initialize with empty/default values, will be populated from localStorage after mount
   const [notificationsLog, setNotificationsLog] = useState<NotificationLogItem[]>([]);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [latestSignificantEventType, setLatestSignificantEventType] = useState<NotificationLogItem['type'] | null>(null);
 
-  // Effect to run only on the client after mounting
   useEffect(() => {
-    setIsMounted(true); // Signal that client has mounted
+    setIsMounted(true);
 
-    // Load from localStorage now that we are on the client
     const storedLog = localStorage.getItem(NOTIFICATION_LOG_STORAGE_KEY);
     if (storedLog) {
       try {
@@ -47,8 +92,6 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
           setNotificationsLog(logFromStorage);
           if (logFromStorage.length > 0) {
             setLatestSignificantEventType(logFromStorage[0].type);
-            // Note: unreadNotificationCount logic is complex to persist reliably without more state.
-            // For now, it resets on load, and only increments for new messages while panel is closed.
           }
         }
       } catch (e) {
@@ -67,9 +110,8 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       setIsSupported(false);
       setPermissionStatus('denied');
     }
-  }, []); // Empty dependency array ensures this runs once on mount
+  }, []);
 
-  // Persist notificationsLog to localStorage whenever it changes, only if mounted
   useEffect(() => {
     if (isMounted && typeof window !== 'undefined') {
       try {
@@ -81,12 +123,28 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   }, [notificationsLog, isMounted]);
 
 
-  const websocketUrl = useMemo(() => { /* ... unchanged ... */ }, []);
-  const { lastMessage } = useWebSocket(websocketUrl, { /* ... options ... */ }, !!websocketUrl);
+  const websocketUrl = useMemo(() => {
+    if (typeof window === 'undefined') return null; // Ensure window exists for env access
+    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || window.location.origin;
+    const wsProtocol = apiUrl.startsWith('https://') ? 'wss://' : 'ws://';
+    const domainAndPath = apiUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    return `${wsProtocol}${domainAndPath}/api/ws/app_notifications`;
+  }, []);
+
+  const { lastMessage } = useWebSocket(websocketUrl, {
+    share: true,
+    shouldReconnect: (closeEvent) => true,
+    reconnectInterval: 5000,
+    reconnectAttempts: 10,
+    retryOnError: true,
+    onOpen: () => console.log('[NotificationProvider] WebSocket for notifications opened.'),
+    onClose: (event) => console.log(`[NotificationProvider] WebSocket for notifications closed. Code: ${event.code}`),
+    onError: (event) => console.error('[NotificationProvider] WebSocket notification error:', event),
+    filter: (message: MessageEvent<any>): boolean => typeof message.data === 'string',
+  }, !!websocketUrl && isMounted); // Only connect if mounted and URL is available
 
   useEffect(() => {
-    if (isMounted && lastMessage?.data) { // Only process if mounted
-      // ... (rest of your lastMessage handling logic remains the same) ...
+    if (isMounted && lastMessage?.data) {
       try {
         const data = JSON.parse(lastMessage.data as string) as NotificationPayload;
         // console.log('[NotificationProvider DEBUG] Received WebSocket data:', data);
@@ -106,7 +164,14 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
           return;
         }
 
-        toast[data.status_variant](data.message, { /* ... toast config ... */ });
+        toast[data.status_variant](data.message, {
+          description: `Job: ${data.run_name} (ID: ...${data.job_id.slice(-6)})`,
+          duration: 10000,
+          action: {
+            label: "View Job",
+            onClick: () => router.push(`/jobs`),
+          },
+        });
 
         const newLogItem: NotificationLogItem = {
           id: uuidv4(),
@@ -135,22 +200,48 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
         console.error('[NotificationProvider DEBUG] Error processing notification message:', error);
       }
     }
-  }, [lastMessage, router, isPanelOpen, notificationsLog, latestSignificantEventType, isMounted]); // Added isMounted
+  }, [lastMessage, router, isPanelOpen, notificationsLog, latestSignificantEventType, isMounted]);
 
-  const requestPermission = useCallback(async () => { /* ... unchanged ... */ }, [isSupported, permissionStatus]);
-  const toggleNotifications = useCallback(() => { /* ... unchanged ... */ }, [/* ... */]);
-  const openNotificationPanel = useCallback(() => { /* ... unchanged ... */ }, []);
-  const closeNotificationPanel = useCallback(() => { /* ... unchanged ... */ }, []);
+  const requestPermission = useCallback(async () => {
+    if (!isMounted || !isSupported || permissionStatus === 'denied') { // Check isMounted
+      toast.info("Browser notifications are blocked or not supported.", { duration: 8000});
+      return;
+    }
+    // ... (rest of function)
+  }, [isMounted, isSupported, permissionStatus]);
+
+  const toggleNotifications = useCallback(() => {
+    if (isMounted) openNotificationPanel(); // Check isMounted
+  }, [isMounted, /* openNotificationPanel dependency */]);
+
+  const openNotificationPanel = useCallback(() => {
+    if (isMounted) { // Check isMounted
+        setIsPanelOpen(true);
+        setUnreadNotificationCount(0);
+    }
+  }, [isMounted]);
+
+  const closeNotificationPanel = useCallback(() => {
+    if (isMounted) setIsPanelOpen(false); // Check isMounted
+  }, [isMounted]);
 
   const clearNotificationsLog = useCallback(() => {
-    setNotificationsLog([]);
-    setUnreadNotificationCount(0);
-    setLatestSignificantEventType(null);
-    if (isMounted && typeof window !== 'undefined') {
-      localStorage.removeItem(NOTIFICATION_LOG_STORAGE_KEY);
+    if (isMounted) { // Check isMounted
+        setNotificationsLog([]);
+        setUnreadNotificationCount(0);
+        setLatestSignificantEventType(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(NOTIFICATION_LOG_STORAGE_KEY);
+        }
+        toast.success("Notifications cleared.");
     }
-    toast.success("Notifications cleared.");
   }, [isMounted]);
+
+  useEffect(() => {
+    if (isMounted && !latestSignificantEventType && notificationsLog.length > 0) {
+      setLatestSignificantEventType(notificationsLog[0].type);
+    }
+  }, [notificationsLog, latestSignificantEventType, isMounted]);
 
 
   const contextValue: NotificationContextType = {
@@ -162,10 +253,10 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     isPanelOpen,
     openNotificationPanel,
     closeNotificationPanel,
-    notificationsLog: isMounted ? notificationsLog : [], // Return empty log if not mounted yet
+    notificationsLog: isMounted ? notificationsLog : [],
     clearNotificationsLog,
     unreadNotificationCount: isMounted ? unreadNotificationCount : 0,
-    latestSignificantEventType: isMounted ? latestSignificantEventType : null, // Return default if not mounted
+    latestSignificantEventType: isMounted ? latestSignificantEventType : null,
   };
 
   return (
