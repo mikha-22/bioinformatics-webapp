@@ -1,8 +1,8 @@
 // frontend_app/components/layout/FloatingNotificationButton.tsx
 "use client";
 
-import React from 'react';
-import { Bell, BellRing, Loader2, AlertTriangle, CheckCircle2, XCircle, MessageSquareWarning } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Bell, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'; // Removed BellRing, MessageSquareWarning, Loader2 for now unless used as default
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useNotificationManager } from '@/components/providers/NotificationProvider';
@@ -13,88 +13,125 @@ export default function FloatingNotificationButton() {
     openNotificationPanel,
     unreadNotificationCount,
     latestSignificantEventType,
-    // isSupported, // Not directly used for button's primary action anymore
-    // permissionStatus // Also less relevant for the primary action
   } = useNotificationManager();
+
+  const [isClient, setIsClient] = useState(false);
+  const [isShaking, setIsShaking] = useState(false);
+  const shakeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (isClient && unreadNotificationCount > 0) {
+      shakeIntervalRef.current = setInterval(() => {
+        setIsShaking(true);
+        setTimeout(() => setIsShaking(false), 500); 
+      }, 2000); 
+    } else {
+      if (shakeIntervalRef.current) {
+        clearInterval(shakeIntervalRef.current);
+        shakeIntervalRef.current = null;
+      }
+      setIsShaking(false);
+    }
+    return () => {
+      if (shakeIntervalRef.current) {
+        clearInterval(shakeIntervalRef.current);
+      }
+    };
+  }, [isClient, unreadNotificationCount]);
+
 
   const handleButtonClick = () => {
     openNotificationPanel();
+    if (shakeIntervalRef.current) {
+      clearInterval(shakeIntervalRef.current);
+      shakeIntervalRef.current = null;
+    }
+    setIsShaking(false);
   };
 
   const getAppearance = () => {
-    let icon: React.ReactNode = <Bell className="h-5 w-5" />;
+    let iconElement: React.ReactNode = <Bell className="h-6 w-6" />; // Default icon
     let tooltipText = "Show Notifications";
-    let buttonVariant: "secondary" | "default" | "destructive" | "outline" = "secondary";
-    let pulse = false;
-    let iconColorClass = "text-foreground"; // Default icon color
+    let buttonBgClass = "bg-secondary hover:bg-secondary/80"; // Default: secondary variant
+    let iconColorClass = "text-secondary-foreground"; // Default icon color based on secondary
+
+    if (!isClient) { // Before hydration, render default state
+      return { iconElement, tooltipText, buttonBgClass, iconColorClass };
+    }
 
     if (unreadNotificationCount > 0) {
-      icon = <MessageSquareWarning className="h-5 w-5" />; // Icon indicating unread messages
       tooltipText = `${unreadNotificationCount} new notification(s). Click to view.`;
-      buttonVariant = "default"; // Make it more prominent like the primary button
-      iconColorClass = "text-primary-foreground"; // If buttonVariant 'default' has dark bg
-      pulse = true; // Add pulse for unread
+      buttonBgClass = "bg-primary hover:bg-primary/90"; // Primary color for unread
+      iconColorClass = "text-primary-foreground"; // Icon color for primary button
+      // Icon remains Bell for unread, color change and shake indicate new items
     } else if (latestSignificantEventType) {
+      tooltipText = "Latest: ";
+      // Keep button background neutral (secondary), icon changes color and type
+      buttonBgClass = "bg-secondary hover:bg-secondary/80";
       switch (latestSignificantEventType) {
         case 'success':
-          icon = <CheckCircle2 className="h-5 w-5" />;
-          tooltipText = "Latest: Job Succeeded. Click to view log.";
+          iconElement = <CheckCircle2 className="h-6 w-6" />;
+          tooltipText += "Job Succeeded. Click to view log.";
           iconColorClass = "text-green-500 dark:text-green-400";
           break;
         case 'error':
-          icon = <XCircle className="h-5 w-5" />;
-          tooltipText = "Latest: Job Failed. Click to view log.";
+          iconElement = <XCircle className="h-6 w-6" />;
+          tooltipText += "Job Failed. Click to view log.";
           iconColorClass = "text-red-500 dark:text-red-400";
           break;
-        case 'warning': // For "job_started" or other warnings
-          icon = <AlertTriangle className="h-5 w-5" />;
-          tooltipText = "Latest: Job Update/Warning. Click to view log.";
+        case 'warning':
+          iconElement = <AlertTriangle className="h-6 w-6" />;
+          tooltipText += "Job Update/Warning. Click to view log.";
           iconColorClass = "text-yellow-500 dark:text-yellow-400";
           break;
-        case 'info': // Could be used for less critical "job_started" if preferred
-          icon = <BellRing className="h-5 w-5" />;
-          tooltipText = "Latest: Information. Click to view log.";
+        case 'info':
+          iconElement = <Bell className="h-6 w-6" />; // Or Info icon
+          tooltipText += "Information. Click to view log.";
           iconColorClass = "text-blue-500 dark:text-blue-400";
           break;
         default:
-          icon = <Bell className="h-5 w-5" />;
-          tooltipText = "Show Notifications";
-          iconColorClass = "text-foreground";
+          iconColorClass = "text-secondary-foreground"; // Fallback for neutral 'secondary'
+          break;
       }
     }
-
-    return { icon, tooltipText, buttonVariant, pulse, iconColorClass };
+    return { iconElement, tooltipText, buttonBgClass, iconColorClass };
   };
 
-  const { icon, tooltipText, buttonVariant, pulse, iconColorClass } = getAppearance();
+  const { iconElement, tooltipText, buttonBgClass, iconColorClass } = getAppearance();
 
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
-            variant={buttonVariant}
+            // variant is not directly used here to allow custom bg/text colors
             size="icon"
             className={cn(
               "fixed bottom-5 z-40 rounded-full shadow-lg",
               "h-12 w-12",
-              "border border-border",
-              "transition-all duration-150 ease-in-out", // Combined transitions
-              "opacity-100 hover:opacity-100",
-              "hover:scale-105",
+              "border border-border", // Consistent border
+              "transition-all duration-150 ease-in-out", // For hover effects
+              "hover:scale-105", // Keep hover scale effect
               "left-[calc(1.25rem_+_3.5rem_+_0.75rem)] sm:left-[calc(1.25rem_+_3.5rem_+_1rem)]",
               "cursor-pointer",
-              pulse && "animate-pulse", // Apply pulse animation if needed
-              // Specific overrides for button variants if default hover isn't desired
-              buttonVariant === "default" && "bg-primary text-primary-foreground hover:bg-primary/90",
-              buttonVariant === "destructive" && "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-              // Ensure icon color is applied correctly within the button
-              iconColorClass
+              "inline-flex items-center justify-center", // Necessary for button layout
+              buttonBgClass, // Apply dynamic background
+              isShaking && "shake-active"
             )}
             onClick={handleButtonClick}
             aria-label={tooltipText}
           >
-            {React.cloneElement(icon as React.ReactElement, { className: cn((icon as React.ReactElement).props.className, iconColorClass) })}
+            {/* Apply dynamic iconColorClass to the icon */}
+            {React.cloneElement(iconElement as React.ReactElement, {
+              className: cn(
+                (iconElement as React.ReactElement).props.className,
+                iconColorClass
+              )
+            })}
           </Button>
         </TooltipTrigger>
         <TooltipContent side="top" align="center">
