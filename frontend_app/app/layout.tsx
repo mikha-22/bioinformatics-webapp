@@ -3,18 +3,17 @@ import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import "./globals.css";
 
-// Layout Components
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import FileBrowserIntegration from "@/components/layout/FileBrowserIntegration";
-import FloatingNotificationButton from "@/components/layout/FloatingNotificationButton"; // <<< --- ADDED IMPORT ---
+import FloatingNotificationButton from "@/components/layout/FloatingNotificationButton";
+import NotificationPanel from "@/components/layout/NotificationPanel";
 
-// Providers and UI Elements
 import QueryProvider from "@/components/providers/QueryProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { FileBrowserProvider } from "@/components/layout/FileBrowserContext";
-import { NotificationProvider } from "@/components/providers/NotificationProvider"; // <<< --- ADDED IMPORT ---
+import { NotificationProvider } from "@/components/providers/NotificationProvider";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -38,7 +37,6 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {/* --- WRAP with NotificationProvider --- */}
           <NotificationProvider>
             <FileBrowserProvider>
               <QueryProvider>
@@ -51,11 +49,11 @@ export default function RootLayout({
                 </div>
                 <Toaster richColors position="top-right" />
                 <FileBrowserIntegration />
-                <FloatingNotificationButton /> {/* <<< --- ADDED FloatingNotificationButton --- */}
+                <FloatingNotificationButton />
+                <NotificationPanel />
               </QueryProvider>
             </FileBrowserProvider>
           </NotificationProvider>
-          {/* --- END WRAP --- */}
         </ThemeProvider>
       </body>
     </html>

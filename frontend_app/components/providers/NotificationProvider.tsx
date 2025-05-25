@@ -1,25 +1,51 @@
 // frontend_app/components/providers/NotificationProvider.tsx
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react'; // <<< ADD useMemo here
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
 import useWebSocket, { ReadyState } from 'react-use-websocket';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { v4 as uuidv4 } from 'uuid'; // Import a UUID generator
 
+// Expanded NotificationPayload to include more event types
 interface NotificationPayload {
-  event_type: "job_completed" | "job_failed";
+  event_type: "job_completed" | "job_failed" | "job_started" | "job_processing_update"; // Added more types
   job_id: string;
   run_name: string;
   message: string;
-  status_variant: "success" | "error";
+  status_variant: "success" | "error" | "info" | "warning"; // Added info/warning
+  // Optional fields for more detail if needed
+  progress?: number;
+  current_task?: string;
+}
+
+// Structure for items in our notification log
+export interface NotificationLogItem {
+  id: string; // Unique ID for each log item
+  type: "success" | "error" | "info" | "warning"; // Simplified type for panel display
+  message: string;
+  description?: string; // e.g., Job Name (ID)
+  job_id?: string;
+  run_name?: string;
+  timestamp: number;
 }
 
 interface NotificationContextType {
+  // Existing permission-related state (can be phased out or repurposed if not needed for panel)
   notificationsEnabled: boolean;
   permissionStatus: NotificationPermission | "loading";
   requestPermission: () => void;
-  toggleNotifications: () => void;
+  toggleNotifications: () => void; // Might repurpose this to toggle panel or clear notifications
   isSupported: boolean;
+
+  // New state and functions for the notification panel
+  isPanelOpen: boolean;
+  openNotificationPanel: () => void;
+  closeNotificationPanel: () => void;
+  notificationsLog: NotificationLogItem[];
+  clearNotificationsLog: () => void;
+  unreadNotificationCount: number; // To potentially show a badge on the button
+  latestSignificantEventType: "success" | "error" | "info" | "warning" | null; // For button color
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -38,6 +64,7 @@ interface NotificationProviderProps {
 
 const NOTIFICATION_PREFERENCE_KEY = 'bioapp_notifications_enabled';
 const NOTIFICATION_PERMISSION_KEY = 'bioapp_notification_permission';
+const MAX_LOG_ITEMS = 50; // Max number of items to keep in the log
 
 export function NotificationProvider({ children }: NotificationProviderProps) {
   const [isSupported, setIsSupported] = useState(false);
@@ -51,6 +78,13 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   const [permissionStatus, setPermissionStatus] = useState<NotificationPermission | "loading">("loading");
   const router = useRouter();
 
+  // New state for the panel
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [notificationsLog, setNotificationsLog] = useState<NotificationLogItem[]>([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [latestSignificantEventType, setLatestSignificantEventType] = useState<NotificationLogItem['type'] | null>(null);
+
+
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       setIsSupported(true);
@@ -61,16 +95,15 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     }
   }, []);
 
-  // <<< --- MOVED websocketUrl CALCULATION INSIDE THE COMPONENT --- >>>
   const websocketUrl = useMemo(() => {
     if (typeof window === 'undefined') return null;
     const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || window.location.origin;
     const wsProtocol = apiUrl.startsWith('https://') ? 'wss://' : 'ws://';
     const domainAndPath = apiUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
     return `${wsProtocol}${domainAndPath}/api/ws/app_notifications`;
-  }, []); // Empty dependency array means it's calculated once on mount
+  }, []);
 
-  const { lastMessage, readyState } = useWebSocket(websocketUrl, {
+  const { lastMessage } = useWebSocket(websocketUrl, {
     share: true,
     shouldReconnect: (closeEvent) => true,
     reconnectInterval: 5000,
@@ -88,7 +121,8 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
         const data = JSON.parse(lastMessage.data as string) as NotificationPayload;
         console.log('[NotificationProvider] Received notification payload:', data);
 
-        toast[data.status_variant === 'success' ? 'success' : 'error'](data.message, {
+        // Show in-app toast
+        toast[data.status_variant](data.message, {
           description: `Job: ${data.run_name} (ID: ...${data.job_id.slice(-6)})`,
           duration: 10000,
           action: {
@@ -97,79 +131,88 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
           },
         });
 
-        if (notificationsEnabled && permissionStatus === 'granted' && document.visibilityState === 'hidden') {
-          const notification = new Notification(`Sarek Job: ${data.run_name}`, {
-            body: data.message,
-            icon: data.status_variant === 'success' ? '/icons/success_icon_64.png' : '/icons/failure_icon_64.png',
-            tag: `job-notification-${data.job_id}`,
-            renotify: true,
-          });
+        // Add to internal log for the panel
+        const newLogItem: NotificationLogItem = {
+          id: uuidv4(),
+          type: data.status_variant,
+          message: data.message,
+          description: `Job: ${data.run_name} (ID: ...${data.job_id.slice(-6)})`,
+          job_id: data.job_id,
+          run_name: data.run_name,
+          timestamp: Date.now(),
+        };
 
-          notification.onclick = () => {
-            window.focus();
-            router.push(`/jobs`);
-            notification.close();
-          };
+        setNotificationsLog(prevLog => [newLogItem, ...prevLog.slice(0, MAX_LOG_ITEMS - 1)]);
+        setLatestSignificantEventType(data.status_variant);
+        if (!isPanelOpen) {
+          setUnreadNotificationCount(prev => prev + 1);
         }
+
       } catch (error) {
         console.error('[NotificationProvider] Error processing notification message:', error);
       }
     }
-  }, [lastMessage, notificationsEnabled, permissionStatus, router]);
+  }, [lastMessage, router, isPanelOpen]); // Added isPanelOpen to dependencies
 
   const requestPermission = useCallback(async () => {
-    if (!isSupported || permissionStatus === 'granted' || permissionStatus === 'denied') {
-      if (permissionStatus === 'denied') {
-        toast.info("Browser notifications are blocked. Please enable them in your browser settings if you wish to receive them.", { duration: 8000});
-      }
+    // This function's relevance diminishes, but we keep it for completeness
+    // if the button ever needs to manage browser perms again.
+    if (!isSupported || permissionStatus === 'denied') {
+      toast.info("Browser notifications are blocked by your browser settings.", { duration: 8000});
       return;
+    }
+    if (permissionStatus === 'granted') {
+        toast.info("Browser notification permission is already granted.", {duration: 6000});
+        return;
     }
     try {
       const permission = await Notification.requestPermission();
       setPermissionStatus(permission);
       localStorage.setItem(NOTIFICATION_PERMISSION_KEY, permission);
-      if (permission === 'granted') {
-        setNotificationsEnabled(true);
-        localStorage.setItem(NOTIFICATION_PREFERENCE_KEY, JSON.stringify(true));
-        toast.success("Browser notifications enabled!");
-      } else if (permission === 'denied') {
-        setNotificationsEnabled(false);
-        localStorage.setItem(NOTIFICATION_PREFERENCE_KEY, JSON.stringify(false));
-        toast.info("Browser notifications denied. You can enable them later via the notification button or browser settings.");
-      }
+      // ... (rest of permission handling, less critical now)
     } catch (error) {
       console.error('[NotificationProvider] Error requesting notification permission:', error);
-      toast.error("Could not request notification permission.");
     }
   }, [isSupported, permissionStatus]);
 
   const toggleNotifications = useCallback(() => {
-    if (!isSupported) {
-        toast.error("Browser notifications are not supported by this browser.");
-        return;
-    }
-    if (permissionStatus === 'denied') {
-      toast.info("Notifications are blocked by your browser. Please check your browser settings.", {
-        action: { label: "Help", onClick: () => alert("To enable notifications, go to your browser's site settings for this page and allow notifications.") }
-      });
-      return;
-    }
-    if (permissionStatus === 'default') {
-      requestPermission();
-      return;
-    }
-    const newValue = !notificationsEnabled;
-    setNotificationsEnabled(newValue);
-    localStorage.setItem(NOTIFICATION_PREFERENCE_KEY, JSON.stringify(newValue));
-    toast.info(`Browser notifications ${newValue ? 'enabled' : 'disabled'}.`);
-  }, [notificationsEnabled, permissionStatus, isSupported, requestPermission]);
+    // This will now primarily be used to open/close the panel or clear notifications.
+    // For now, let's make it open the panel.
+    openNotificationPanel();
+  }, []); // Removed dependencies no longer relevant for this specific toggle action
+
+  // Panel management functions
+  const openNotificationPanel = useCallback(() => {
+    setIsPanelOpen(true);
+    setUnreadNotificationCount(0); // Reset unread count when panel is opened
+    // Optionally reset latestSignificantEventType if button color should reset on open
+    // setLatestSignificantEventType(null);
+  }, []);
+
+  const closeNotificationPanel = useCallback(() => {
+    setIsPanelOpen(false);
+  }, []);
+
+  const clearNotificationsLog = useCallback(() => {
+    setNotificationsLog([]);
+    setUnreadNotificationCount(0);
+    setLatestSignificantEventType(null); // Reset button color
+    toast.success("Notifications cleared.");
+  }, []);
 
   const contextValue: NotificationContextType = {
-    notificationsEnabled,
+    notificationsEnabled, // Keeping for now, might be useful for user preference of in-app features
     permissionStatus,
     requestPermission,
-    toggleNotifications,
+    toggleNotifications, // This will be used to open the panel from the button
     isSupported,
+    isPanelOpen,
+    openNotificationPanel,
+    closeNotificationPanel,
+    notificationsLog,
+    clearNotificationsLog,
+    unreadNotificationCount,
+    latestSignificantEventType,
   };
 
   return (
