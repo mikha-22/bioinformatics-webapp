@@ -1,4 +1,4 @@
-// File: backend/app/routers/notifications_ws.py
+#File: backend/app/routers/notifications_ws.py
 import asyncio
 import logging
 import json
