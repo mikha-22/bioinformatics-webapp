@@ -89,7 +89,23 @@ if [ -z "$outdir_base" ]; then log "ERROR: Missing required argument: outdir_bas
 if [ -z "$genome" ]; then log "ERROR: Missing required argument: genome (Argument #4)" >&2; exit 1; fi
 
 log "Run Name (Input): $run_name_input"
-# ... (logging for other arguments remains the same) ...
+log "Input CSV: $input_csv"
+log "Outdir Base: $outdir_base"
+log "Genome: $genome"
+log "Tools: ${tools:-<not_specified>}"
+log "Step: ${step:-<not_specified>}"
+log "Profile: ${profile:-<not_specified_will_use_default_or_from_config>}"
+log "Aligner: ${aligner:-<not_specified_will_use_default_or_from_config>}"
+log "Intervals: ${intervals:-<not_specified>}"
+log "dbSNP: ${dbsnp:-<not_specified>}"
+log "Known Indels: ${known_indels:-<not_specified>}"
+log "Panel of Normals (PoN): ${pon:-<not_specified>}"
+log "Joint Germline: $joint_germline_flag"
+log "WES: $wes_flag"
+log "Trim FASTQ: $trim_fastq_flag"
+log "Skip QC: $skip_qc_flag"
+log "Skip Annotation: $skip_annotation_flag"
+log "Skip BaseRecalibrator: $skip_baserecalibrator_flag"
 log "Is Rerun: $is_rerun"
 log "Job ID Suffix Arg: $job_id_suffix_arg"
 
@@ -156,10 +172,14 @@ cmd+=" --genome \"${genome}\""
 cmd+=" -c \"${NEXTFLOW_CONFIG_FILE}\""
 cmd+=" -name \"${RUN_SPECIFIC_IDENTIFIER}\""
 
-# <<< --- ADDED -with-trace OPTION --- >>>
-# The trace file will be generated inside the Sarek results directory for this specific run.
+# --- MODIFIED PART: Explicitly add --igenomes_base ---
+# This path should be the path *inside the container* where iGenomes is mounted
+# This will override params.igenomes_base if it's also set in NEXTFLOW_CONFIG_FILE
+cmd+=" --igenomes_base /data/igenomes_local"
+log "Explicitly adding --igenomes_base /data/igenomes_local to the command."
+# --- END MODIFIED PART ---
+
 cmd+=" -with-trace \"${results_dir}/execution_trace.txt\""
-# <<< --- END ADDED OPTION --- >>>
 
 
 export NXF_WORK="${RUN_SPECIFIC_WORK_DIR}"
@@ -184,7 +204,6 @@ if [ "$skip_qc_flag" = "true" ]; then cmd+=" --skip_qc"; fi
 if [ "$skip_annotation_flag" = "true" ]; then cmd+=" --skip_annotation"; fi
 if [ "$is_rerun" = "true" ]; then cmd+=" -resume"; fi
 
-# ... (Sanity Checks remain the same) ...
 log "--- Worker Environment & Sanity Checks ---"
 log "User: $(whoami) (UID: $(id -u))"
 log "Current Directory (of script execution): $(pwd)"
