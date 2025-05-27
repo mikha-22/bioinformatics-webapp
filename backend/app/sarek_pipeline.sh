@@ -175,8 +175,8 @@ cmd+=" -name \"${RUN_SPECIFIC_IDENTIFIER}\""
 # --- MODIFIED PART: Explicitly add --igenomes_base ---
 # This path should be the path *inside the container* where iGenomes is mounted
 # This will override params.igenomes_base if it's also set in NEXTFLOW_CONFIG_FILE
-cmd+=" --igenomes_base /data/igenomes_local"
-log "Explicitly adding --igenomes_base /data/igenomes_local to the command."
+cmd+=" --igenomes_base /home/admin01/work/mnt/nas/sarek-webapp/data/igenomes_local"
+log "Explicitly adding --igenomes_base <path> to the command."
 # --- END MODIFIED PART ---
 
 cmd+=" -with-trace \"${results_dir}/execution_trace.txt\""
