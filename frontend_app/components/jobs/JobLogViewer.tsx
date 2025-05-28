@@ -13,7 +13,7 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogDescription,
+    // DialogDescription, // No longer using DialogDescription for the main block
     DialogFooter,
     DialogClose
 } from "@/components/ui/dialog";
@@ -36,8 +36,8 @@ interface JobLogViewerProps {
     jobId: string | null;
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
-    jobRunName?: string | null; // <<< ADDED: For the main title part
-    jobDescription?: string | null; // User-provided run description
+    jobRunName?: string | null;
+    jobDescription?: string | null;
     jobStatus?: string;
 }
 
@@ -53,7 +53,7 @@ export default function JobLogViewer({
     jobId, 
     isOpen, 
     onOpenChange, 
-    jobRunName, // <<< Destructure new prop
+    jobRunName,
     jobDescription, 
     jobStatus 
 }: JobLogViewerProps) {
@@ -190,7 +190,7 @@ export default function JobLogViewer({
     const handleScroll = useCallback(() => {
         const viewport = scrollAreaViewportRef.current;
         if (viewport) {
-            const atBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 10; // Allow small tolerance
+            const atBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 10;
             if (atBottom !== isScrolledToBottom) {
                 setIsScrolledToBottom(atBottom);
             }
@@ -230,19 +230,16 @@ export default function JobLogViewer({
 
     const isActuallyLive = !isTerminalStatus(jobStatus) && initialHistoryLoaded;
 
-    // --- MODIFIED HEADER ---
     const logTypePrefix = (isTerminalStatus(jobStatus) || !websocketUrl) && initialHistoryLoaded 
         ? "Log History: " 
         : "Live Logs: ";
     
     const displayRunNameInTitle = jobRunName || (jobId ? `Job ${jobId.split('_').pop()?.slice(0,8)}...` : "Log Viewer");
     const titleText = `${logTypePrefix}${displayRunNameInTitle}`;
-    // --- END MODIFIED HEADER ---
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-5xl md:max-w-6xl lg:max-w-7xl h-[90vh] flex flex-col p-0 gap-0">
-                {/* --- MODIFIED DialogHeader and its children --- */}
                 <DialogHeader className="p-4 border-b flex-shrink-0">
                     <DialogTitle className="flex items-center gap-2">
                         {(isTerminalStatus(jobStatus) || !websocketUrl) && initialHistoryLoaded 
@@ -252,11 +249,13 @@ export default function JobLogViewer({
                             {titleText}
                         </span>
                     </DialogTitle>
-                    <DialogDescription className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs pt-1 gap-2">
-                        <div className="flex-grow space-y-0.5">
+
+                    {/* Replaced DialogDescription with a div for layout */}
+                    <div className="text-muted-foreground text-xs pt-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <div className="flex-grow space-y-0.5"> {/* Container for left-aligned details */}
                             {jobId && (
                                 <p className="truncate">
-                                    <span className="font-medium text-muted-foreground">Job ID:</span>
+                                    <span className="font-semibold">Job ID:</span>
                                     <span 
                                         className="font-mono text-xs ml-1.5 bg-muted/50 dark:bg-black/30 px-1.5 py-0.5 rounded-sm"
                                         title={jobId}
@@ -267,7 +266,7 @@ export default function JobLogViewer({
                             )}
                             {jobDescription && (
                                 <p className="truncate" title={jobDescription}>
-                                    <span className="font-medium text-muted-foreground">Description:</span>
+                                    <span className="font-semibold">Description:</span>
                                     <span className="ml-1.5">{jobDescription}</span>
                                 </p>
                             )}
@@ -284,9 +283,8 @@ export default function JobLogViewer({
                                  {connectionStatusText}
                              </Badge>
                          )}
-                    </DialogDescription>
+                    </div>
                 </DialogHeader>
-                {/* --- END MODIFIED DialogHeader --- */}
 
                 <ScrollArea className="flex-grow bg-gray-950 dark:bg-black text-white font-mono text-[0.8rem] leading-relaxed overflow-y-auto" onScroll={handleScroll}>
                     <ScrollAreaPrimitive.Viewport ref={scrollAreaViewportRef} className="h-full w-full rounded-[inherit] p-4">
