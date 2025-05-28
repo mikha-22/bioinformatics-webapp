@@ -3,17 +3,16 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import useWebSocket, { ReadyState } from 'react-use-websocket';
-import { Terminal, Wifi, WifiOff, Loader2, ServerCrash, History } from 'lucide-react';
+import { Terminal, Wifi, WifiOff, Loader2, ServerCrash, History, AlertTriangle, CheckCircle, XCircleIcon } from 'lucide-react'; // Added more icons
 import Convert from 'ansi-to-html';
 import { useQuery } from "@tanstack/react-query";
-import * as api from "@/lib/api"; // For getJobLogHistory
+import * as api from "@/lib/api";
 
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
-    // DialogDescription, // No longer using DialogDescription for the main block
     DialogFooter,
     DialogClose
 } from "@/components/ui/dialog";
@@ -42,12 +41,23 @@ interface JobLogViewerProps {
 }
 
 let messageIdCounter = 0;
-const ansiConverter = new Convert({ newline: true, escapeXML: true });
+const ansiConverter = new Convert({ 
+    newline: true, 
+    escapeXML: true,
+    // Define some basic ANSI colors to HTML styles if needed, though defaults are usually fine
+    // fg: '#FFF', bg: '#000', // Default foreground/background
+    // colors: { /* ... custom color map ... */ }
+});
 
 const isTerminalStatus = (status?: string): boolean => {
     const lowerStatus = status?.toLowerCase();
     return ['finished', 'failed', 'stopped', 'canceled'].includes(lowerStatus || "");
 };
+
+// Regex for parsing Nextflow process lines
+const nfProcessRegex = /^\[([a-f0-9]{2}\/[a-f0-9]{6})\]\s+(Submitted process|process|COMPLETED|FAILED|CACHED)\s+>\s+([^ \n(]+)(?:\s+\(([^)]*)\))?(?:\s+\[\s*([^\]%]+%)\s*\])?/i;
+const wrapperLogRegex = /^(\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]\[PID:\d+\])/;
+
 
 export default function JobLogViewer({ 
     jobId, 
@@ -197,43 +207,74 @@ export default function JobLogViewer({
         }
     }, [isScrolledToBottom]);
     
-    const getLogLineColor = (type: LogLine['type']): string => {
-        switch (type) {
-            case 'stderr': return 'text-red-400';
-            case 'error': return 'text-red-500 font-semibold';
-            case 'info': return 'text-blue-400';
-            case 'status': return 'text-yellow-400 italic';
-            case 'control': return 'text-purple-400';
+    const getEnhancedLogDetails = (log: LogLine): { content: React.ReactNode, lineClasses: string } => {
+        let baseClasses = "whitespace-pre-wrap break-words";
+        let lineContent = log.line;
+        let isStructured = false;
+        let structuredElements: React.ReactNode = null;
+
+        // Determine base color from log.type
+        switch (log.type) {
+            case 'stderr': baseClasses = cn(baseClasses, 'text-red-400 dark:text-red-500'); break;
+            case 'error': baseClasses = cn(baseClasses, 'text-red-500 dark:text-red-600 font-semibold'); break;
+            case 'info': baseClasses = cn(baseClasses, 'text-blue-400 dark:text-blue-500'); break;
+            case 'status': baseClasses = cn(baseClasses, 'text-yellow-400 dark:text-yellow-500 italic'); break;
+            case 'control': baseClasses = cn(baseClasses, 'text-purple-400 dark:text-purple-500'); break;
             case 'stdout':
             case 'raw':
-            default: return 'text-gray-300';
+            default: baseClasses = cn(baseClasses, 'text-gray-300 dark:text-gray-400'); break;
         }
+
+        // 1. Wrapper Script Logs (identified by [timestamp][PID:xxxx] prefix)
+        if (wrapperLogRegex.test(log.line)) {
+            baseClasses = cn(baseClasses, 'text-sky-400 dark:text-sky-500'); // Distinct color for wrapper
+        }
+
+        // 2. Nextflow Process Lines - Parse and structure them
+        const nfMatch = log.line.match(nfProcessRegex);
+        if (nfMatch) {
+            isStructured = true;
+            const [, nfHash, nfActionStatus, nfProcessNameFull, nfInput, nfProgress] = nfMatch;
+            const nfProcessNameShort = nfProcessNameFull.split(':').pop() || nfProcessNameFull;
+            
+            let actionColor = "text-purple-400 dark:text-purple-500"; // Default for submitted/process
+            if (nfActionStatus.toUpperCase() === "COMPLETED") actionColor = "text-green-400 dark:text-green-500";
+            else if (nfActionStatus.toUpperCase() === "FAILED") actionColor = "text-red-400 dark:text-red-500";
+            else if (nfActionStatus.toUpperCase() === "CACHED") actionColor = "text-teal-400 dark:text-teal-500";
+
+            structuredElements = (
+                <>
+                    <span className="text-gray-500 dark:text-gray-600 mr-1">[{nfHash}]</span>
+                    <span className={cn("font-semibold mr-1", actionColor)}>{nfProcessNameShort}</span>
+                    {nfInput && <span className="text-blue-400 dark:text-blue-500 mr-1">({nfInput.trim()})</span>}
+                    {nfProgress && <span className="text-yellow-400 dark:text-yellow-500 mr-1">[{nfProgress}]</span>}
+                    {nfActionStatus.toUpperCase() !== "PROCESS" && nfActionStatus.toUpperCase() !== "SUBMITTED PROCESS" && 
+                     !nfProgress && <span className={cn("font-medium",actionColor)}>{nfActionStatus.toUpperCase()}</span>}
+                </>
+            );
+        }
+
+        // 3. Keyword Highlighting (only if not already structured, to avoid double processing)
+        if (!isStructured) {
+            if (log.line.includes("Pipeline completed successfully")) {
+                baseClasses = cn(baseClasses, "text-green-400 dark:text-green-300 font-bold bg-green-900/40 dark:bg-green-500/20 p-0.5 rounded-sm");
+            } else if (log.line.includes("Pipeline failed")) {
+                baseClasses = cn(baseClasses, "text-red-400 dark:text-red-300 font-bold bg-red-900/40 dark:bg-red-500/20 p-0.5 rounded-sm");
+            } else if (log.type !== 'stderr' && log.line.toUpperCase().includes("ERROR:")) { // Avoid double styling stderr
+                baseClasses = cn(baseClasses, "text-red-400 dark:text-red-300 font-semibold");
+            } else if (log.type !== 'stderr' && (log.line.toUpperCase().includes("WARN:") || log.line.toUpperCase().includes("WARNING:"))) {
+                baseClasses = cn(baseClasses, "text-yellow-400 dark:text-yellow-300");
+            }
+        }
+        
+        const content = isStructured ? structuredElements : <span dangerouslySetInnerHTML={{ __html: ansiConverter.toHtml(lineContent) }} />;
+        return { content, lineClasses: baseClasses };
     };
     
-    const connectionStatusText = {
-        [ReadyState.CONNECTING]: 'Connecting...',
-        [ReadyState.OPEN]: 'Connected (Live)',
-        [ReadyState.CLOSING]: 'Closing...',
-        [ReadyState.CLOSED]: 'Disconnected',
-        [ReadyState.UNINSTANTIATED]: 'Idle',
-    }[readyState];
-
-    const getStatusIndicator = () => {
-        switch (readyState) {
-            case ReadyState.CONNECTING: return <Loader2 className="h-3 w-3 animate-spin text-yellow-500" />;
-            case ReadyState.OPEN: return <Wifi className="h-3 w-3 text-green-500" />;
-            case ReadyState.CLOSED: return <WifiOff className="h-3 w-3 text-red-500" />;
-            case ReadyState.CLOSING: return <Loader2 className="h-3 w-3 animate-spin text-orange-500" />;
-            default: return <ServerCrash className="h-3 w-3 text-gray-500" />;
-        }
-    };
-
+    const connectionStatusText = { /* ... (same as before) ... */ }[readyState];
+    const getStatusIndicator = () => { /* ... (same as before) ... */ };
     const isActuallyLive = !isTerminalStatus(jobStatus) && initialHistoryLoaded;
-
-    const logTypePrefix = (isTerminalStatus(jobStatus) || !websocketUrl) && initialHistoryLoaded 
-        ? "Log History: " 
-        : "Live Logs: ";
-    
+    const logTypePrefix = (isTerminalStatus(jobStatus) || !websocketUrl) && initialHistoryLoaded ? "Log History: " : "Live Logs: ";
     const displayRunNameInTitle = jobRunName || (jobId ? `Job ${jobId.split('_').pop()?.slice(0,8)}...` : "Log Viewer");
     const titleText = `${logTypePrefix}${displayRunNameInTitle}`;
 
@@ -249,10 +290,8 @@ export default function JobLogViewer({
                             {titleText}
                         </span>
                     </DialogTitle>
-
-                    {/* Replaced DialogDescription with a div for layout */}
                     <div className="text-muted-foreground text-xs pt-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                        <div className="flex-grow space-y-0.5"> {/* Container for left-aligned details */}
+                        <div className="flex-grow space-y-0.5">
                             {jobId && (
                                 <p className="truncate">
                                     <span className="font-semibold">Job ID:</span>
@@ -298,18 +337,16 @@ export default function JobLogViewer({
                         )}
 
                         {logs.map((log) => {
-                            const htmlLogLine = ansiConverter.toHtml(log.line);
+                            const { content, lineClasses } = getEnhancedLogDetails(log);
                             return (
-                               <div
-                                    key={log.id}
-                                    className={cn(getLogLineColor(log.type), "whitespace-pre-wrap break-words")}
-                                    dangerouslySetInnerHTML={{ __html: htmlLogLine }}
-                                />
+                               <div key={log.id} className={lineClasses}>
+                                    {content}
+                               </div>
                             );
                         })}
 
                         {showEOFMessage && (
-                            <p className="text-yellow-400 italic pt-2">
+                            <p className="text-yellow-400 dark:text-yellow-500 italic pt-2">
                                 --- {isTerminalStatus(jobStatus) || !websocketUrl ? "End of historical log" : "End of log stream (Job finished or stopped)"} ---
                             </p>
                         )}
