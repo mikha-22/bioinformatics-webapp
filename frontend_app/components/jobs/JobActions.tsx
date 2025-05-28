@@ -19,15 +19,8 @@ import {
 import { toast } from "sonner";
 
 import { Button, buttonVariants } from "@/components/ui/button";
-// Using composed DropdownMenu components for cleaner imports
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuPortal,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+// Using DropdownMenuPrimitive for direct control as in your previous working version
+import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -56,13 +49,13 @@ import { formatDuration } from "@/lib/utils";
 import { formatDistanceToNow } from 'date-fns';
 import JobLogViewer from "./JobLogViewer";
 
-// Helper functions
+// Helper functions (assuming these are correctly defined)
 function getStatusVariant(internalStatus: string | null | undefined): "default" | "destructive" | "secondary" | "outline" {
     const status = internalStatus?.toLowerCase();
     switch (status) {
-        case 'finished': return 'default';
+        case 'finished': return 'default'; // Using 'default' for success green
         case 'failed': return 'destructive';
-        case 'started': case 'running': return 'default';
+        case 'started': case 'running': return 'default'; // Using 'default' for active blue/purple
         case 'queued': case 'staged': return 'secondary';
         case 'stopped': case 'canceled': return 'outline';
         default: return 'secondary';
@@ -169,45 +162,54 @@ export default function JobActions({ job }: JobActionsProps) {
                        </Button>
                     )}
                 </div>
-                {/* More Actions Dropdown */}
+                {/* More Actions Dropdown - Using DropdownMenuPrimitive */}
                 <div className="flex items-center gap-1">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                    <DropdownMenuPrimitive.Root>
+                        <DropdownMenuPrimitive.Trigger asChild>
                             <Button variant="ghost" size="icon" className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors flex-shrink-0">
-                                <MoreHorizontal className="h-5 w-5" /> <span className="sr-only">Job Actions</span>
+                                <MoreHorizontal className="h-5 w-5" /> <span className="sr-only">More Job Actions</span>
                             </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuPortal>
-                            <DropdownMenuContent
+                        </DropdownMenuPrimitive.Trigger>
+                        <DropdownMenuPrimitive.Portal>
+                            <DropdownMenuPrimitive.Content
                                 align="end" sideOffset={4}
-                                className="min-w-[12rem] z-50 overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2" >
-                                <DropdownMenuItem
-                                    onSelect={(e) => { e.preventDefault(); setIsDetailsOpen(true); }} >
-                                    <span className="flex items-center gap-2"><Info className="h-4 w-4" /> View Details</span>
-                                </DropdownMenuItem>
+                                className="min-w-[12rem] z-50 overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2"
+                            >
+                                <DropdownMenuPrimitive.Item
+                                    onSelect={(e) => { e.preventDefault(); setIsDetailsOpen(true); }}
+                                    className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                                >
+                                    <Info className="mr-2 h-4 w-4" />
+                                    <span>View Details</span>
+                                </DropdownMenuPrimitive.Item>
+
                                 {job.status === 'finished' && job.result?.results_path && (
-                                    <DropdownMenuItem asChild>
-                                        <Link href={`/results?highlight=${encodeURIComponent(job.result.results_path.split('/').filter(Boolean).pop() || '')}`} className="flex items-center gap-2">
-                                            <FolderGit2 className="h-4 w-4" /> View Results
+                                    <DropdownMenuPrimitive.Item asChild
+                                        className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                                    >
+                                        <Link href={`/results?highlight=${encodeURIComponent(job.result.results_path.split('/').filter(Boolean).pop() || '')}`} className="flex items-center w-full">
+                                            <FolderGit2 className="mr-2 h-4 w-4" />
+                                            <span>View Results</span>
                                         </Link>
-                                    </DropdownMenuItem>
+                                    </DropdownMenuPrimitive.Item>
                                 )}
+
                                 {canRemove && (
                                     <>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem
+                                        <DropdownMenuPrimitive.Separator className="my-1 h-px bg-muted -mx-1" />
+                                        <DropdownMenuPrimitive.Item
                                             onSelect={(e) => { e.preventDefault(); setIsRemoveConfirmOpen(true); }}
                                             disabled={removeMutation.isPending}
-                                            variant="destructive" >
-                                            <span className="flex items-center gap-2">
-                                                {removeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Remove Job
-                                            </span>
-                                        </DropdownMenuItem>
+                                            className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors text-destructive hover:bg-destructive/10 hover:text-destructive data-[disabled]:pointer-events-none data-[disabled]:opacity-50 dark:hover:bg-destructive/20"
+                                        >
+                                            {removeMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                                            <span>Remove Job</span>
+                                        </DropdownMenuPrimitive.Item>
                                     </>
                                 )}
-                            </DropdownMenuContent>
-                        </DropdownMenuPortal>
-                    </DropdownMenu>
+                            </DropdownMenuPrimitive.Content>
+                        </DropdownMenuPrimitive.Portal>
+                    </DropdownMenuPrimitive.Root>
                 </div>
             </div>
 
@@ -258,13 +260,14 @@ export default function JobActions({ job }: JobActionsProps) {
             <AlertDialog open={isRemoveConfirmOpen} onOpenChange={setIsRemoveConfirmOpen}> <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Remove Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to remove job <span className="font-mono font-semibold">{job.job_id}</span>? This will remove its entry from the list. Results files (if any) will not be deleted. This action cannot be undone. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={removeMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleRemove} disabled={removeMutation.isPending} className={buttonVariants({ variant: "destructive" })}> {removeMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Remove Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent> </AlertDialog>
             <AlertDialog open={isRerunConfirmOpen} onOpenChange={setIsRerunConfirmOpen}> <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Re-stage Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to re-stage job <span className="font-mono font-semibold">{job.job_id}</span>? This will create a new 'staged' job entry using the same parameters. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={rerunMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleRerun} disabled={rerunMutation.isPending}> {rerunMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Re-stage Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent> </AlertDialog>
 
+            {/* Log Viewer - Ensure job, job.id, and job.status are valid before rendering */}
             {job && job.job_id && job.status && (
                   <JobLogViewer
                       jobId={logViewerJobId} // This state controls which job's logs are shown
                       isOpen={isLogViewerOpen}
                       onOpenChange={setIsLogViewerOpen}
                       jobDescription={job.description}
-                      jobStatus={job.status} // Pass the current job's status
+                      jobStatus={job.status} // <<< Pass the current job's status
                   />
               )}
         </>
