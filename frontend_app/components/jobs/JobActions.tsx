@@ -19,15 +19,15 @@ import {
 import { toast } from "sonner";
 
 import { Button, buttonVariants } from "@/components/ui/button";
-import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"; // For direct use if needed
-import { // Keep direct imports for clarity or if specific sub-components are used
+// Using composed DropdownMenu components for cleaner imports
+import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuPortal,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"; // Using composed components
+} from "@/components/ui/dropdown-menu";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -56,7 +56,7 @@ import { formatDuration } from "@/lib/utils";
 import { formatDistanceToNow } from 'date-fns';
 import JobLogViewer from "./JobLogViewer";
 
-// Helper functions (assuming these are correctly defined elsewhere or here)
+// Helper functions
 function getStatusVariant(internalStatus: string | null | undefined): "default" | "destructive" | "secondary" | "outline" {
     const status = internalStatus?.toLowerCase();
     switch (status) {
@@ -96,7 +96,7 @@ const formatParamValue = (value: any): string => {
 };
 
 interface JobActionsProps {
-  job: Job | undefined; // Make job potentially undefined to handle loading/error states gracefully
+  job: Job | undefined;
 }
 
 export default function JobActions({ job }: JobActionsProps) {
@@ -122,13 +122,12 @@ export default function JobActions({ job }: JobActionsProps) {
     const handleViewLogs = () => {
         if (job && job.job_id && !job.job_id.startsWith("staged_")) {
             setLogViewerJobId(job.job_id);
-            setIsLogViewerOpen(true); // job.status is passed directly to JobLogViewer component below
+            setIsLogViewerOpen(true);
         }
     };
 
     if (!job || typeof job.job_id !== 'string') {
-        // console.warn("JobActions rendered with undefined or invalid job object/job_id", job);
-        return <div className="flex items-center justify-end gap-1 h-9 w-[100px] sm:w-[130px] md:w-[150px]"></div>; // Placeholder for layout consistency
+        return <div className="flex items-center justify-end gap-1 h-9 w-[100px] sm:w-[130px] md:w-[150px]"></div>;
     }
 
     const internalStatus = job.status?.toLowerCase();
@@ -146,6 +145,7 @@ export default function JobActions({ job }: JobActionsProps) {
     return (
         <>
             <div className="flex items-center justify-between gap-1 w-full">
+                {/* Action Buttons Group */}
                 <div className="flex items-center gap-1">
                     <Button
                         variant="ghost" size="icon" onClick={handleViewLogs} disabled={!canViewLogs}
@@ -169,6 +169,7 @@ export default function JobActions({ job }: JobActionsProps) {
                        </Button>
                     )}
                 </div>
+                {/* More Actions Dropdown */}
                 <div className="flex items-center gap-1">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -210,8 +211,8 @@ export default function JobActions({ job }: JobActionsProps) {
                 </div>
             </div>
 
+            {/* Details Dialog */}
             <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-                {/* ... Dialog Content for Job Details (unchanged from previous version) ... */}
                 <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>Job Details: {job.job_id}</DialogTitle>
@@ -250,21 +251,20 @@ export default function JobActions({ job }: JobActionsProps) {
                     </div>
                     <DialogFooter className="mt-4"> <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose> </DialogFooter>
                 </DialogContent>
-            </Dialog>
+             </Dialog>
 
-            {/* AlertDialogs for stop, remove, rerun confirmations (unchanged from previous version) */}
+            {/* Confirmation Dialogs */}
             <AlertDialog open={isStopConfirmOpen} onOpenChange={setIsStopConfirmOpen}> <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Stop/Cancel Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to stop job <span className="font-mono font-semibold">{job.job_id}</span>? If it's running, a stop signal will be sent. If it's queued, it will be canceled. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={stopMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleStop} disabled={stopMutation.isPending} className="bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-700"> {stopMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Stop/Cancel Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent> </AlertDialog>
             <AlertDialog open={isRemoveConfirmOpen} onOpenChange={setIsRemoveConfirmOpen}> <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Remove Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to remove job <span className="font-mono font-semibold">{job.job_id}</span>? This will remove its entry from the list. Results files (if any) will not be deleted. This action cannot be undone. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={removeMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleRemove} disabled={removeMutation.isPending} className={buttonVariants({ variant: "destructive" })}> {removeMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Remove Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent> </AlertDialog>
             <AlertDialog open={isRerunConfirmOpen} onOpenChange={setIsRerunConfirmOpen}> <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Re-stage Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to re-stage job <span className="font-mono font-semibold">{job.job_id}</span>? This will create a new 'staged' job entry using the same parameters. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={rerunMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleRerun} disabled={rerunMutation.isPending}> {rerunMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Re-stage Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent> </AlertDialog>
 
-            {/* Ensure job, job.id, and job.status are valid before rendering JobLogViewer */}
             {job && job.job_id && job.status && (
                   <JobLogViewer
-                      jobId={logViewerJobId}
+                      jobId={logViewerJobId} // This state controls which job's logs are shown
                       isOpen={isLogViewerOpen}
                       onOpenChange={setIsLogViewerOpen}
                       jobDescription={job.description}
-                      jobStatus={job.status} // <<< --- PASSING jobStatus ---
+                      jobStatus={job.status} // Pass the current job's status
                   />
               )}
         </>
