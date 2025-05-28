@@ -266,6 +266,7 @@ export default function JobActions({ job }: JobActionsProps) {
                       jobId={logViewerJobId} // This state controls which job's logs are shown
                       isOpen={isLogViewerOpen}
                       onOpenChange={setIsLogViewerOpen}
+                      jobRunName={job.run_name || job.meta?.run_name}
                       jobDescription={job.description}
                       jobStatus={job.status} // <<< Pass the current job's status
                   />
