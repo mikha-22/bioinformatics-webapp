@@ -254,7 +254,7 @@ export default function JobsPage() {
               Stop Selected ({selectedStoppableJobs.length})
             </Button>
             <Button
-              variant="destructiveOutline" // Use your custom or a suitable destructive variant
+              variant="destructive" // Use your custom or a suitable destructive variant
               size="sm" onClick={handleBatchRemove}
               disabled={selectedRemovableJobs.length === 0 || batchRemoveMutation.isPending}
               className="cursor-pointer" >
