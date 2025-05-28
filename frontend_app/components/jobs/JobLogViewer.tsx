@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import useWebSocket, { ReadyState } from 'react-use-websocket';
-import { Terminal, Wifi, WifiOff, Loader2, ServerCrash, History, AlertTriangle, CheckCircle, XCircleIcon } from 'lucide-react'; // Added more icons
+import { Terminal, Wifi, WifiOff, Loader2, ServerCrash, History } from 'lucide-react'; // Keep existing icons
 import Convert from 'ansi-to-html';
 import { useQuery } from "@tanstack/react-query";
 import * as api from "@/lib/api";
@@ -44,9 +44,6 @@ let messageIdCounter = 0;
 const ansiConverter = new Convert({ 
     newline: true, 
     escapeXML: true,
-    // Define some basic ANSI colors to HTML styles if needed, though defaults are usually fine
-    // fg: '#FFF', bg: '#000', // Default foreground/background
-    // colors: { /* ... custom color map ... */ }
 });
 
 const isTerminalStatus = (status?: string): boolean => {
@@ -54,7 +51,6 @@ const isTerminalStatus = (status?: string): boolean => {
     return ['finished', 'failed', 'stopped', 'canceled'].includes(lowerStatus || "");
 };
 
-// Regex for parsing Nextflow process lines
 const nfProcessRegex = /^\[([a-f0-9]{2}\/[a-f0-9]{6})\]\s+(Submitted process|process|COMPLETED|FAILED|CACHED)\s+>\s+([^ \n(]+)(?:\s+\(([^)]*)\))?(?:\s+\[\s*([^\]%]+%)\s*\])?/i;
 const wrapperLogRegex = /^(\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]\[PID:\d+\])/;
 
@@ -162,8 +158,20 @@ export default function JobLogViewer({
         reconnectAttempts: 10,
         retryOnError: true,
         onOpen: () => console.log(`[LogViewer WS ${jobId}] WebSocket opened.`),
-        onClose: (event) => console.log(`[LogViewer WS ${jobId}] WebSocket closed. Code: ${event.code}`),
-        onError: (event) => console.error(`[LogViewer WS ${jobId}] WebSocket error:`, event),
+        onClose: (event) => console.log(`[LogViewer WS ${jobId}] WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`),
+        // --- MODIFIED onError ---
+        onError: (event) => {
+            if (event instanceof Event && !('message' in event) && !('code' in event) && Object.keys(event).length === 0) {
+                // This checks if it's a generic Event object that is also empty (like the {} reported)
+                console.info(`[LogViewer WS ${jobId}] WebSocket connection event (likely a standard closure or abrupt termination after job end, type: ${event.type}). Event object:`, event);
+            } else if (event instanceof Event && !('message' in event)) {
+                 console.warn(`[LogViewer WS ${jobId}] WebSocket event (type: ${event.type}) with no specific error message. Event:`, event);
+            }
+            else {
+                console.error(`[LogViewer WS ${jobId}] WebSocket error:`, event);
+            }
+        },
+        // --- END MODIFIED onError ---
         filter: (message: MessageEvent<any>): boolean => typeof message.data === 'string',
     }, !!websocketUrl);
 
@@ -178,7 +186,7 @@ export default function JobLogViewer({
 
                 if (logType === 'control' && logLineContent === 'EOF') {
                     setShowEOFMessage(true);
-                    setWebsocketUrl(null);
+                    setWebsocketUrl(null); // This will trigger the WebSocket to close
                     return;
                 }
                 logEntry = { id: messageIdCounter++, type: logType as LogLine['type'], line: logLineContent, timestamp: Date.now() };
@@ -213,7 +221,6 @@ export default function JobLogViewer({
         let isStructured = false;
         let structuredElements: React.ReactNode = null;
 
-        // Determine base color from log.type
         switch (log.type) {
             case 'stderr': baseClasses = cn(baseClasses, 'text-red-400 dark:text-red-500'); break;
             case 'error': baseClasses = cn(baseClasses, 'text-red-500 dark:text-red-600 font-semibold'); break;
@@ -225,19 +232,17 @@ export default function JobLogViewer({
             default: baseClasses = cn(baseClasses, 'text-gray-300 dark:text-gray-400'); break;
         }
 
-        // 1. Wrapper Script Logs (identified by [timestamp][PID:xxxx] prefix)
         if (wrapperLogRegex.test(log.line)) {
-            baseClasses = cn(baseClasses, 'text-sky-400 dark:text-sky-500'); // Distinct color for wrapper
+            baseClasses = cn(baseClasses, 'text-sky-400 dark:text-sky-500');
         }
 
-        // 2. Nextflow Process Lines - Parse and structure them
         const nfMatch = log.line.match(nfProcessRegex);
         if (nfMatch) {
             isStructured = true;
             const [, nfHash, nfActionStatus, nfProcessNameFull, nfInput, nfProgress] = nfMatch;
             const nfProcessNameShort = nfProcessNameFull.split(':').pop() || nfProcessNameFull;
             
-            let actionColor = "text-purple-400 dark:text-purple-500"; // Default for submitted/process
+            let actionColor = "text-purple-400 dark:text-purple-500";
             if (nfActionStatus.toUpperCase() === "COMPLETED") actionColor = "text-green-400 dark:text-green-500";
             else if (nfActionStatus.toUpperCase() === "FAILED") actionColor = "text-red-400 dark:text-red-500";
             else if (nfActionStatus.toUpperCase() === "CACHED") actionColor = "text-teal-400 dark:text-teal-500";
@@ -254,13 +259,12 @@ export default function JobLogViewer({
             );
         }
 
-        // 3. Keyword Highlighting (only if not already structured, to avoid double processing)
         if (!isStructured) {
             if (log.line.includes("Pipeline completed successfully")) {
                 baseClasses = cn(baseClasses, "text-green-400 dark:text-green-300 font-bold bg-green-900/40 dark:bg-green-500/20 p-0.5 rounded-sm");
             } else if (log.line.includes("Pipeline failed")) {
                 baseClasses = cn(baseClasses, "text-red-400 dark:text-red-300 font-bold bg-red-900/40 dark:bg-red-500/20 p-0.5 rounded-sm");
-            } else if (log.type !== 'stderr' && log.line.toUpperCase().includes("ERROR:")) { // Avoid double styling stderr
+            } else if (log.type !== 'stderr' && log.line.toUpperCase().includes("ERROR:")) {
                 baseClasses = cn(baseClasses, "text-red-400 dark:text-red-300 font-semibold");
             } else if (log.type !== 'stderr' && (log.line.toUpperCase().includes("WARN:") || log.line.toUpperCase().includes("WARNING:"))) {
                 baseClasses = cn(baseClasses, "text-yellow-400 dark:text-yellow-300");
@@ -271,8 +275,24 @@ export default function JobLogViewer({
         return { content, lineClasses: baseClasses };
     };
     
-    const connectionStatusText = { /* ... (same as before) ... */ }[readyState];
-    const getStatusIndicator = () => { /* ... (same as before) ... */ };
+    const connectionStatusText = {
+        [ReadyState.CONNECTING]: 'Connecting...',
+        [ReadyState.OPEN]: 'Connected (Live)',
+        [ReadyState.CLOSING]: 'Closing...',
+        [ReadyState.CLOSED]: 'Disconnected',
+        [ReadyState.UNINSTANTIATED]: 'Idle',
+    }[readyState];
+
+    const getStatusIndicator = () => {
+        switch (readyState) {
+            case ReadyState.CONNECTING: return <Loader2 className="h-3 w-3 animate-spin text-yellow-500" />;
+            case ReadyState.OPEN: return <Wifi className="h-3 w-3 text-green-500" />;
+            case ReadyState.CLOSED: return <WifiOff className="h-3 w-3 text-red-500" />;
+            case ReadyState.CLOSING: return <Loader2 className="h-3 w-3 animate-spin text-orange-500" />;
+            default: return <ServerCrash className="h-3 w-3 text-gray-500" />;
+        }
+    };
+
     const isActuallyLive = !isTerminalStatus(jobStatus) && initialHistoryLoaded;
     const logTypePrefix = (isTerminalStatus(jobStatus) || !websocketUrl) && initialHistoryLoaded ? "Log History: " : "Live Logs: ";
     const displayRunNameInTitle = jobRunName || (jobId ? `Job ${jobId.split('_').pop()?.slice(0,8)}...` : "Log Viewer");
