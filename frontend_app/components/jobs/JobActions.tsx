@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState } from "react";
-// import { useRouter } from "next/navigation"; // Not strictly needed for this specific change, but keep if used elsewhere
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -15,12 +14,20 @@ import {
     FolderGit2,
     Loader2,
     Terminal,
-    History, // <<< --- ADDED History icon for rerun info ---
+    History,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button, buttonVariants } from "@/components/ui/button";
-import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
+import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"; // For direct use if needed
+import { // Keep direct imports for clarity or if specific sub-components are used
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuPortal,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"; // Using composed components
 import {
     AlertDialog,
     AlertDialogAction,
@@ -43,28 +50,57 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-import { Job, SampleInfo, JobMeta } from "@/lib/types"; // Removed unused InputFilenames, SarekParams, RunParameters for this file
+import { Job, SampleInfo, JobMeta } from "@/lib/types";
 import * as api from "@/lib/api";
 import { formatDuration } from "@/lib/utils";
 import { formatDistanceToNow } from 'date-fns';
 import JobLogViewer from "./JobLogViewer";
 
-// Helper functions (getStatusVariant, formatTimestamp, formatTimestampRelative, formatParamKey, formatParamValue)
-// Assuming these are correctly defined as in your previous versions or a shared utility
-function getStatusVariant(internalStatus: string | null | undefined): "default" | "destructive" | "secondary" | "outline" { const status = internalStatus?.toLowerCase(); switch (status) { case 'finished': return 'default'; case 'failed': return 'destructive'; case 'started': case 'running': return 'default'; case 'queued': case 'staged': return 'secondary'; case 'stopped': case 'canceled': return 'outline'; default: return 'secondary'; } }
-function formatTimestamp(timestamp: number | null | undefined): string { if (!timestamp) return "N/A"; try { const date = new Date(timestamp * 1000); if (isNaN(date.getTime())) return "Invalid Date"; return date.toLocaleString(); } catch (e) { return "Invalid Date"; } }
-function formatTimestampRelative(timestamp: number | null | undefined): string { if (!timestamp) return "N/A"; try { if (timestamp <= 0) return "N/A"; const date = new Date(timestamp * 1000); if (isNaN(date.getTime())) return "Invalid Date"; return formatDistanceToNow(date, { addSuffix: true }); } catch (e) { console.error("Error formatting relative timestamp:", timestamp, e); return "Invalid Date"; } }
+// Helper functions (assuming these are correctly defined elsewhere or here)
+function getStatusVariant(internalStatus: string | null | undefined): "default" | "destructive" | "secondary" | "outline" {
+    const status = internalStatus?.toLowerCase();
+    switch (status) {
+        case 'finished': return 'default';
+        case 'failed': return 'destructive';
+        case 'started': case 'running': return 'default';
+        case 'queued': case 'staged': return 'secondary';
+        case 'stopped': case 'canceled': return 'outline';
+        default: return 'secondary';
+    }
+}
+function formatTimestamp(timestamp: number | null | undefined): string {
+    if (!timestamp) return "N/A";
+    try {
+        const date = new Date(timestamp * 1000);
+        if (isNaN(date.getTime())) return "Invalid Date";
+        return date.toLocaleString();
+    } catch (e) { return "Invalid Date"; }
+}
+function formatTimestampRelative(timestamp: number | null | undefined): string {
+    if (!timestamp) return "N/A";
+    try {
+        if (timestamp <= 0) return "N/A";
+        const date = new Date(timestamp * 1000);
+        if (isNaN(date.getTime())) return "Invalid Date";
+        return formatDistanceToNow(date, { addSuffix: true });
+    } catch (e) { console.error("Error formatting relative timestamp:", timestamp, e); return "Invalid Date"; }
+}
 const formatParamKey = (key: string): string => key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-const formatParamValue = (value: any): string => { if (value === true) return 'Yes'; if (value === false) return 'No'; if (value === null || value === undefined) return 'N/A'; if (typeof value === 'string' && value.trim() === '') return 'N/A'; if (Array.isArray(value)) { return value.length > 0 ? value.join(', ') : 'N/A'; } if (typeof value === 'object') { return JSON.stringify(value); } return String(value); }
-
+const formatParamValue = (value: any): string => {
+    if (value === true) return 'Yes'; if (value === false) return 'No';
+    if (value === null || value === undefined) return 'N/A';
+    if (typeof value === 'string' && value.trim() === '') return 'N/A';
+    if (Array.isArray(value)) { return value.length > 0 ? value.join(', ') : 'N/A'; }
+    if (typeof value === 'object') { return JSON.stringify(value); }
+    return String(value);
+};
 
 interface JobActionsProps {
-  job: Job | undefined;
+  job: Job | undefined; // Make job potentially undefined to handle loading/error states gracefully
 }
 
 export default function JobActions({ job }: JobActionsProps) {
     const queryClient = useQueryClient();
-    // const router = useRouter(); // Keep if used for navigation on notification click etc.
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [isStopConfirmOpen, setIsStopConfirmOpen] = useState(false);
     const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false);
@@ -73,44 +109,26 @@ export default function JobActions({ job }: JobActionsProps) {
     const [logViewerJobId, setLogViewerJobId] = useState<string | null>(null);
     const jobsQueryKey = ['jobsList'];
 
-    const startMutation = useMutation({
-        mutationFn: api.startJob,
-        onSuccess: (data) => { toast.success(`Job ${data.job_id} started successfully.`); queryClient.invalidateQueries({ queryKey: jobsQueryKey }); },
-        onError: (error: Error) => { toast.error(`Failed to start job: ${error.message}`); }
-    });
-    const stopMutation = useMutation({
-        mutationFn: api.stopJob,
-        onSuccess: (data) => { toast.info(`${data.message}`); queryClient.invalidateQueries({ queryKey: jobsQueryKey }); },
-        onError: (error: Error) => { toast.error(`Failed to stop/cancel job: ${error.message}`); },
-        onSettled: () => setIsStopConfirmOpen(false),
-    });
-    const removeMutation = useMutation({
-        mutationFn: api.removeJob,
-        onSuccess: (data) => { toast.success(`Job ${data.removed_id} removed.`); queryClient.invalidateQueries({ queryKey: jobsQueryKey }); },
-        onError: (error: Error) => { toast.error(`Failed to remove job: ${error.message}`); queryClient.invalidateQueries({ queryKey: jobsQueryKey }); },
-        onSettled: () => setIsRemoveConfirmOpen(false),
-    });
-    const rerunMutation = useMutation({
-        mutationFn: api.rerunJob,
-        onSuccess: (data) => { toast.success(`Job ${job?.job_id} re-staged as ${data.staged_job_id}.`); queryClient.invalidateQueries({ queryKey: jobsQueryKey }); },
-        onError: (error: Error) => { toast.error(`Failed to re-stage job: ${error.message}`); },
-        onSettled: () => setIsRerunConfirmOpen(false),
-    });
+    const startMutation = useMutation({ mutationFn: api.startJob, onSuccess: (data) => { toast.success(`Job ${data.job_id} started successfully.`); queryClient.invalidateQueries({ queryKey: jobsQueryKey }); }, onError: (error: Error) => { toast.error(`Failed to start job: ${error.message}`); } });
+    const stopMutation = useMutation({ mutationFn: api.stopJob, onSuccess: (data) => { toast.info(`${data.message}`); queryClient.invalidateQueries({ queryKey: jobsQueryKey }); }, onError: (error: Error) => { toast.error(`Failed to stop/cancel job: ${error.message}`); }, onSettled: () => setIsStopConfirmOpen(false), });
+    const removeMutation = useMutation({ mutationFn: api.removeJob, onSuccess: (data) => { toast.success(`Job ${data.removed_id} removed.`); queryClient.invalidateQueries({ queryKey: jobsQueryKey }); }, onError: (error: Error) => { toast.error(`Failed to remove job: ${error.message}`); queryClient.invalidateQueries({ queryKey: jobsQueryKey }); }, onSettled: () => setIsRemoveConfirmOpen(false), });
+    const rerunMutation = useMutation({ mutationFn: api.rerunJob, onSuccess: (data) => { toast.success(`Job ${job?.job_id} re-staged as ${data.staged_job_id}.`); queryClient.invalidateQueries({ queryKey: jobsQueryKey }); }, onError: (error: Error) => { toast.error(`Failed to re-stage job: ${error.message}`); }, onSettled: () => setIsRerunConfirmOpen(false), });
 
     const handleStart = () => { if (!job || !job.job_id) return; startMutation.mutate(job.job_id); };
     const handleStop = () => { if (!job || !job.job_id) return; stopMutation.mutate(job.job_id); };
     const handleRemove = () => { if (!job || !job.job_id) return; removeMutation.mutate(job.job_id); };
     const handleRerun = () => { if (!job || !job.job_id) return; rerunMutation.mutate(job.job_id); };
+
     const handleViewLogs = () => {
         if (job && job.job_id && !job.job_id.startsWith("staged_")) {
             setLogViewerJobId(job.job_id);
-            setIsLogViewerOpen(true);
+            setIsLogViewerOpen(true); // job.status is passed directly to JobLogViewer component below
         }
     };
 
     if (!job || typeof job.job_id !== 'string') {
-        console.warn("JobActions rendered with undefined or invalid job.job_id", job);
-        return <div className="flex items-center justify-end gap-1 h-9 w-[100px]"></div>;
+        // console.warn("JobActions rendered with undefined or invalid job object/job_id", job);
+        return <div className="flex items-center justify-end gap-1 h-9 w-[100px] sm:w-[130px] md:w-[150px]"></div>; // Placeholder for layout consistency
     }
 
     const internalStatus = job.status?.toLowerCase();
@@ -120,7 +138,7 @@ export default function JobActions({ job }: JobActionsProps) {
     const canRemove = internalStatus === 'staged' || internalStatus === 'finished' || internalStatus === 'failed' || internalStatus === 'stopped' || internalStatus === 'canceled';
     const canViewLogs = internalStatus !== 'staged';
 
-    const meta = job.meta as JobMeta | null | undefined; // Type assertion for clarity
+    const meta = job.meta as JobMeta | null | undefined;
     const inputParams = meta?.input_params;
     const sarekParams = meta?.sarek_params;
     const hasParameters = !!(inputParams && Object.keys(inputParams).length > 0) || !!(sarekParams && Object.keys(sarekParams).length > 0);
@@ -128,7 +146,6 @@ export default function JobActions({ job }: JobActionsProps) {
     return (
         <>
             <div className="flex items-center justify-between gap-1 w-full">
-                {/* ... (existing buttons for logs, start, stop, rerun) ... */}
                 <div className="flex items-center gap-1">
                     <Button
                         variant="ghost" size="icon" onClick={handleViewLogs} disabled={!canViewLogs}
@@ -153,48 +170,48 @@ export default function JobActions({ job }: JobActionsProps) {
                     )}
                 </div>
                 <div className="flex items-center gap-1">
-                    <DropdownMenuPrimitive.Root>
-                        <DropdownMenuPrimitive.Trigger asChild>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-9 w-9 p-2 flex items-center justify-center hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors flex-shrink-0">
                                 <MoreHorizontal className="h-5 w-5" /> <span className="sr-only">Job Actions</span>
                             </Button>
-                        </DropdownMenuPrimitive.Trigger>
-                        <DropdownMenuPrimitive.Portal>
-                            <DropdownMenuPrimitive.Content
+                        </DropdownMenuTrigger>
+                        <DropdownMenuPortal>
+                            <DropdownMenuContent
                                 align="end" sideOffset={4}
                                 className="min-w-[12rem] z-50 overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2" >
-                                <DropdownMenuPrimitive.Item
-                                    onSelect={(e) => { e.preventDefault(); setIsDetailsOpen(true); }}
-                                    className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50" >
+                                <DropdownMenuItem
+                                    onSelect={(e) => { e.preventDefault(); setIsDetailsOpen(true); }} >
                                     <span className="flex items-center gap-2"><Info className="h-4 w-4" /> View Details</span>
-                                </DropdownMenuPrimitive.Item>
+                                </DropdownMenuItem>
                                 {job.status === 'finished' && job.result?.results_path && (
-                                    <DropdownMenuPrimitive.Item asChild className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground">
+                                    <DropdownMenuItem asChild>
                                         <Link href={`/results?highlight=${encodeURIComponent(job.result.results_path.split('/').filter(Boolean).pop() || '')}`} className="flex items-center gap-2">
                                             <FolderGit2 className="h-4 w-4" /> View Results
                                         </Link>
-                                    </DropdownMenuPrimitive.Item>
+                                    </DropdownMenuItem>
                                 )}
                                 {canRemove && (
                                     <>
-                                        <DropdownMenuPrimitive.Separator className="my-1 h-px bg-muted -mx-1" />
-                                        <DropdownMenuPrimitive.Item
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
                                             onSelect={(e) => { e.preventDefault(); setIsRemoveConfirmOpen(true); }}
                                             disabled={removeMutation.isPending}
-                                            className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none transition-colors hover:bg-destructive/10 hover:text-destructive text-destructive data-[disabled]:pointer-events-none data-[disabled]:opacity-50 dark:hover:bg-destructive/20" >
+                                            variant="destructive" >
                                             <span className="flex items-center gap-2">
                                                 {removeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Remove Job
                                             </span>
-                                        </DropdownMenuPrimitive.Item>
+                                        </DropdownMenuItem>
                                     </>
                                 )}
-                            </DropdownMenuPrimitive.Content>
-                        </DropdownMenuPrimitive.Portal>
-                    </DropdownMenuPrimitive.Root>
+                            </DropdownMenuContent>
+                        </DropdownMenuPortal>
+                    </DropdownMenu>
                 </div>
             </div>
 
             <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+                {/* ... Dialog Content for Job Details (unchanged from previous version) ... */}
                 <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>Job Details: {job.job_id}</DialogTitle>
@@ -211,23 +228,19 @@ export default function JobActions({ job }: JobActionsProps) {
                             <div className="font-medium text-muted-foreground">Duration:</div> <div>{formatDuration(job.resources?.duration_seconds)}</div>
                         </div>
 
-                        {/* <<< --- ADDED Rerun Information Section --- >>> */}
                         {meta?.is_rerun_execution && meta?.original_job_id && (
                           <div className="mt-3 pt-3 border-t">
                             <h4 className="font-semibold mb-1.5 text-sm text-muted-foreground flex items-center">
-                                <History className="h-4 w-4 mr-2" />
-                                Rerun Information
+                                <History className="h-4 w-4 mr-2" /> Rerun Information
                             </h4>
                             <div className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm pl-4 items-center">
                               <div className="font-medium text-muted-foreground/80">Original Job ID:</div>
                               <div className="font-mono text-xs bg-muted/70 px-1.5 py-0.5 rounded-sm break-all" title={meta.original_job_id}>
                                 {meta.original_job_id}
-                                {/* Consider making this a link later if feasible to jump to original job details */}
                               </div>
                             </div>
                           </div>
                         )}
-                        {/* <<< --- END ADDED Rerun Information Section --- >>> */}
 
                         {job.resources && (job.resources.peak_memory_mb || job.resources.average_cpu_percent) && ( <div> <h4 className="font-semibold mb-1">Resources Used:</h4> <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm pl-4"> <div className="font-medium text-muted-foreground">Peak Memory:</div> <div>{job.resources.peak_memory_mb ? `${job.resources.peak_memory_mb.toFixed(1)} MB` : 'N/A'}</div> <div className="font-medium text-muted-foreground">Average CPU:</div> <div>{job.resources.average_cpu_percent ? `${job.resources.average_cpu_percent.toFixed(1)} %` : 'N/A'}</div> </div> </div> )}
                         {hasParameters && ( <div> <h4 className="font-semibold mb-1">Parameters:</h4> <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm pl-4"> {inputParams && Object.entries(inputParams).map(([key, value]) => ( <React.Fragment key={`input-${key}`}> <div className="font-medium text-muted-foreground truncate" title={key}>{formatParamKey(key)}:</div> <div className="font-mono text-xs break-words" title={String(value ?? '')}>{formatParamValue(value)}</div> </React.Fragment> ))} {sarekParams && Object.entries(sarekParams).map(([key, value]) => ( <React.Fragment key={`sarek-${key}`}> <div className="font-medium text-muted-foreground truncate" title={key}>{formatParamKey(key)}:</div> <div className="font-mono text-xs break-words" title={String(value ?? '')}>{formatParamValue(value)}</div> </React.Fragment> ))} </div> </div> )}
@@ -237,19 +250,21 @@ export default function JobActions({ job }: JobActionsProps) {
                     </div>
                     <DialogFooter className="mt-4"> <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose> </DialogFooter>
                 </DialogContent>
-             </Dialog>
+            </Dialog>
 
-            {/* ... (AlertDialogs for stop, remove, rerun confirmations) ... */}
+            {/* AlertDialogs for stop, remove, rerun confirmations (unchanged from previous version) */}
             <AlertDialog open={isStopConfirmOpen} onOpenChange={setIsStopConfirmOpen}> <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Stop/Cancel Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to stop job <span className="font-mono font-semibold">{job.job_id}</span>? If it's running, a stop signal will be sent. If it's queued, it will be canceled. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={stopMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleStop} disabled={stopMutation.isPending} className="bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-700"> {stopMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Stop/Cancel Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent> </AlertDialog>
             <AlertDialog open={isRemoveConfirmOpen} onOpenChange={setIsRemoveConfirmOpen}> <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Remove Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to remove job <span className="font-mono font-semibold">{job.job_id}</span>? This will remove its entry from the list. Results files (if any) will not be deleted. This action cannot be undone. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={removeMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleRemove} disabled={removeMutation.isPending} className={buttonVariants({ variant: "destructive" })}> {removeMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Remove Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent> </AlertDialog>
             <AlertDialog open={isRerunConfirmOpen} onOpenChange={setIsRerunConfirmOpen}> <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Re-stage Job</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to re-stage job <span className="font-mono font-semibold">{job.job_id}</span>? This will create a new 'staged' job entry using the same parameters. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel disabled={rerunMutation.isPending}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleRerun} disabled={rerunMutation.isPending}> {rerunMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Re-stage Job </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent> </AlertDialog>
 
-            {job && job.job_id && (
+            {/* Ensure job, job.id, and job.status are valid before rendering JobLogViewer */}
+            {job && job.job_id && job.status && (
                   <JobLogViewer
                       jobId={logViewerJobId}
                       isOpen={isLogViewerOpen}
                       onOpenChange={setIsLogViewerOpen}
                       jobDescription={job.description}
+                      jobStatus={job.status} // <<< --- PASSING jobStatus ---
                   />
               )}
         </>

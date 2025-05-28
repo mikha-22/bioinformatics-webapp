@@ -5,14 +5,21 @@ import os
 import zipfile
 import io
 from pathlib import Path
-import mimetypes # Ensure mimetypes is imported
+import mimetypes
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse, FileResponse # Ensure FileResponse is imported
+from fastapi.responses import StreamingResponse, FileResponse
 from typing import List, Dict, Any, Generator, Optional
 from pydantic import BaseModel
+import redis # For sync redis client
+import redis.asyncio as aioredis # For new async endpoint
 
-from ..core.config import DATA_DIR, RESULTS_DIR
+from ..core.config import (
+    DATA_DIR, RESULTS_DIR,
+    LOG_HISTORY_PREFIX, # <<< ADDED
+    REDIS_HOST, REDIS_PORT, REDIS_DB # <<< ADDED for async client helper
+)
 from ..utils.files import get_directory_contents, get_safe_path, get_filebrowser_config
+# from ..core.redis_rq import get_redis_connection # Keep if other endpoints use it
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -49,18 +56,32 @@ def zip_directory_generator(directory: Path) -> Generator[bytes, None, None]:
                     buffer.truncate()
                 except Exception as e:
                      logger.warning(f"Error adding file {file_path} to zip: {e}")
-            elif file_path.is_dir() and not any(file_path.iterdir()): # Add empty directories
+            elif file_path.is_dir() and not any(file_path.iterdir()):
                  arcname = file_path.relative_to(directory).as_posix() + '/'
                  zipi = zipfile.ZipInfo(arcname)
-                 zipi.external_attr = 0o40755 << 16 # type: ignore # Set directory permissions
+                 zipi.external_attr = 0o40755 << 16 # type: ignore
                  zipf.writestr(zipi, '')
     buffer.seek(0)
     yield buffer.read()
 
-# --- Existing Endpoints (Assumed to be correct from your codebase) ---
+# Async Redis client dependency for the new history endpoint
+async def get_async_redis_client_for_data_router():
+    r_async = None
+    try:
+        r_async = aioredis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=False)
+        await r_async.ping()
+        yield r_async
+    except redis.exceptions.ConnectionError as e:
+        logger.error(f"Could not connect to async Redis for data router: {e}")
+        raise HTTPException(status_code=503, detail="Log history service unavailable (Redis connection).")
+    finally:
+        if r_async:
+            await r_async.close()
 
+# --- Existing Endpoints ---
 @router.get("/get_data", response_model=List[Dict[str, str]], summary="List Data Files")
 async def get_data():
+    # ... (implementation as before) ...
     if not DATA_DIR.exists() or not DATA_DIR.is_dir():
         logger.error(f"Configured DATA_DIR does not exist or is not a directory: {DATA_DIR}")
         raise HTTPException(status_code=500, detail="Server configuration error: Data directory not found.")
@@ -84,6 +105,7 @@ async def get_data():
 
 @router.get("/get_results", response_model=List[Dict[str, Any]], summary="List Result Run Directories")
 async def get_results_runs(fb_config: Dict = Depends(get_filebrowser_config)):
+    # ... (implementation as before) ...
     if not RESULTS_DIR.exists():
         logger.warning(f"Results directory not found: {RESULTS_DIR}. Returning empty list.")
         return []
@@ -92,6 +114,7 @@ async def get_results_runs(fb_config: Dict = Depends(get_filebrowser_config)):
 
 @router.get("/get_results/{run_dir_name:path}", response_model=List[Dict[str, Any]], summary="List Files in a Specific Run Directory")
 async def get_results_run_files(run_dir_name: str, fb_config: Dict = Depends(get_filebrowser_config)):
+    # ... (implementation as before) ...
     logger.info(f"Request to list files for run directory: '{run_dir_name}'")
     try:
         target_run_dir = get_safe_path(RESULTS_DIR, run_dir_name)
@@ -108,6 +131,7 @@ async def get_results_run_files(run_dir_name: str, fb_config: Dict = Depends(get
 
 @router.get("/results/{run_dir_name:path}/parameters", response_model=RunParametersResponse, summary="Get Parameters for a Run")
 async def get_run_parameters(run_dir_name: str):
+    # ... (implementation as before) ...
     logger.info(f"Request for parameters for run: '{run_dir_name}'")
     try:
         target_run_dir = get_safe_path(RESULTS_DIR, run_dir_name)
@@ -146,6 +170,7 @@ async def get_run_parameters(run_dir_name: str):
 
 @router.get("/download_result/{run_dir_name:path}", summary="Download Run Directory as Zip")
 async def download_result_run(run_dir_name: str):
+    # ... (implementation as before) ...
     logger.info(f"Request to download run directory: '{run_dir_name}'")
     try:
         target_run_dir = get_safe_path(RESULTS_DIR, run_dir_name)
@@ -165,6 +190,7 @@ async def download_result_run(run_dir_name: str):
 
 @router.get("/download_file/{run_dir_name:path}/{file_path:path}", summary="Download Single Result File")
 async def download_result_file(run_dir_name: str, file_path: str):
+    # ... (implementation as before) ...
     logger.info(f"Request to download file '{file_path}' from run '{run_dir_name}'")
     try:
         target_run_dir = get_safe_path(RESULTS_DIR, run_dir_name)
@@ -177,118 +203,106 @@ async def download_result_file(run_dir_name: str, file_path: str):
         return FileResponse(
             path=str(target_file_path),
             filename=filename,
-            media_type='application/octet-stream' # Generic binary for download
+            media_type='application/octet-stream'
         )
     except HTTPException as e: raise e
     except Exception as e:
         logger.exception(f"Unexpected error downloading file '{file_path}' from run '{run_dir_name}': {e}")
         raise HTTPException(status_code=500, detail="Internal server error downloading file.")
 
-# --- Endpoint to get MultiQC report path ---
+
 @router.get("/results/{run_dir_name}/multiqc_path", response_model=Optional[str], summary="Get Relative Path to MultiQC Report")
 async def get_multiqc_report_path(run_dir_name: str):
+    # ... (implementation as before) ...
     logger.info(f"Request for MultiQC report path in run: '{run_dir_name}'")
     try:
         target_run_dir = get_safe_path(RESULTS_DIR, run_dir_name)
         if not target_run_dir.is_dir():
             logger.warning(f"Run directory '{run_dir_name}' not found when searching for MultiQC.")
             raise HTTPException(status_code=404, detail=f"Run directory '{run_dir_name}' not found.")
-
-        logger.info(f"[MultiQC Debug] Checking run dir: {target_run_dir.resolve()}")
-
         common_paths = [
-            Path("multiqc/multiqc_report.html"),
-            Path("multiqc_report.html"),
-            Path("Reports/multiqc_report.html"),
-            Path("Reports/MultiQC/multiqc_report.html")
+            Path("multiqc/multiqc_report.html"), Path("multiqc_report.html"),
+            Path("Reports/multiqc_report.html"), Path("Reports/MultiQC/multiqc_report.html")
         ]
-
         for rel_path_obj in common_paths:
             potential_file = target_run_dir / rel_path_obj
-            logger.info(f"[MultiQC Debug] Checking potential path: {potential_file.resolve()} (exists: {potential_file.exists()}, is_file: {potential_file.is_file() if potential_file.exists() else 'N/A'}) for rel_path_obj: {rel_path_obj}")
             if potential_file.is_file():
                 try:
                     actual_relative_path = potential_file.relative_to(target_run_dir)
                     logger.info(f"Found MultiQC report for run '{run_dir_name}' at relative path: {actual_relative_path.as_posix()}")
                     return actual_relative_path.as_posix()
-                except ValueError: # Should not happen if rel_path_obj is truly relative
+                except ValueError:
                     logger.error(f"Could not make path {potential_file} relative to {target_run_dir}")
-                    # Fallback to the constructed relative path if relative_to fails unexpectedly
                     return rel_path_obj.as_posix()
-
         logger.info(f"MultiQC report not found in common locations for run '{run_dir_name}'.")
-        return None # Return None if not found, frontend will get a 200 OK with null body
-    except HTTPException as e: # Re-raise HTTPExceptions from get_safe_path or our own 404
-        raise e
+        return None
+    except HTTPException as e: raise e
     except Exception as e:
         logger.exception(f"Unexpected error finding MultiQC report for run '{run_dir_name}': {e}")
         raise HTTPException(status_code=500, detail="Server error finding MultiQC report.")
 
-# --- UPDATED Endpoint for serving static files (HTML, CSS, JS, images) ---
+
 @router.get("/results/{run_dir_name}/static/{file_path:path}", summary="Serve Static File from Results")
 async def serve_static_result_file(run_dir_name: str, file_path: str):
+    # ... (implementation as before) ...
     logger.info(f"Request to serve static file '{file_path}' from run '{run_dir_name}'")
-
-    ALLOWED_STATIC_EXTENSIONS = [
-        ".html", ".htm",
-        ".css",
-        ".js", ".json", # JSON might be used for data by JS
-        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
-        ".woff", ".woff2", ".ttf", ".otf", ".eot", # Fonts
-        ".txt", ".csv", ".tsv", # For any plain text data files MultiQC might link
-    ]
-
+    ALLOWED_STATIC_EXTENSIONS = [".html", ".htm", ".css", ".js", ".json", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".otf", ".eot", ".txt", ".csv", ".tsv"]
     file_extension = Path(file_path).suffix.lower()
-
-    if not file_path or not file_extension: # Check if file_path or extension is empty
-        logger.warning(f"Invalid file_path (empty or no extension): {file_path}")
+    if not file_path or not file_extension:
         raise HTTPException(status_code=400, detail="Invalid file path.")
-
     if file_extension not in ALLOWED_STATIC_EXTENSIONS:
-        logger.warning(f"Attempt to access non-whitelisted file type via static endpoint: {file_path} (ext: {file_extension})")
         raise HTTPException(status_code=403, detail=f"Access denied: File type '{file_extension}' is not allowed.")
     try:
         target_run_dir = get_safe_path(RESULTS_DIR, run_dir_name)
         if not target_run_dir.is_dir():
             raise HTTPException(status_code=404, detail=f"Run directory '{run_dir_name}' not found.")
-
         target_file = get_safe_path(target_run_dir, file_path)
-
         if not target_file.is_file():
             raise HTTPException(status_code=404, detail=f"File '{file_path}' not found in run '{run_dir_name}'.")
-
         if RESULTS_DIR.resolve() not in target_file.resolve().parents and RESULTS_DIR.resolve() != target_file.resolve().parent :
-             logger.error(f"SECURITY ALERT: Resolved static file path '{target_file.resolve()}' is outside allowed scope. Base: '{RESULTS_DIR.resolve()}', Target Parent: '{target_file.resolve().parent}'. Original request: run='{run_dir_name}', file='{file_path}'")
              raise HTTPException(status_code=403, detail="Access to the requested file is forbidden.")
-
         media_type, _ = mimetypes.guess_type(str(target_file))
-
-        # Explicitly set media_type for HTML files to ensure rendering
-        if file_extension in [".html", ".htm"]:
-            media_type = "text/html"
-        elif not media_type: # Fallback for common web types if mimetypes doesn't guess them well
+        if file_extension in [".html", ".htm"]: media_type = "text/html"
+        elif not media_type:
             if file_extension == ".js": media_type = "application/javascript"
             elif file_extension == ".css": media_type = "text/css"
-            elif file_extension == ".json": media_type = "application/json"
-            elif file_extension == ".svg": media_type = "image/svg+xml"
             else: media_type = "application/octet-stream"
-            logger.info(f"MIME type for {target_file.name} determined as {media_type} (extension fallback: {file_extension})")
-        else:
-            logger.info(f"MIME type for {target_file.name} identified by mimetypes as {media_type}")
-
-        logger.info(f"Serving static file: {target_file} with media_type: {media_type}")
-
-        # For HTML and other web content, we want it displayed inline.
-        # For other types, filename is useful for "Save As".
-        # FileResponse generally handles Content-Disposition correctly based on media_type.
-        # If media_type is 'text/html', it should default to 'inline'.
-        return FileResponse(
-            path=str(target_file),
-            media_type=media_type,
-            filename=target_file.name if media_type != "text/html" else None # Suggest download only for non-HTML
-        )
-    except HTTPException as e:
-        raise e
+        return FileResponse(path=str(target_file), media_type=media_type, filename=target_file.name if media_type != "text/html" else None)
+    except HTTPException as e: raise e
     except Exception as e:
         logger.exception(f"Unexpected error serving static file '{file_path}' from run '{run_dir_name}': {e}")
         raise HTTPException(status_code=500, detail="Internal server error serving file.")
+
+# <<< --- NEW ENDPOINT --- >>>
+@router.get("/job_log_history/{job_id}", response_model=List[str], summary="Get Full Log History for a Job via HTTP")
+async def get_job_log_history_http(
+    job_id: str,
+    redis_client: aioredis.Redis = Depends(get_async_redis_client_for_data_router) # Use the async client
+):
+    """
+    Retrieves the complete log history for a given job ID from Redis.
+    The logs are stored as a list of JSON strings.
+    """
+    if not job_id or job_id.startswith("staged_"): # Staged jobs don't have RQ log history
+        logger.warning(f"Attempt to get log history for invalid or staged job ID: {job_id}")
+        raise HTTPException(status_code=400, detail="Invalid job ID for log history retrieval or job is staged.")
+
+    list_key = f"{LOG_HISTORY_PREFIX}{job_id}"
+    logger.info(f"HTTP request for log history from Redis list: {list_key}")
+    try:
+        # Fetch all items from the list. Redis returns list of bytes if decode_responses=False.
+        history_items_bytes = await redis_client.lrange(list_key, 0, -1)
+        
+        # Decode each byte string to a UTF-8 string.
+        # Each item in history_items_bytes is expected to be a JSON string representing a log line.
+        history_json_strings = [item.decode('utf-8') for item in history_items_bytes]
+        
+        logger.info(f"Retrieved {len(history_json_strings)} historical log lines for job {job_id} via HTTP.")
+        return history_json_strings # Return the list of JSON strings
+    except redis.exceptions.RedisError as e:
+        logger.error(f"Redis error fetching history for job {job_id} from {list_key} via HTTP: {e}")
+        raise HTTPException(status_code=503, detail=f"Error fetching log history due to storage issue: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error fetching history for job {job_id} via HTTP: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Unexpected server error fetching log history.")
+# <<< --- END NEW ENDPOINT --- >>>

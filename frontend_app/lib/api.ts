@@ -4,7 +4,7 @@ import { Job, PipelineInput, ResultRun, ResultItem, DataFile, JobStatusDetails, 
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-console.log("[API Init DEBUG] NEXT_PUBLIC_API_BASE_URL:", API_BASE_URL);
+// console.log("[API Init DEBUG] NEXT_PUBLIC_API_BASE_URL:", API_BASE_URL);
 if (!API_BASE_URL && typeof window !== 'undefined') {
   console.error("CRITICAL: NEXT_PUBLIC_API_BASE_URL is not defined. API calls will likely fail.");
 }
@@ -40,10 +40,9 @@ apiClient.interceptors.response.use(
   }
 );
 
-// <<< --- ADDED Batch Action Response Types --- >>>
 export interface BatchActionDetail {
   job_id: string;
-  status: string; // e.g., "stop_signal_sent", "canceled", "removed", "not_found", "error"
+  status: string;
   message?: string;
 }
 
@@ -52,7 +51,9 @@ export interface BatchActionResponse {
   failed_count: number;
   details: BatchActionDetail[];
 }
-// <<< --- END ADDED Batch Action Response Types --- >>>
+
+// New type for log lines fetched from HTTP endpoint (they are JSON strings from Redis)
+export type LogLineFromHttpHistory = string;
 
 
 // ========================
@@ -92,10 +93,10 @@ export const startJob = async (stagedJobId: string): Promise<{ message: string; 
     }
 };
 
-export const stopJob = async (jobId: string): Promise<{ message: string; job_id: string, action_status: string }> => { // Added action_status
+export const stopJob = async (jobId: string): Promise<{ message: string; job_id: string, action_status: string }> => {
     if (!jobId) throw new Error("Job ID is required to stop.");
      try {
-        const response = await apiClient.post(`/api/stop_job/${jobId}`); // Path remains the same for single stop
+        const response = await apiClient.post(`/api/stop_job/${jobId}`);
         return response.data;
     } catch (error) {
          console.error(`Failed to stop job ${jobId}:`, error);
@@ -103,10 +104,10 @@ export const stopJob = async (jobId: string): Promise<{ message: string; job_id:
     }
 };
 
-export const removeJob = async (jobId: string): Promise<{ message: string; removed_id: string, action_status: string }> => { // Added action_status
+export const removeJob = async (jobId: string): Promise<{ message: string; removed_id: string, action_status: string }> => {
     if (!jobId) throw new Error("Job ID is required to remove.");
      try {
-        const response = await apiClient.delete(`/api/remove_job/${jobId}`); // Path remains the same for single remove
+        const response = await apiClient.delete(`/api/remove_job/${jobId}`);
         return response.data;
     } catch (error) {
          console.error(`Failed to remove job ${jobId}:`, error);
@@ -125,7 +126,6 @@ export const rerunJob = async (jobId: string): Promise<{ message: string; staged
     }
 };
 
-// <<< --- ADDED Batch Job Action API Functions --- >>>
 export const batchStopJobs = async (jobIds: string[]): Promise<BatchActionResponse> => {
   if (!jobIds || jobIds.length === 0) {
     throw new Error("At least one Job ID is required for batch stop.");
@@ -151,13 +151,27 @@ export const batchRemoveJobs = async (jobIds: string[]): Promise<BatchActionResp
     throw error;
   }
 };
-// <<< --- END ADDED Batch Job Action API Functions --- >>>
+
+// <<< --- ADDED Function to fetch full log history --- >>>
+export const getJobLogHistory = async (jobId: string): Promise<LogLineFromHttpHistory[]> => {
+  if (!jobId) {
+    throw new Error("Job ID is required to fetch log history.");
+  }
+  try {
+    // Assuming the new endpoint is /api/job_log_history/{job_id}
+    const response = await apiClient.get<LogLineFromHttpHistory[]>(`/api/job_log_history/${jobId}`);
+    return response.data || [];
+  } catch (error) {
+    console.error(`Failed to fetch log history for job ${jobId}:`, error);
+    throw error; // Re-throw to be caught by React Query
+  }
+};
+// <<< --- END ADDED Function --- >>>
 
 
 // ========================
 // Results Data Functions
 // ========================
-// ... (existing results functions remain unchanged) ...
 export const getResultsList = async (): Promise<ResultRun[]> => {
   try {
     const response = await apiClient.get<ResultRun[]>("/api/get_results");
@@ -276,7 +290,6 @@ export const getDataFiles = async (type?: string, extensions?: string[]): Promis
 // ========================
 // Profile Management Functions
 // ========================
-// ... (existing profile functions remain unchanged) ...
 export const listProfileNames = async (): Promise<string[]> => {
     try {
         const response = await apiClient.get<string[]>("/api/profiles");
@@ -291,7 +304,7 @@ export const getProfileData = async (profileName: string): Promise<ProfileData> 
     if (!profileName) throw new Error("Profile name is required.");
     try {
         const response = await apiClient.get<ProfileData>(`/api/profiles/${encodeURIComponent(profileName)}`);
-        return response.data || {}; // Ensure it returns an object even if data is null/undefined
+        return response.data || {};
     } catch (error) {
          console.error(`Failed to fetch profile data for ${profileName}:`, error);
         throw error;

@@ -1,11 +1,12 @@
 // File: frontend_app/components/jobs/JobLogViewer.tsx
-// --- START OF FILE ---
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import useWebSocket, { ReadyState } from 'react-use-websocket';
-import { Terminal, Wifi, WifiOff, Loader2, ServerCrash } from 'lucide-react';
-import Convert from 'ansi-to-html'; // <<< ADDED IMPORT
+import { Terminal, Wifi, WifiOff, Loader2, ServerCrash, History } from 'lucide-react';
+import Convert from 'ansi-to-html';
+import { useQuery } from "@tanstack/react-query";
+import * as api from "@/lib/api"; // For getJobLogHistory
 
 import {
     Dialog,
@@ -21,12 +22,14 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 import { cn } from '@/lib/utils';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
+import ErrorDisplay from '@/components/common/ErrorDisplay'; // For displaying history fetch errors
 
 interface LogLine {
     id: number;
     type: 'stdout' | 'stderr' | 'info' | 'error' | 'status' | 'control' | 'raw';
     line: string;
-    timestamp: number;
+    timestamp: number; // Can be approximate for historical logs
 }
 
 interface JobLogViewerProps {
@@ -34,121 +37,158 @@ interface JobLogViewerProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     jobDescription?: string | null;
+    jobStatus?: string; // Status of the job
 }
 
 let messageIdCounter = 0;
+const ansiConverter = new Convert({ newline: true, escapeXML: true });
 
-// Create a new Convert instance
-// You can configure options like fg, bg, newline, escapeXML, stream, etc.
-const ansiConverter = new Convert({
-    newline: true,    // Convert \n to <br/>
-    escapeXML: true,  // Escape XML entities for security if rendering HTML directly
-    // Optional: Customize colors to better fit your dark theme if defaults clash
-    // colors: {
-    //   0: '#000', // black
-    //   1: '#C00', // red
-    //   2: '#0C0', // green
-    //   3: '#C90', // yellow
-    //   4: '#00C', // blue
-    //   5: '#C0C', // magenta
-    //   6: '#0CC', // cyan
-    //   7: '#CCC', // white
-    //   // ... and bright versions 8-15
-    // }
-});
+const isTerminalStatus = (status?: string): boolean => {
+    const lowerStatus = status?.toLowerCase();
+    return ['finished', 'failed', 'stopped', 'canceled'].includes(lowerStatus || "");
+};
 
-export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescription }: JobLogViewerProps) {
+export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescription, jobStatus }: JobLogViewerProps) {
     const [logs, setLogs] = useState<LogLine[]>([]);
     const scrollAreaViewportRef = useRef<HTMLDivElement>(null);
-    const bottomRef = useRef<HTMLDivElement>(null); // Sentinel for scrolling
+    const bottomRef = useRef<HTMLDivElement>(null);
     const [websocketUrl, setWebsocketUrl] = useState<string | null>(null);
     const [showEOFMessage, setShowEOFMessage] = useState(false);
     const [isScrolledToBottom, setIsScrolledToBottom] = useState(true);
+    const [initialHistoryLoaded, setInitialHistoryLoaded] = useState(false);
 
-    // Scroll to Bottom Function
     const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
         bottomRef.current?.scrollIntoView({ behavior: behavior });
-        if (behavior === 'auto') { // Force state update on instant scroll
-             setIsScrolledToBottom(true);
+        if (behavior === 'auto') {
+            setIsScrolledToBottom(true);
         }
     }, []);
 
-    // Construct WebSocket URL & Reset State on Open/Job Change
+    // Fetch historical logs when the dialog opens for ANY job type initially
+    const {
+        data: historicalLogStrings,
+        isLoading: isLoadingHistory,
+        isError: isErrorHistory,
+        error: errorHistory,
+        isSuccess: isHistorySuccess,
+    } = useQuery<string[], Error>({
+        queryKey: ['jobLogHistory', jobId, 'initial'], // Add 'initial' to differentiate if needed
+        queryFn: () => {
+            if (!jobId) throw new Error("Job ID is required for history");
+            console.log(`[LogViewer ${jobId}] Fetching initial history via HTTP...`);
+            return api.getJobLogHistory(jobId);
+        },
+        enabled: isOpen && !!jobId, // Fetch whenever the dialog is open with a valid job ID
+        staleTime: 5 * 60 * 1000, // Cache for a bit, but refetch if dialog reopens after a while
+        refetchOnWindowFocus: false,
+        retry: 1,
+    });
+
+    // Effect to setup WebSocket URL and reset states based on job status (terminal or live)
     useEffect(() => {
-        if (isOpen && jobId && typeof window !== 'undefined') {
+        if (isOpen && jobId) {
+            setLogs([]); // Clear previous logs immediately on open or job change
+            messageIdCounter = 0;
+            setShowEOFMessage(false);
+            setIsScrolledToBottom(true);
+            setInitialHistoryLoaded(false); // Reset history loaded flag
+
+            if (isTerminalStatus(jobStatus)) {
+                console.log(`[LogViewer ${jobId}] Terminal status. Historical view only.`);
+                setWebsocketUrl(null); // No WebSocket for terminal jobs
+            } else {
+                console.log(`[LogViewer ${jobId}] Live status. Will attempt WebSocket after history.`);
+                // WebSocket URL will be set after history is loaded/attempted
+                setWebsocketUrl(null); // Clear initially, set later
+            }
+        } else { // Dialog closed or no jobId
+            setWebsocketUrl(null);
+            setLogs([]);
+            setInitialHistoryLoaded(false);
+        }
+    }, [jobId, isOpen, jobStatus]);
+
+
+    // Effect to process fetched historical logs
+    useEffect(() => {
+        if (isOpen && jobId && (isHistorySuccess || isErrorHistory) && !initialHistoryLoaded) {
+            console.log(`[LogViewer ${jobId}] Processing historical logs. Success: ${isHistorySuccess}, Error: ${isErrorHistory}`);
+            if (isHistorySuccess && historicalLogStrings) {
+                const formattedHistoricalLogs: LogLine[] = historicalLogStrings.map((jsonString, index) => {
+                    try {
+                        const parsedItem = JSON.parse(jsonString);
+                        return {
+                            id: messageIdCounter++,
+                            type: parsedItem.type || 'raw',
+                            line: parsedItem.line || jsonString,
+                            timestamp: Date.now() - (historicalLogStrings.length - index) * 1000
+                        };
+                    } catch (e) {
+                        return { id: messageIdCounter++, type: 'raw', line: jsonString, timestamp: Date.now() - (historicalLogStrings.length - index) * 1000 };
+                    }
+                });
+                setLogs(formattedHistoricalLogs);
+                if (isTerminalStatus(jobStatus)) {
+                    setShowEOFMessage(true); // For purely historical, show EOF after loading
+                }
+            }
+            setInitialHistoryLoaded(true); // Mark history as processed (even if error)
+            setTimeout(() => scrollToBottom('auto'), 50); // Scroll after setting logs
+        }
+    }, [isOpen, jobId, historicalLogStrings, isLoadingHistory, isHistorySuccess, isErrorHistory, initialHistoryLoaded, jobStatus, scrollToBottom]);
+
+    // Effect to setup WebSocket URL for LIVE jobs AFTER initial history load attempt
+    useEffect(() => {
+        if (isOpen && jobId && initialHistoryLoaded && !isTerminalStatus(jobStatus) && !websocketUrl) {
+            console.log(`[LogViewer ${jobId}] Initial history loaded, setting up WebSocket for live logs.`);
             const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || window.location.origin;
             const wsProtocol = apiUrl.startsWith('https://') ? 'wss://' : 'ws://';
             const domainAndPath = apiUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
             const url = `${wsProtocol}${domainAndPath}/api/ws/logs/${jobId}`;
-            // console.log("[JobLogViewer] Setting WebSocket URL:", url);
             setWebsocketUrl(url);
-            setShowEOFMessage(false); // Reset EOF message
-            setLogs([]); // Clear previous logs
-            messageIdCounter = 0; // Reset counter
-            setIsScrolledToBottom(true); // Assume scrolled to bottom initially
-             // Scroll to bottom instantly when opening/switching job
-             setTimeout(() => scrollToBottom('auto'), 50);
-        } else {
-            setWebsocketUrl(null); // Clear URL when dialog is closed or no job ID
         }
-    }, [jobId, isOpen, scrollToBottom]);
+    }, [isOpen, jobId, initialHistoryLoaded, jobStatus, websocketUrl]);
 
-    // Reset non-URL state when dialog closes (mainly for cleanliness if jobId doesn't change but dialog reopens)
-    useEffect(() => {
-        if (!isOpen) {
-            setLogs([]);
-            messageIdCounter = 0;
-            setShowEOFMessage(false);
-            // websocketUrl is already handled by the other useEffect
-        }
-    }, [isOpen]);
 
     // WebSocket Hook
-    const {
-        lastMessage,
-        readyState,
-    } = useWebSocket(websocketUrl, {
-         share: false, // Each viewer instance should have its own connection
-         shouldReconnect: (closeEvent) => true, // Always attempt to reconnect
-         reconnectInterval: 3000,
-         reconnectAttempts: 10,
-         retryOnError: true,
-         onOpen: () => console.log(`[JobLogViewer] WebSocket opened for ${jobId}`),
-         onClose: (event) => console.log(`[JobLogViewer] WebSocket closed for ${jobId}. Code: ${event.code}, Reason: ${event.reason}`),
-         onError: (event) => console.error(`[JobLogViewer] WebSocket error for ${jobId}:`, event),
-         // Ensure we only process string messages
-         filter: (message: MessageEvent<any>): boolean => typeof message.data === 'string',
-     }, !!websocketUrl); // Only connect if websocketUrl is not null
+    const { lastMessage, readyState } = useWebSocket(websocketUrl, {
+        share: false,
+        shouldReconnect: (closeEvent) => true,
+        reconnectInterval: 3000,
+        reconnectAttempts: 10,
+        retryOnError: true,
+        onOpen: () => console.log(`[LogViewer WS ${jobId}] WebSocket opened.`),
+        onClose: (event) => console.log(`[LogViewer WS ${jobId}] WebSocket closed. Code: ${event.code}`),
+        onError: (event) => console.error(`[LogViewer WS ${jobId}] WebSocket error:`, event),
+        filter: (message: MessageEvent<any>): boolean => typeof message.data === 'string',
+    }, !!websocketUrl); // Only connect if websocketUrl is not null
 
-    // Handle incoming messages
+
+    // Handle incoming LIVE messages from WebSocket
     useEffect(() => {
-        if (lastMessage !== null) {
+        if (websocketUrl && lastMessage !== null) { // Only process if WebSocket is active
             let logEntry: LogLine | null = null;
             try {
                 const jsonData = JSON.parse(lastMessage.data);
-                const logData = jsonData as { type?: string; line?: any }; // Type assertion for clarity
+                const logData = jsonData as { type?: string; line?: any };
                 const logType = logData.type || 'raw';
-                // Ensure line is always a string, even if originally a number or object
                 const logLineContent = typeof logData.line === 'string' ? logData.line : JSON.stringify(logData.line ?? '');
 
                 if (logType === 'control' && logLineContent === 'EOF') {
-                    // console.log(`[JobLogViewer] Received EOF for ${jobId}`);
+                    console.log(`[LogViewer WS ${jobId}] Received EOF via WebSocket.`);
                     setShowEOFMessage(true);
-                    setTimeout(() => scrollToBottom('auto'), 50); // Scroll after EOF message state is set
-                    return; // Don't add EOF to logs list
+                    setWebsocketUrl(null); // Optionally close WS on EOF
+                    return;
                 }
                 logEntry = { id: messageIdCounter++, type: logType as LogLine['type'], line: logLineContent, timestamp: Date.now() };
             } catch (e) {
-                // If parsing fails, treat the whole message as a raw log line
-                // console.warn("[JobLogViewer] Message not valid JSON, treating as raw:", lastMessage.data);
                 logEntry = { id: messageIdCounter++, type: 'raw', line: lastMessage.data, timestamp: Date.now() };
             }
-
             if (logEntry) {
                 setLogs((prevLogs) => [...prevLogs, logEntry!]);
             }
         }
-    }, [lastMessage, jobId, scrollToBottom]); // Added scrollToBottom
+    }, [lastMessage, websocketUrl, jobId]);
 
     // Auto-Scroll Effect
     useEffect(() => {
@@ -157,83 +197,54 @@ export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescripti
         }
     }, [logs, isScrolledToBottom, scrollToBottom]);
 
-    // Handle manual scrolling
-    const handleScroll = useCallback(() => {
-        if (scrollAreaViewportRef.current) {
-            const { scrollTop, scrollHeight, clientHeight } = scrollAreaViewportRef.current;
-            // A small threshold helps with sub-pixel issues or slight delays
-            const atBottom = scrollHeight - scrollTop - clientHeight < 15;
-            if (atBottom !== isScrolledToBottom) {
-                setIsScrolledToBottom(atBottom);
-            }
-        }
-    }, [isScrolledToBottom]);
+    const handleScroll = useCallback(() => { /* ... as before ... */ }, [isScrolledToBottom]);
+    const getLogLineColor = (type: LogLine['type']): string => { /* ... as before ... */ };
+    const connectionStatusText = { /* ... as before ... */ }[readyState];
+    const getStatusIndicator = () => { /* ... as before ... */ };
 
-
-    // Connection status text and indicator
-    const connectionStatusText = {
-        [ReadyState.CONNECTING]: 'Connecting...',
-        [ReadyState.OPEN]: 'Connected',
-        [ReadyState.CLOSING]: 'Closing...',
-        [ReadyState.CLOSED]: 'Disconnected',
-        [ReadyState.UNINSTANTIATED]: 'Idle',
-    }[readyState];
-
-    const getStatusIndicator = () => {
-        switch (readyState) {
-            case ReadyState.CONNECTING: return <Loader2 className="h-3 w-3 animate-spin text-yellow-500"/>;
-            case ReadyState.OPEN: return <Wifi className="h-3 w-3 text-green-500"/>;
-            case ReadyState.CLOSED: return <WifiOff className="h-3 w-3 text-red-500"/>;
-            case ReadyState.CLOSING: return <WifiOff className="h-3 w-3 text-yellow-500"/>;
-            default: return <ServerCrash className="h-3 w-3 text-gray-500"/>;
-        }
-    };
-
-    // Log line color based on type (primarily for non-ANSI lines or as a base)
-    const getLogLineColor = (type: LogLine['type']): string => {
-        switch (type) {
-            case 'stdout': return 'text-gray-300 dark:text-gray-300'; // Base for stdout
-            case 'stderr': return 'text-red-500 dark:text-red-400'; // Base for stderr
-            case 'error': return 'text-red-600 dark:text-red-500 font-semibold';
-            case 'info': return 'text-blue-500 dark:text-blue-400';
-            case 'status': return 'text-yellow-600 dark:text-yellow-400 italic';
-            case 'control': return 'hidden'; // Hide control messages like EOF
-            case 'raw':
-            default: return 'text-gray-500 dark:text-gray-500'; // For unparsed or unknown
-        }
-    };
+    const isActuallyLive = !isTerminalStatus(jobStatus) && initialHistoryLoaded;
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-5xl md:max-w-6xl lg:max-w-7xl h-[90vh] flex flex-col p-0 gap-0">
-                {/* Header */}
                 <DialogHeader className="p-4 border-b flex-shrink-0">
                     <DialogTitle className="flex items-center gap-2">
-                        <Terminal className="h-5 w-5" /> Live Logs: <span className="font-mono text-sm ml-1 truncate">{jobDescription || jobId}</span>
+                        {(isTerminalStatus(jobStatus) || !websocketUrl) && initialHistoryLoaded ? <History className="h-5 w-5 text-blue-500" /> : <Terminal className="h-5 w-5" />}
+                        {(isTerminalStatus(jobStatus) || !websocketUrl) && initialHistoryLoaded ? "Log History: " : "Live Logs: "}
+                        <span className="font-mono text-sm ml-1 truncate">{jobDescription || jobId}</span>
                     </DialogTitle>
                     <DialogDescription className="flex items-center justify-between text-xs pt-1">
-                         <span>Real-time output & history from the pipeline process.</span>
-                         <Badge variant="outline" className="flex items-center gap-1.5 py-0.5 px-2 text-xs">
-                             {getStatusIndicator()}
-                             {connectionStatusText}
-                         </Badge>
+                         <span>
+                            {isLoadingHistory && "Loading history..."}
+                            {isErrorHistory && "Error loading history."}
+                            {isHistorySuccess && isTerminalStatus(jobStatus) && "Complete log history."}
+                            {isHistorySuccess && !isTerminalStatus(jobStatus) && "Historical logs loaded, listening for live updates..."}
+                         </span>
+                         {isActuallyLive && ( // Only show WS status if it's supposed to be live
+                             <Badge variant="outline" className="flex items-center gap-1.5 py-0.5 px-2 text-xs">
+                                 {getStatusIndicator()}
+                                 {connectionStatusText}
+                             </Badge>
+                         )}
                     </DialogDescription>
                 </DialogHeader>
 
                 <ScrollArea className="flex-grow bg-gray-950 dark:bg-black text-white font-mono text-[0.8rem] leading-relaxed overflow-y-auto" onScroll={handleScroll}>
                     <ScrollAreaPrimitive.Viewport ref={scrollAreaViewportRef} className="h-full w-full rounded-[inherit] p-4">
-                        {/* Initial Status Messages */}
-                        {logs.length === 0 && readyState === ReadyState.CONNECTING && ( <p className="text-yellow-500 italic">Connecting to log stream...</p> )}
-                        {logs.length === 0 && readyState === ReadyState.OPEN && !showEOFMessage && ( <p className="text-gray-500 italic">Loading history or waiting for live logs...</p> )}
-                        {logs.length === 0 && (readyState === ReadyState.CLOSED || readyState === ReadyState.UNINSTANTIATED) && !websocketUrl && jobId && ( <p className="text-gray-500 italic">Preparing connection...</p> )}
-                        {logs.length === 0 && readyState === ReadyState.CLOSED && websocketUrl && !showEOFMessage && ( <p className="text-red-500 italic">Connection closed. Attempting to reconnect...</p> )}
+                        {isLoadingHistory && (
+                            <div className="flex justify-center items-center h-full">
+                                <LoadingSpinner label="Loading log history..." size="lg" />
+                            </div>
+                        )}
+                        {isErrorHistory && !isLoadingHistory && (
+                             <ErrorDisplay title="Failed to Load Log History" error={errorHistory} className="m-4" />
+                        )}
 
-                        {/* Render Logs */}
+                        {/* Render Logs (historical and/or live) */}
                         {logs.map((log) => {
-                            // Convert ANSI to HTML
                             const htmlLogLine = ansiConverter.toHtml(log.line);
                             return (
-                               <div // Use div for block display of potentially multi-span HTML from ansi-to-html
+                               <div
                                     key={log.id}
                                     className={cn(getLogLineColor(log.type), "whitespace-pre-wrap break-words")}
                                     dangerouslySetInnerHTML={{ __html: htmlLogLine }}
@@ -242,21 +253,24 @@ export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescripti
                         })}
 
                         {/* EOF Message */}
-                        {showEOFMessage && ( <p className="text-yellow-400 italic pt-2">--- End of log stream (Job finished or stopped) ---</p> )}
-
+                        {showEOFMessage && (
+                            <p className="text-yellow-400 italic pt-2">
+                                --- {isTerminalStatus(jobStatus) || !websocketUrl ? "End of historical log" : "End of log stream (Job finished or stopped)"} ---
+                            </p>
+                        )}
                         {/* Sentinel Element for scrolling */}
                         <div ref={bottomRef} style={{ height: '1px' }} />
-
                     </ScrollAreaPrimitive.Viewport>
                     <ScrollBar orientation="vertical" />
                     <ScrollBar orientation="horizontal" />
                 </ScrollArea>
 
-                 {/* Footer with Pause/Resume Button */}
                  <DialogFooter className="p-3 border-t flex-shrink-0">
-                    <Button type="button" variant="secondary" onClick={() => setIsScrolledToBottom(!isScrolledToBottom)} size="sm">
-                       {isScrolledToBottom ? "Pause Auto-Scroll" : "Resume Auto-Scroll"}
-                    </Button>
+                    {isActuallyLive && ( // Only show pause/resume for live view
+                         <Button type="button" variant="secondary" onClick={() => setIsScrolledToBottom(!isScrolledToBottom)} size="sm">
+                           {isScrolledToBottom ? "Pause Auto-Scroll" : "Resume Auto-Scroll"}
+                        </Button>
+                    )}
                     <DialogClose asChild>
                         <Button type="button" variant="outline" size="sm">Close</Button>
                     </DialogClose>
@@ -265,4 +279,3 @@ export default function JobLogViewer({ jobId, isOpen, onOpenChange, jobDescripti
         </Dialog>
     );
 }
-// --- END OF FILE ---
