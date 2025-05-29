@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { useForm, useFieldArray, SubmitErrorHandler, FieldErrors } from "react-hook-form"; // Removed FormProvider from here as <Form> is used
+import { useForm, useFieldArray, SubmitErrorHandler, FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -19,7 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Form, // This IS the FormProvider from react-hook-form via your ui/form.tsx alias
+  Form, 
   FormControl,
   FormDescription,
   FormField,
@@ -79,7 +79,77 @@ const STEPS_FOR_INPUT_TYPE: Record<'fastq' | 'bam_cram' | 'vcf', SarekStep[]> = 
 const fastqPipelineSchemaBase = z.object({ ...commonRunInfoSchema, input_type: z.literal('fastq'), samples: z.array(fastqSampleSchema).min(1), genome: z.enum(VALID_GENOME_VALUES), step: z.enum(['mapping']), intervals_file: z.string().optional().refine(v=>!v||v.endsWith('.bed')||v.endsWith('.list')||v.endsWith('.interval_list'), "Must be .bed, .list, or .interval_list"), dbsnp: z.string().optional(), known_indels: z.string().optional(), pon: z.string().optional(), tools: z.array(z.string()).default([]), profile: z.enum(SAREK_PROFILES as [string,...string[]]).default("docker"), aligner: z.enum(SAREK_ALIGNERS as [string,...string[]]).optional().default("bwa-mem"), joint_germline: z.boolean().default(false), wes: z.boolean().default(false), trim_fastq: z.boolean().default(false), skip_qc: z.boolean().default(false), skip_annotation: z.boolean().default(false), skip_baserecalibrator: z.boolean().default(false),});
 const bamCramPipelineSchemaBase = z.object({ ...commonRunInfoSchema, input_type: z.literal('bam_cram'), samples: z.array(bamCramSampleSchema).min(1), genome: z.enum(VALID_GENOME_VALUES), step: z.enum(["markduplicates","prepare_recalibration","recalibrate","variant_calling"]), intervals_file: z.string().optional().refine(v=>!v||v.endsWith('.bed')||v.endsWith('.list')||v.endsWith('.interval_list'), "Must be .bed, .list, or .interval_list"), dbsnp: z.string().optional(), known_indels: z.string().optional(), pon: z.string().optional(), tools: z.array(z.string()).default([]), profile: z.enum(SAREK_PROFILES as [string,...string[]]).default("docker"), aligner: z.union([z.string().length(0),z.null(),z.undefined()]).optional(), joint_germline: z.boolean().default(false), wes: z.boolean().default(false), trim_fastq: z.boolean().default(false), skip_qc: z.boolean().default(false), skip_annotation: z.boolean().default(false), skip_baserecalibrator: z.boolean().default(false),});
 const vcfPipelineSchemaBase = z.object({ ...commonRunInfoSchema, input_type: z.literal('vcf'), samples: z.array(vcfSampleSchema).min(1), genome: z.enum(VALID_GENOME_VALUES), step: z.enum(['annotation']), intervals_file: z.string().optional().refine(v=>!v||v.endsWith('.bed')||v.endsWith('.list')||v.endsWith('.interval_list'), "Must be .bed, .list, or .interval_list"), dbsnp: z.string().optional(), known_indels: z.string().optional(), pon: z.string().optional(), tools: z.array(z.string()).default([]), profile: z.enum(SAREK_PROFILES as [string,...string[]]).default("docker"), aligner: z.union([z.string().length(0),z.null(),z.undefined()]).optional(), joint_germline: z.boolean().default(false), wes: z.boolean().default(false), trim_fastq: z.boolean().default(false), skip_qc: z.boolean().default(false), skip_annotation: z.boolean().default(false), skip_baserecalibrator: z.boolean().default(false),});
-const pipelineInputSchema = z.discriminatedUnion("input_type", [ fastqPipelineSchemaBase, bamCramPipelineSchemaBase, vcfPipelineSchemaBase, ]).superRefine((data,ctx)=>{ const i=data.input_type!=='vcf'&&data.step!=='variant_calling'&&data.step!=='annotation',o=!data.skip_baserecalibrator,s=!data.dbsnp&&!data.known_indels;if(i&&o&&s){ctx.addIssue({code:z.ZodIssueCode.custom,message:"dbSNP or Known Indels file required if BQSR not skipped.",path:["dbsnp"]});ctx.addIssue({code:z.ZodIssueCode.custom,message:"dbSNP or Known Indels file required.",path:["skip_baserecalibrator"]})} if(data.step!=='annotation'){const t=data.tools??[],n=t.filter(e=>SOMATIC_TOOLS.includes(e));if(n.length>0){const r=data.samples.some(e=>e.status===1);if(!r){ctx.addIssue({code:z.ZodIssueCode.custom,message:`Somatic tool(s) selected (${n.join(', ')}) require at least one sample with Status = 1 (Tumor).`,path:["tools"]});ctx.addIssue({code:z.ZodIssueCode.custom,message:`Tumor sample required for selected somatic tool(s).`,path:["samples"]})}}} if(data.input_type==='fastq'){if(data.aligner&&!SAREK_ALIGNERS.includes(data.aligner)){ctx.addIssue({code:z.ZodIssueCode.custom,message:"Invalid aligner selected.",path:["aligner"]})}} if(data.input_type==='bam_cram'){if(data.trim_fastq){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Trim FASTQ' not applicable for BAM/CRAM input",path:["trim_fastq"]})} if(data.aligner&&data.aligner.length>0){ctx.addIssue({code:z.ZodIssueCode.custom,message:"Aligner not applicable for BAM/CRAM input",path:["aligner"]})} if(data.skip_baserecalibrator&&(data.step==='variant_calling')){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Skip Base Recalibration' not applicable when starting at variant calling.",path:["skip_baserecalibrator"]})}} if(data.input_type==='vcf'){if(data.trim_fastq){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Trim FASTQ' not applicable for VCF input",path:["trim_fastq"]})} if(data.aligner&&data.aligner.length>0){ctx.addIssue({code:z.ZodIssueCode.custom,message:"Aligner not applicable for VCF input",path:["aligner"]})} if(data.skip_baserecalibrator){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Skip Base Recalibration' not applicable for VCF input",path:["skip_baserecalibrator"]})} if(data.tools.length>0){ctx.addIssue({code:z.ZodIssueCode.custom,message:"Variant calling tools not applicable for VCF input",path:["tools"]})} if(data.skip_annotation){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Skip Annotation' not applicable when starting at annotation",path:["skip_annotation"]})} if(data.joint_germline){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Joint Germline' not applicable when starting at annotation",path:["joint_germline"]})}}});
+
+const pipelineInputSchema = z.discriminatedUnion("input_type", [ 
+    fastqPipelineSchemaBase, 
+    bamCramPipelineSchemaBase, 
+    vcfPipelineSchemaBase, 
+]).superRefine((data,ctx)=>{ 
+    // BQSR Check
+    const isBqsrRelevant = data.input_type!=='vcf'&&data.step!=='variant_calling'&&data.step!=='annotation';
+    const isBqsrEnabled = !data.skip_baserecalibrator;
+    const missingBqsrReferenceFiles = !data.dbsnp&&!data.known_indels;
+    if(isBqsrRelevant && isBqsrEnabled && missingBqsrReferenceFiles){
+        ctx.addIssue({code:z.ZodIssueCode.custom,message:"dbSNP or Known Indels file required if BQSR not skipped.",path:["dbsnp"]});
+        ctx.addIssue({code:z.ZodIssueCode.custom,message:"dbSNP or Known Indels file required.",path:["skip_baserecalibrator"]});
+    } 
+    // Somatic Tool Tumor Sample Check
+    if(data.step!=='annotation'){
+        const toolsUsed = data.tools??[];
+        const somaticToolsSelected = toolsUsed.filter(tool=>SOMATIC_TOOLS.includes(tool));
+        if(somaticToolsSelected.length>0){
+            const hasTumorSample = data.samples.some(sample=>sample.status===1);
+            if(!hasTumorSample){
+                ctx.addIssue({code:z.ZodIssueCode.custom,message:`Somatic tool(s) selected (${somaticToolsSelected.join(', ')}) require at least one sample with Status = 1 (Tumor).`,path:["tools"]});
+                // Optionally add error to samples array itself or first sample's status field
+                // ctx.addIssue({code:z.ZodIssueCode.custom,message:`Tumor sample required for selected somatic tool(s).`,path:["samples"]});
+            }
+        }
+    }
+    // Input Type Specific Validations
+    if(data.input_type==='fastq'){
+        if(data.aligner&&!SAREK_ALIGNERS.includes(data.aligner)){ctx.addIssue({code:z.ZodIssueCode.custom,message:"Invalid aligner selected.",path:["aligner"]})}
+    } 
+    if(data.input_type==='bam_cram'){
+        if(data.trim_fastq){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Trim FASTQ' not applicable for BAM/CRAM input",path:["trim_fastq"]})} 
+        if(data.aligner&&data.aligner.length>0){ctx.addIssue({code:z.ZodIssueCode.custom,message:"Aligner not applicable for BAM/CRAM input",path:["aligner"]})} 
+        if(data.skip_baserecalibrator&&(data.step==='variant_calling')){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Skip Base Recalibration' not applicable when starting at variant calling.",path:["skip_baserecalibrator"]})}
+    } 
+    if(data.input_type==='vcf'){
+        if(data.trim_fastq){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Trim FASTQ' not applicable for VCF input",path:["trim_fastq"]})} 
+        if(data.aligner&&data.aligner.length>0){ctx.addIssue({code:z.ZodIssueCode.custom,message:"Aligner not applicable for VCF input",path:["aligner"]})} 
+        if(data.skip_baserecalibrator){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Skip Base Recalibration' not applicable for VCF input",path:["skip_baserecalibrator"]})} 
+        if(data.tools && data.tools.length>0){ctx.addIssue({code:z.ZodIssueCode.custom,message:"Variant calling tools not applicable for VCF input",path:["tools"]})} 
+        if(data.skip_annotation){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Skip Annotation' not applicable when starting at annotation",path:["skip_annotation"]})} 
+        if(data.joint_germline){ctx.addIssue({code:z.ZodIssueCode.custom,message:"'Joint Germline' not applicable when starting at annotation",path:["joint_germline"]})}
+    }
+
+    // --- ADDED: Unique Sample ID Check ---
+    if (data.samples && data.samples.length > 1) {
+        const sampleIds = data.samples.map(s => s.sample?.trim().toLowerCase());
+        const uniqueSampleIds = new Set(sampleIds);
+        if (uniqueSampleIds.size !== sampleIds.length) {
+            const seenIdsForErrorPath = new Set<string>(); // To avoid adding multiple errors to the same field path
+            data.samples.forEach((sample, index) => {
+                const normalizedId = sample.sample?.trim().toLowerCase();
+                // Check if this specific ID is a duplicate by comparing its first and last index in the array
+                if (normalizedId && sampleIds.indexOf(normalizedId) !== sampleIds.lastIndexOf(normalizedId)) {
+                    const errorPathKey = `samples.${index}.sample`;
+                    if (!seenIdsForErrorPath.has(errorPathKey)) {
+                        ctx.addIssue({
+                            code: z.ZodIssueCode.custom,
+                            message: "Sample ID must be unique across all samples.",
+                            path: ["samples", index, "sample"], 
+                        });
+                        seenIdsForErrorPath.add(errorPathKey);
+                    }
+                }
+            });
+        }
+    }
+    // --- END ADDED ---
+});
+
 type PipelineFormValues = z.infer<typeof pipelineInputSchema>;
 type InputType = PipelineFormValues['input_type'];
 
@@ -162,12 +232,96 @@ export default function InputPage() {
   const isSomaticToolSelected = watchedTools?.some(tool => SOMATIC_TOOLS.includes(tool)) ?? false;
   const hasTumorSample = watchedSamples?.some(sample => sample.status === 1) ?? false;
   const isSomaticTumorCheckFailedForButton = isSomaticToolSelected && !hasTumorSample && watchedStep !== 'annotation';
-  const isStagingDisabled = stageMutation.isPending || saveProfileMutation.isPending || isBqsrCheckFailedForButton || isSomaticTumorCheckFailedForButton;
+  
+  // Check for duplicate sample IDs
+  const hasDuplicateSampleIds = useMemo(() => {
+    if (watchedSamples && watchedSamples.length > 1) {
+        const sampleIds = watchedSamples.map(s => s.sample?.trim().toLowerCase());
+        return new Set(sampleIds).size !== sampleIds.length;
+    }
+    return false;
+  }, [watchedSamples]);
+
+  const isStagingDisabled = stageMutation.isPending || saveProfileMutation.isPending || isBqsrCheckFailedForButton || isSomaticTumorCheckFailedForButton || hasDuplicateSampleIds;
   const disabledButtonTooltipMessage = getDisabledButtonTooltip();
 
-  function getDisabledButtonTooltip(): string | undefined { if (isBqsrCheckFailedForButton) { return "BQSR requires dbSNP or Known Indels file unless skipped."; } if (isSomaticTumorCheckFailedForButton) { return "Selected somatic tool(s) require at least one Tumor sample (Status=1)."; } if (stageMutation.isPending || saveProfileMutation.isPending) { return "Operation in progress..."; } return undefined; };
-  function onSubmit(values: PipelineFormValues) { const apiPayload: PipelineInput = { run_name: values.run_name, run_description: values.run_description, input_type: values.input_type, samples: values.samples.map((s): ApiSampleInfo => ({ patient: s.patient, sample: s.sample, sex: s.sex!, status: s.status!, lane: s.lane || null, fastq_1: s.fastq_1 || null, fastq_2: s.fastq_2 || null, bam_cram: s.bam_cram || null, index: s.index || null, vcf: s.vcf || null, })), genome: values.genome, step: values.step, intervals_file: values.intervals_file || undefined, dbsnp: values.dbsnp || undefined, known_indels: values.known_indels || undefined, pon: values.pon || undefined, tools: showTools && values.tools && values.tools.length > 0 ? values.tools : undefined, profile: values.profile, aligner: showAligner ? (values.aligner || undefined) : undefined, joint_germline: showJointGermline ? values.joint_germline : undefined, wes: values.wes, trim_fastq: showTrimFastq ? values.trim_fastq : undefined, skip_qc: values.skip_qc, skip_annotation: showSkipAnnotation ? values.skip_annotation : undefined, skip_baserecalibrator: showSkipBaserecalibrator ? values.skip_baserecalibrator : undefined, }; stageMutation.mutate(apiPayload); }
-  const scrollToFirstError = (errors: FieldErrors<PipelineFormValues>) => { const errorKeys = Object.keys(errors); if (errorKeys.length > 0) { let firstErrorKey = errorKeys[0] as keyof PipelineFormValues | 'samples'; let fieldNameToQuery = firstErrorKey as string; if (firstErrorKey === 'samples') { const samplesCardHeader = formRef.current?.querySelector('#samples-card-header'); if (samplesCardHeader && errors.samples?.root) { samplesCardHeader.scrollIntoView({ behavior: "smooth", block: "center" }); return; } if (Array.isArray(errors.samples)) { const firstSampleErrorIndex = errors.samples.findIndex(s => s && Object.keys(s).length > 0); if (firstSampleErrorIndex !== -1) { const sampleErrors = errors.samples[firstSampleErrorIndex]; if (sampleErrors) { const firstSampleFieldError = Object.keys(sampleErrors)[0] as keyof ApiSampleInfo; fieldNameToQuery = `samples.${firstSampleErrorIndex}.${firstSampleFieldError}`; } } } else { fieldNameToQuery = 'samples.0.patient';} } const attemptScroll = () => { let element = formRef.current?.querySelector(`[name="${fieldNameToQuery}"]`); if (!element) { const errorPathParts = fieldNameToQuery.split('.'); let selector = `#${errorPathParts.join('-')}-form-item`; element = formRef.current?.querySelector(selector); if (!element) { element = formRef.current?.querySelector(`label[for="${fieldNameToQuery}"]`);} if (!element && fieldNameToQuery === 'step') { element = formRef.current?.querySelector('button[role="combobox"][aria-controls*="radix"][id*="step"]'); } if (!element && fieldNameToQuery.startsWith('samples.')) { const sampleIndexMatch = fieldNameToQuery.match(/samples\.(\d+)\./); if (sampleIndexMatch && sampleIndexMatch[1]) { const errorSampleIndex = parseInt(sampleIndexMatch[1], 10); const sampleCard = formRef.current?.querySelectorAll('div[class*="relative border border-border pt-8"]')[errorSampleIndex]; if(sampleCard) element = sampleCard as HTMLElement;} } } if (element) { element.scrollIntoView({ behavior: "smooth", block: "center" }); } else { formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } }; attemptScroll(); } };
+  function getDisabledButtonTooltip(): string | undefined { 
+    if (hasDuplicateSampleIds) { return "Sample IDs must be unique when multiple samples are provided."; }
+    if (isBqsrCheckFailedForButton) { return "BQSR requires dbSNP or Known Indels file unless skipped."; } 
+    if (isSomaticTumorCheckFailedForButton) { return "Selected somatic tool(s) require at least one Tumor sample (Status=1)."; } 
+    if (stageMutation.isPending || saveProfileMutation.isPending) { return "Operation in progress..."; } 
+    return undefined; 
+  };
+
+  function onSubmit(values: PipelineFormValues) { 
+      const apiPayload: PipelineInput = { 
+          run_name: values.run_name, run_description: values.run_description, 
+          input_type: values.input_type, 
+          samples: values.samples.map((s): ApiSampleInfo => ({ 
+              patient: s.patient, sample: s.sample, sex: s.sex!, status: s.status!, 
+              lane: s.lane || null, fastq_1: s.fastq_1 || null, fastq_2: s.fastq_2 || null, 
+              bam_cram: s.bam_cram || null, index: s.index || null, vcf: s.vcf || null, 
+          })), 
+          genome: values.genome, step: values.step, 
+          intervals_file: values.intervals_file || undefined, 
+          dbsnp: values.dbsnp || undefined, known_indels: values.known_indels || undefined, 
+          pon: values.pon || undefined, 
+          tools: showTools && values.tools && values.tools.length > 0 ? values.tools : undefined, 
+          profile: values.profile, 
+          aligner: showAligner ? (values.aligner || undefined) : undefined, 
+          joint_germline: showJointGermline ? values.joint_germline : undefined, 
+          wes: values.wes, 
+          trim_fastq: showTrimFastq ? values.trim_fastq : undefined, 
+          skip_qc: values.skip_qc, 
+          skip_annotation: showSkipAnnotation ? values.skip_annotation : undefined, 
+          skip_baserecalibrator: showSkipBaserecalibrator ? values.skip_baserecalibrator : undefined, 
+      }; 
+      stageMutation.mutate(apiPayload); 
+  }
+  const scrollToFirstError = (errors: FieldErrors<PipelineFormValues>) => { 
+      const errorKeys = Object.keys(errors); 
+      if (errorKeys.length > 0) { 
+          let firstErrorKey = errorKeys[0] as keyof PipelineFormValues | 'samples'; 
+          let fieldNameToQuery = firstErrorKey as string; 
+          if (firstErrorKey === 'samples') { 
+              const samplesCardHeader = formRef.current?.querySelector('#samples-card-header'); 
+              if (samplesCardHeader && errors.samples?.root) { 
+                  samplesCardHeader.scrollIntoView({ behavior: "smooth", block: "center" }); return; 
+              } 
+              if (Array.isArray(errors.samples)) { 
+                  const firstSampleErrorIndex = errors.samples.findIndex(s => s && Object.keys(s).length > 0); 
+                  if (firstSampleErrorIndex !== -1) { 
+                      const sampleErrors = errors.samples[firstSampleErrorIndex]; 
+                      if (sampleErrors) { 
+                          const firstSampleFieldError = Object.keys(sampleErrors)[0] as keyof ApiSampleInfo; 
+                          fieldNameToQuery = `samples.${firstSampleErrorIndex}.${firstSampleFieldError}`; 
+                      } 
+                  } 
+              } else { fieldNameToQuery = 'samples.0.patient';} 
+          } 
+          const attemptScroll = () => { 
+              let element = formRef.current?.querySelector(`[name="${fieldNameToQuery}"]`); 
+              if (!element) { 
+                  const errorPathParts = fieldNameToQuery.split('.'); 
+                  let selector = `#${errorPathParts.join('-')}-form-item`; 
+                  element = formRef.current?.querySelector(selector); 
+                  if (!element) { element = formRef.current?.querySelector(`label[for="${fieldNameToQuery}"]`);} 
+                  if (!element && fieldNameToQuery === 'step') { element = formRef.current?.querySelector('button[role="combobox"][aria-controls*="radix"][id*="step"]'); } 
+                  if (!element && fieldNameToQuery.startsWith('samples.')) { 
+                      const sampleIndexMatch = fieldNameToQuery.match(/samples\.(\d+)\./); 
+                      if (sampleIndexMatch && sampleIndexMatch[1]) { 
+                          const errorSampleIndex = parseInt(sampleIndexMatch[1], 10); 
+                          const sampleCard = formRef.current?.querySelectorAll('div[class*="relative border border-border pt-8"]')[errorSampleIndex]; 
+                          if(sampleCard) element = sampleCard as HTMLElement;
+                      } 
+                  } 
+              } 
+              if (element) { element.scrollIntoView({ behavior: "smooth", block: "center" }); } 
+              else { formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } 
+          }; 
+          attemptScroll(); 
+      } 
+  };
   const onFormError: SubmitErrorHandler<PipelineFormValues> = (errorsArgument) => { console.warn("Form validation failed.", errorsArgument); toast.error("Please fix the validation errors.", { duration: 5000 }); scrollToFirstError(errorsArgument); };
   const toggleCheckboxValue = (fieldName: keyof PipelineFormValues | 'tools', tool?: string) => { if (fieldName === 'tools' && tool) { const currentVal = form.getValues("tools") ?? []; const newVal = currentVal.includes(tool) ? currentVal.filter((t) => t !== tool) : [...currentVal, tool]; form.setValue("tools", newVal, { shouldValidate: true, shouldDirty: true }); } else if (fieldName !== 'tools') { const fieldKey = fieldName as keyof PipelineFormValues; if (fieldKey in form.getValues()) { const currentVal = form.getValues(fieldKey); form.setValue(fieldKey, !currentVal, { shouldValidate: true, shouldDirty: true }); } } };
   const handleProfileLoaded = (name: string | null, data: ProfileData | null) => { setCurrentProfileName(name); form.setValue('run_name', '', { shouldValidate: false, shouldDirty: true }); form.setValue('run_description', '', { shouldValidate: false, shouldDirty: true }); if (data) { let loadedInputType: InputType = 'fastq'; if (data.step === 'mapping') loadedInputType = 'fastq'; else if (STEPS_FOR_INPUT_TYPE.bam_cram.includes(data.step as SarekStep)) loadedInputType = 'bam_cram'; else if (data.step === 'annotation') loadedInputType = 'vcf'; const currentFormInputType = form.getValues('input_type'); if (loadedInputType !== currentFormInputType) { toast.info(`Profile '${name}' uses ${loadedInputType.toUpperCase()} input. Switching input type and applying settings.`); (formRef.current as any)._profileToApplyAfterReset = data; form.setValue('input_type', loadedInputType, { shouldValidate: true }); } else { Object.entries(data).forEach(([key, value]) => { const fieldKey = key as keyof ProfileData; if (fieldKey in form.getValues()) { form.setValue(fieldKey as any, value !== null ? value : form.formState.defaultValues?.[fieldKey as keyof PipelineFormValues], { shouldValidate: true, shouldDirty: true }); } }); } } else { form.reset(); setSelectedInputType('fastq'); } setAdvancedAccordionValue(undefined); };
@@ -200,7 +354,7 @@ export default function InputPage() {
         </Card>
 
         <Card>
-          <CardHeader id="samples-card-header"> <CardTitle className="text-xl">Sample Information</CardTitle> <CardDescription> {selectedInputType === 'fastq' && "Provide FASTQ file pairs and lane information."} {selectedInputType === 'bam_cram' && "Provide coordinate-sorted BAM or CRAM files (and index for CRAM)."} {selectedInputType === 'vcf' && "Provide VCF files (and index for compressed VCFs)."} {" Status 0 = Normal, 1 = Tumor. IDs cannot contain spaces."} </CardDescription> </CardHeader>
+          <CardHeader id="samples-card-header"> <CardTitle className="text-xl">Sample Information</CardTitle> <CardDescription> {selectedInputType === 'fastq' && "Provide FASTQ file pairs and lane information."} {selectedInputType === 'bam_cram' && "Provide coordinate-sorted BAM or CRAM files (and index for CRAM)."} {selectedInputType === 'vcf' && "Provide VCF files (and index for compressed VCFs)."} {" Status 0 = Normal, 1 = Tumor. IDs cannot contain spaces. Sample IDs must be unique if multiple samples are provided."} </CardDescription> </CardHeader>
           <CardContent className="space-y-4">
             {fields.map((field, index) => { if (selectedInputType === 'fastq') { return <SampleInputGroup key={field.id} index={index} remove={remove} control={form.control as Control<any>} />; } else if (selectedInputType === 'bam_cram') { return <BamCramSampleInputGroup key={field.id} index={index} remove={remove} control={form.control as Control<any>} />; } else if (selectedInputType === 'vcf') { return <VcfSampleInputGroup key={field.id} index={index} remove={remove} control={form.control as Control<any>} />; } return null; })}
             <Button type="button" variant="outline" size="sm" onClick={addSample} className="mt-2 cursor-pointer" > <PlusCircle className="mr-2 h-4 w-4" /> Add Sample </Button>
