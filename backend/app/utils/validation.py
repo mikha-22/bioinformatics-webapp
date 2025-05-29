@@ -4,18 +4,19 @@ import csv
 import tempfile
 import os
 import re
-import gzip # <<< ADDED
-import shutil # <<< ADDED
+import gzip
+import shutil
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 from fastapi import HTTPException
 
 from ..models.pipeline import PipelineInput, SampleInfo
-from ..core.config import DATA_DIR # RESULTS_DIR, SAREK_DEFAULT_TOOLS etc. are not directly used in this function but good to keep if other utils use them
+from ..core.config import DATA_DIR
 from .files import get_safe_path
 
 logger = logging.getLogger(__name__)
 
+# ... (VALID_SAREK_... constants remain the same) ...
 VALID_SAREK_TOOLS = ["strelka", "mutect2", "freebayes", "mpileup", "vardict", "manta", "cnvkit"]
 VALID_SAREK_STEPS = ["mapping", "markduplicates", "prepare_recalibration", "recalibrate", "variant_calling", "annotation"]
 VALID_SAREK_PROFILES = ["docker", "singularity", "conda", "podman", "test", "test_annotation", "test_tumor_only", "test_tumor_normal", "test_joint_germline"]
@@ -41,9 +42,9 @@ STEP_TO_INPUT_TYPE = {
     "annotation": "vcf",
 }
 
+
 def validate_pipeline_input(input_data: PipelineInput) -> tuple[Dict[str, Optional[Path]], List[str]]:
     validation_errors: List[str] = []
-    # Collect informational messages about auto-gzipping separately
     info_messages: List[str] = []
     paths_map: Dict[str, Optional[Path]] = {
         "input_csv": None, "intervals": None, "dbsnp": None,
@@ -82,7 +83,7 @@ def validate_pipeline_input(input_data: PipelineInput) -> tuple[Dict[str, Option
         if not input_data.samples:
             validation_errors.append("At least one sample must be provided.")
         elif not csv_headers:
-             pass # Error already added
+             pass
         else:
             sample_rows_for_csv = []
             for i, sample in enumerate(input_data.samples):
@@ -98,75 +99,96 @@ def validate_pipeline_input(input_data: PipelineInput) -> tuple[Dict[str, Option
                      validation_errors.append(f"{sample_id_str}: Sex invalid.")
                 if sample.status == 1: has_tumor_sample_in_sheet = True
 
-                row_data = [sample.patient, sample.sample, sample.sex, sample.status]
-                validated_main_file_host: Optional[Path] = None
-                validated_index_file_host: Optional[Path] = None # Used for fastq_2 or actual index
+                row_data_base = [sample.patient, sample.sample, sample.sex, sample.status]
+                
+                # Paths to be written to the CSV for this sample
+                csv_fastq1_path_str: Optional[str] = None
+                csv_fastq2_path_str: Optional[str] = None
+                csv_bam_cram_path_str: Optional[str] = None
+                csv_vcf_path_str: Optional[str] = None
+                csv_index_path_str: Optional[str] = None
+
 
                 if input_type == "fastq":
                     if not sample.lane or not re.match(r"^L\d{3}$", sample.lane):
                         validation_errors.append(f"{sample_id_str}: Lane '{sample.lane}' invalid (e.g., L001).")
+                    
+                    temp_fastq1_path: Optional[Path] = None
+                    temp_fastq2_path: Optional[Path] = None
+
                     if not sample.fastq_1 or not sample.fastq_2:
                          validation_errors.append(f"{sample_id_str}: Both fastq_1 and fastq_2 required.")
                     else:
-                        for fq_field, is_r1 in [('fastq_1', True), ('fastq_2', False)]:
-                            original_path_str = getattr(sample, fq_field)
-                            if not original_path_str: continue # Should be caught by above check
+                        for fq_field_name, is_r1_flag in [('fastq_1', True), ('fastq_2', False)]:
+                            original_relative_path_str = getattr(sample, fq_field_name)
+                            if not original_relative_path_str: continue 
 
+                            current_field_final_path: Optional[Path] = None
                             try:
-                                abs_path = get_safe_path(DATA_DIR, original_path_str)
-                                if not abs_path.is_file():
-                                    validation_errors.append(f"{sample_id_str}: {fq_field.upper()} file not found: {original_path_str}")
-                                    continue
+                                abs_path_uncompressed = get_safe_path(DATA_DIR, original_relative_path_str)
+                                if not abs_path_uncompressed.is_file():
+                                    validation_errors.append(f"{sample_id_str}: {fq_field_name.upper()} file not found: {original_relative_path_str}")
+                                    continue # Skip to next field or sample if file not found
                                 
-                                final_path_for_csv = abs_path
-                                if abs_path.name.endswith(('.fastq', '.fq')):
-                                    gz_path = abs_path.with_name(abs_path.name + '.gz')
+                                if abs_path_uncompressed.name.endswith(('.fastq.gz', '.fq.gz')):
+                                    current_field_final_path = abs_path_uncompressed
+                                elif abs_path_uncompressed.name.endswith(('.fastq', '.fq')):
+                                    gz_path = abs_path_uncompressed.with_name(abs_path_uncompressed.name + '.gz')
                                     if not gz_path.exists():
-                                        info_msg = f"{sample_id_str}: Auto-gzipping {original_path_str} to {gz_path.name}."
+                                        info_msg = f"{sample_id_str}: Auto-gzipping {original_relative_path_str} to {gz_path.name}."
                                         logger.info(f"[Validation] {info_msg}")
-                                        info_messages.append(info_msg) # Collect info message
+                                        info_messages.append(info_msg)
                                         try:
-                                            with open(abs_path, 'rb') as f_in, gzip.open(gz_path, 'wb') as f_out:
+                                            with open(abs_path_uncompressed, 'rb') as f_in, gzip.open(gz_path, 'wb') as f_out:
                                                 shutil.copyfileobj(f_in, f_out)
-                                            logger.info(f"[Validation] Successfully gzipped {abs_path} to {gz_path}")
-                                            final_path_for_csv = gz_path
+                                            logger.info(f"[Validation] Successfully gzipped {abs_path_uncompressed} to {gz_path}")
+                                            current_field_final_path = gz_path
                                         except Exception as e_gzip:
-                                            logger.error(f"[Validation] Failed to gzip {abs_path}: {e_gzip}")
-                                            validation_errors.append(f"{sample_id_str}: Failed to auto-gzip {fq_field.upper()} file {original_path_str}.")
-                                            final_path_for_csv = None # Mark as error
-                                    else: # Gzipped version already exists
-                                        logger.info(f"[Validation] Using existing gzipped file for {fq_field.upper()}: {gz_path}")
-                                        final_path_for_csv = gz_path
-                                elif not abs_path.name.endswith(('.fastq.gz', '.fq.gz')):
-                                    validation_errors.append(f"{sample_id_str}: {fq_field.upper()} file '{original_path_str}' has unsupported extension.")
-                                    final_path_for_csv = None
-
-                                if final_path_for_csv:
-                                    if is_r1: validated_main_file_host = final_path_for_csv
-                                    else: validated_index_file_host = final_path_for_csv
-                                else: # Error occurred
-                                    if is_r1: validated_main_file_host = None
-                                    else: validated_index_file_host = None
+                                            logger.error(f"[Validation] Failed to gzip {abs_path_uncompressed}: {e_gzip}")
+                                            validation_errors.append(f"{sample_id_str}: Failed to auto-gzip {fq_field_name.upper()} file {original_relative_path_str}.")
+                                            # current_field_final_path remains None
+                                    else:
+                                        logger.info(f"[Validation] Using existing gzipped file for {fq_field_name.upper()}: {gz_path}")
+                                        current_field_final_path = gz_path
+                                else:
+                                    validation_errors.append(f"{sample_id_str}: {fq_field_name.upper()} file '{original_relative_path_str}' has unsupported extension. Expected .fastq.gz or .fq.gz (or .fastq/.fq for auto-compression).")
+                                    # current_field_final_path remains None
                                     
-                            except HTTPException as e: validation_errors.append(f"{sample_id_str} {fq_field.upper()}: {e.detail}")
-                            except Exception as e: logger.error(f"Unexpected error for {fq_field.upper()} of {sample_id_str}: {e}"); validation_errors.append(f"{sample_id_str}: Error validating {fq_field.upper()}.")
+                            except HTTPException as e: 
+                                validation_errors.append(f"{sample_id_str} {fq_field_name.upper()}: {e.detail}")
+                            except Exception as e: 
+                                logger.error(f"Unexpected error for {fq_field_name.upper()} of {sample_id_str}: {e}"); validation_errors.append(f"{sample_id_str}: Error validating {fq_field_name.upper()}.")
+                            
+                            if is_r1_flag:
+                                temp_fastq1_path = current_field_final_path
+                            else:
+                                temp_fastq2_path = current_field_final_path
                     
-                    row_data.extend([
-                        sample.lane,
-                        str(validated_main_file_host) if validated_main_file_host else sample.fastq_1,
-                        str(validated_index_file_host) if validated_index_file_host else sample.fastq_2
-                    ])
+                    # Only set CSV paths if both are valid (i.e., successfully processed/found as .gz)
+                    if temp_fastq1_path and temp_fastq2_path:
+                        csv_fastq1_path_str = str(temp_fastq1_path)
+                        csv_fastq2_path_str = str(temp_fastq2_path)
+                    else:
+                        # If any FASTQ processing failed, we might not want to proceed with this sample for CSV
+                        # Or, ensure validation_errors list is checked before CSV generation
+                        # For now, if they are None, the CSV will get None or original paths if we don't handle it
+                        # Let's ensure if they are None, the CSV gets the original path to make the error obvious in Nextflow if it gets that far
+                        csv_fastq1_path_str = sample.fastq_1 # Fallback to original if processing failed
+                        csv_fastq2_path_str = sample.fastq_2 # Fallback to original
+
+                    row_data = row_data_base + [sample.lane, csv_fastq1_path_str, csv_fastq2_path_str]
+
                 elif input_type == "bam_cram":
-                    # ... (BAM/CRAM logic remains the same) ...
+                    # ... (BAM/CRAM logic - ensure validated_main_file_host and validated_index_file_host are absolute paths) ...
                     if not sample.bam_cram:
                          validation_errors.append(f"{sample_id_str}: bam_cram file path is required.")
                     else:
                         try:
                             bam_path = get_safe_path(DATA_DIR, sample.bam_cram)
                             if not bam_path.is_file(): validation_errors.append(f"{sample_id_str}: BAM/CRAM file not found: {sample.bam_cram}")
-                            elif not (bam_path.suffix == '.bam' or bam_path.suffix == '.cram'):
+                            elif not (bam_path.name.lower().endswith('.bam') or bam_path.name.lower().endswith('.cram')): # Check name for suffix
                                 validation_errors.append(f"{sample_id_str}: File must be .bam or .cram: {sample.bam_cram}")
-                            else: validated_main_file_host = bam_path
+                            else: csv_bam_cram_path_str = str(bam_path)
                         except HTTPException as e: validation_errors.append(f"{sample_id_str} BAM/CRAM: {e.detail}")
                         except Exception as e: logger.error(f"Unexpected error validating BAM/CRAM for {sample_id_str}: {e}"); validation_errors.append(f"{sample_id_str}: Error validating BAM/CRAM file.")
 
@@ -174,47 +196,46 @@ def validate_pipeline_input(input_data: PipelineInput) -> tuple[Dict[str, Option
                             try:
                                 idx_path = get_safe_path(DATA_DIR, sample.index)
                                 if not idx_path.is_file(): validation_errors.append(f"{sample_id_str}: Index file not found: {sample.index}")
-                                else: validated_index_file_host = idx_path
+                                else: csv_index_path_str = str(idx_path)
                             except HTTPException as e: validation_errors.append(f"{sample_id_str} Index: {e.detail}")
                             except Exception as e: logger.error(f"Unexpected error validating Index for {sample_id_str}: {e}"); validation_errors.append(f"{sample_id_str}: Error validating Index file.")
-                        elif validated_main_file_host and validated_main_file_host.suffix == '.cram':
+                        elif csv_bam_cram_path_str and csv_bam_cram_path_str.lower().endswith('.cram'):
                             validation_errors.append(f"{sample_id_str}: CRAM file requires a .crai index.")
-                    row_data.extend([
-                         str(validated_main_file_host) if validated_main_file_host else sample.bam_cram,
-                         str(validated_index_file_host) if validated_index_file_host else (sample.index or '')
-                    ])
+                    row_data = row_data_base + [csv_bam_cram_path_str or sample.bam_cram, csv_index_path_str or (sample.index or '')]
+
                 elif input_type == "vcf":
-                    # ... (VCF logic remains the same) ...
+                    # ... (VCF logic - ensure validated_main_file_host and validated_index_file_host are absolute paths) ...
                     if not sample.vcf:
                          validation_errors.append(f"{sample_id_str}: VCF file path is required.")
                     else:
                         try:
-                            vcf_path = get_safe_path(DATA_DIR, sample.vcf)
-                            if not vcf_path.is_file(): validation_errors.append(f"{sample_id_str}: VCF file not found: {sample.vcf}")
-                            elif not (vcf_path.suffix == '.vcf' or vcf_path.name.endswith('.vcf.gz')):
+                            vcf_path_obj = get_safe_path(DATA_DIR, sample.vcf)
+                            if not vcf_path_obj.is_file(): validation_errors.append(f"{sample_id_str}: VCF file not found: {sample.vcf}")
+                            elif not (vcf_path_obj.name.lower().endswith('.vcf') or vcf_path_obj.name.lower().endswith('.vcf.gz')):
                                 validation_errors.append(f"{sample_id_str}: File must be .vcf or .vcf.gz: {sample.vcf}")
-                            else: validated_main_file_host = vcf_path
+                            else: csv_vcf_path_str = str(vcf_path_obj)
                         except HTTPException as e: validation_errors.append(f"{sample_id_str} VCF: {e.detail}")
                         except Exception as e: logger.error(f"Unexpected error validating VCF for {sample_id_str}: {e}"); validation_errors.append(f"{sample_id_str}: Error validating VCF file.")
 
                         if sample.index:
                             try:
-                                idx_path = get_safe_path(DATA_DIR, sample.index)
-                                if not idx_path.is_file(): validation_errors.append(f"{sample_id_str}: Index file not found: {sample.index}")
-                                elif not (idx_path.suffix == '.tbi' or idx_path.suffix == '.csi'):
+                                idx_path_obj = get_safe_path(DATA_DIR, sample.index)
+                                if not idx_path_obj.is_file(): validation_errors.append(f"{sample_id_str}: Index file not found: {sample.index}")
+                                elif not (idx_path_obj.name.lower().endswith('.tbi') or idx_path_obj.name.lower().endswith('.csi')):
                                      validation_errors.append(f"{sample_id_str}: VCF index must be .tbi or .csi: {sample.index}")
-                                else: validated_index_file_host = idx_path
+                                else: csv_index_path_str = str(idx_path_obj)
                             except HTTPException as e: validation_errors.append(f"{sample_id_str} Index: {e.detail}")
                             except Exception as e: logger.error(f"Unexpected error validating Index for {sample_id_str}: {e}"); validation_errors.append(f"{sample_id_str}: Error validating Index file.")
-                        elif validated_main_file_host and validated_main_file_host.name.endswith('.vcf.gz'):
+                        elif csv_vcf_path_str and csv_vcf_path_str.lower().endswith('.vcf.gz'):
                              validation_errors.append(f"{sample_id_str}: Compressed VCF (.vcf.gz) requires an index.")
-                    row_data.extend([
-                         str(validated_main_file_host) if validated_main_file_host else sample.vcf,
-                         str(validated_index_file_host) if validated_index_file_host else (sample.index or '')
-                    ])
+                    row_data = row_data_base + [csv_vcf_path_str or sample.vcf, csv_index_path_str or (sample.index or '')]
+                
                 sample_rows_for_csv.append(row_data)
 
+            # --- Create Samplesheet CSV ---
             if not validation_errors and csv_headers:
+                # Log the exact rows being written
+                logger.info(f"DEBUG: Final sample rows for CSV: {sample_rows_for_csv}")
                 try:
                     with tempfile.NamedTemporaryFile(mode='w', newline='', suffix='.csv', delete=False) as temp_csv:
                         csv_writer = csv.writer(temp_csv)
@@ -230,6 +251,7 @@ def validate_pipeline_input(input_data: PipelineInput) -> tuple[Dict[str, Option
                      if temp_csv_file_path and os.path.exists(temp_csv_file_path):
                          os.remove(temp_csv_file_path)
 
+        # --- Validate Optional Files (remains the same) ---
         optional_files_map = {
             "intervals": (input_data.intervals_file, "Intervals"),
             "dbsnp": (input_data.dbsnp, "dbSNP"),
@@ -250,6 +272,7 @@ def validate_pipeline_input(input_data: PipelineInput) -> tuple[Dict[str, Option
                 except HTTPException as e: validation_errors.append(f"{display_name}: {e.detail}")
                 except Exception as e: logger.error(f"Error validating {key} '{filename}': {e}"); validation_errors.append(f"Error validating {display_name} file.")
 
+        # --- Validate Sarek Parameters (remains the same) ---
         if not input_data.genome:
             validation_errors.append("Genome build must be specified.")
         elif input_data.genome not in VALID_SAREK_GENOMES:
@@ -287,15 +310,9 @@ def validate_pipeline_input(input_data: PipelineInput) -> tuple[Dict[str, Option
              except OSError as e: logger.warning(f"Could not clean up temp CSV {paths_map['input_csv']}: {e}")
              paths_map["input_csv"] = None
         error_message = "Validation errors:\n" + "\n".join(f"- {error}" for error in validation_errors)
-        if info_messages: # Prepend info messages if any
+        if info_messages:
             error_message = "Info:\n" + "\n".join(f"- {info}" for info in info_messages) + "\n\n" + error_message
         logger.warning(f"Validation failed: {error_message}")
         raise HTTPException(status_code=400, detail=error_message)
-
-    # If successful, but there were info messages (like auto-gzipping), we might want to return them
-    # For now, the primary return is paths_map and an empty error list on success.
-    # The info_messages are logged by the backend. If they need to go to frontend,
-    # the return signature of this function or the API endpoint would need adjustment.
-    # For simplicity, we'll assume backend logging is sufficient for these auto-corrections.
 
     return paths_map, validation_errors
